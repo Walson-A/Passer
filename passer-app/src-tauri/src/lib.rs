@@ -441,11 +441,34 @@ fn get_ip() -> String {
         .unwrap_or_else(|_| "Unknown".to_string())
 }
 
+#[tauri::command]
+async fn open_downloads(_app_handle: AppHandle) -> Result<(), String> {
+    let path = get_downloads_dir();
+    // Use the opener plugin logic or just shell open if simple
+    // Since we have the opener plugin, let's use it via the app handle or just use the plugin in JS?
+    // Actually, opener plugin is best used from JS. 
+    // But since we need the specific path which is calculated in Rust, let's open it here.
+    // We can use `open::that` shorthand if we had the crate, but we check if tauri_plugin_opener can be called from Rust or just use `std::process::Command` for explorer.
+    
+    #[cfg(target_os = "windows")]
+    {
+        use std::process::Command;
+        let _ = Command::new("explorer").arg(&path).spawn().map_err(|e| e.to_string())?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        use std::process::Command;
+        let _ = Command::new("open").arg(&path).spawn().map_err(|e| e.to_string())?;
+    }
+    
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![get_ip])
+        .invoke_handler(tauri::generate_handler![get_ip, open_downloads])
         .setup(|app| {
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
