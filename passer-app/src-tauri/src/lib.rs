@@ -17,6 +17,8 @@ use tauri::{
     tray::{TrayIconBuilder, TrayIconEvent, MouseButton},
     WindowEvent,
 };
+use tauri_plugin_autostart::MacosLauncher;
+use tauri_plugin_autostart::ManagerExt;
 
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 struct WebDavCreds {
@@ -642,7 +644,7 @@ async fn open_webdav() {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, Some(vec!["--flag1", "--flag2"]))) // Args are optional
+        .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec![]))) 
         .invoke_handler(tauri::generate_handler![get_ip, open_downloads, open_webdav, get_webdav_creds])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
@@ -663,6 +665,10 @@ pub fn run() {
             // But Axum handlers use their own state injection. 
             // We need to ensure consistency. The start_server function creates its own Arc<ServerState> currently?
             // Let's optimize: We should share the SAME state instance.
+            init_mdns();
+
+            // Enable Auto-Start
+            let _ = app.autolaunch().enable();
             
             let handle = app.handle().clone();
             // let handle2 = app.handle().clone();
