@@ -16,9 +16,13 @@ dist-ssr
 .vscode/*
 !.vscode/extensions.json
 .idea
+# Rust / Tauri
+src-tauri/target/
+src-tauri/gen/
+target/
+**/*.rs.bk
+
+# OS
 .DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+Thumbs.db
+

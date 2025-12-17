@@ -11,7 +11,12 @@ use std::borrow::Cow;
 use std::path::PathBuf;
 use std::fs;
 use tower_http::cors::CorsLayer;
-use tauri::{Emitter, AppHandle, Manager};
+use tauri::{
+    Emitter, AppHandle, Manager, 
+    menu::{Menu, MenuItem},
+    tray::{TrayIconBuilder, TrayIconEvent, MouseButton},
+    WindowEvent,
+};
 
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 struct WebDavCreds {
@@ -637,7 +642,14 @@ async fn open_webdav() {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, Some(vec!["--flag1", "--flag2"]))) // Args are optional
         .invoke_handler(tauri::generate_handler![get_ip, open_downloads, open_webdav, get_webdav_creds])
+        .on_window_event(|window, event| {
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                window.hide().unwrap();
+                api.prevent_close();
+            }
+        })
         .setup(|app| {
             init_mdns();
 
@@ -669,6 +681,65 @@ pub fn run() {
             
             // Register state with tauri? Not strictly needed unless commands access it via State<T>
             app.manage(state);
+
+            // --- System Tray Setup ---
+            let show_i = MenuItem::with_id(app, "show", "Open Passer", true, None::<&str>).unwrap();
+            let folder_i = MenuItem::with_id(app, "folder", "Open Passer Folder", true, None::<&str>).unwrap();
+            let status_i = MenuItem::with_id(app, "status", "Status: Online", false, None::<&str>).unwrap(); // Disabled
+            let copy_i = MenuItem::with_id(app, "copy", "Copy Connection Info", true, None::<&str>).unwrap();
+            let quit_i = MenuItem::with_id(app, "quit", "Quit Passer", true, None::<&str>).unwrap();
+            
+            let menu = Menu::with_items(app, &[
+                &show_i, 
+                &folder_i, 
+                &status_i, 
+                &copy_i, 
+                &quit_i
+            ]).unwrap();
+
+            let _tray = TrayIconBuilder::new()
+                .icon(app.default_window_icon().unwrap().clone())
+                .menu(&menu)
+                .show_menu_on_left_click(false)
+                .on_menu_event(|app, event| {
+                     match event.id.as_ref() {
+                        "show" => {
+                            if let Some(window) = app.get_webview_window("main") {
+                                let _ = window.show();
+                                let _ = window.set_focus();
+                            }
+                        }
+                        "folder" => {
+                             // Open root "Passer" folder
+                             let path = get_passer_base_dir();
+                             #[cfg(target_os = "windows")]
+                             let _ = std::process::Command::new("explorer").arg(&path).spawn();
+                             #[cfg(target_os = "macos")]
+                             let _ = std::process::Command::new("open").arg(&path).spawn();
+                        }
+                        "copy" => {
+                            // Copy smb://passer.local
+                            if let Ok(mut clipboard) = arboard::Clipboard::new() {
+                                let _ = clipboard.set_text("smb://passer.local");
+                            }
+                        }
+                        "quit" => {
+                            app.exit(0);
+                        }
+                        _ => {}
+                     }
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let TrayIconEvent::Click { button: MouseButton::Left, .. } = event {
+                        let app = tray.app_handle();
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                })
+                .build(app);
+
             Ok(())
         })
         .run(tauri::generate_context!())
