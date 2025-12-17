@@ -5,6 +5,7 @@ import { GlassCard } from "./components/GlassCard";
 import { StatusLine } from "./components/StatusLine";
 import { ControlFooter } from "./components/ControlFooter";
 import { HistoryWidget } from "./components/HistoryWidget";
+import { PasserSpace } from "./components/PasserSpace";
 import "./App.css";
 
 interface LogEntry {
@@ -96,7 +97,6 @@ function App() {
 
         {/* Main Card */}
         <GlassCard status={isServerOn ? status : "idle"} />
-
         {/* Status Text */}
         <StatusLine
           text={statusText}
@@ -104,6 +104,9 @@ function App() {
           ip={ip || undefined}
           onToggle={toggleServer}
         />
+
+        {/* WebDAV Space */}
+        <PasserSpace />
 
         {/* Recent History */}
         <HistoryWidget items={history} />

@@ -33,4 +33,9 @@ clipboard-win = "5.4.1"
 tempfile = "3.23.0"
 zip = "6.0.0"
 mdns-sd = "0.11"
+dav-server = { version = "0.7" }
+rand = "0.8"
+base64 = "0.21"
+headers = "0.3" 
+open = "5.0" # For auth headers handling if needed
 

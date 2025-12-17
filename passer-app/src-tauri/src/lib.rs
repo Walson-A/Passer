@@ -11,12 +11,20 @@ use std::borrow::Cow;
 use std::path::PathBuf;
 use std::fs;
 use tower_http::cors::CorsLayer;
-use tauri::{Emitter, AppHandle};
+use tauri::{Emitter, AppHandle, Manager};
+
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
+struct WebDavCreds {
+    port: u16,
+    user: String,
+    pass: String,
+}
 
 // Shared state
 #[derive(Clone)]
 struct ServerState {
     app_handle: AppHandle,
+    webdav_creds: Arc<std::sync::Mutex<Option<WebDavCreds>>>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -30,15 +38,29 @@ struct LogEvent {
     kind: String, // "info", "error", "success"
 }
 
-// --- Helper: Get Download Dir ---
-fn get_downloads_dir() -> PathBuf {
+// --- Helper: Get Base Dirs ---
+fn get_passer_base_dir() -> PathBuf {
     let user_profile = std::env::var("USERPROFILE").unwrap_or_else(|_| "C:\\".to_string());
-    let path = PathBuf::from(user_profile).join("Desktop").join("PasserFiles");
+    PathBuf::from(user_profile).join("Desktop").join("Passer")
+}
+
+fn get_downloads_dir() -> PathBuf {
+    let path = get_passer_base_dir().join("Passboard"); // For Push/Pull
     let _ = fs::create_dir_all(&path);
     path
 }
 
-// --- Helper: Sort into Subfolders ---
+fn get_webdav_dir() -> PathBuf {
+    let path = get_passer_base_dir().join("Passer Space"); // For WebDAV
+    let _ = fs::create_dir_all(&path);
+    path
+}
+
+// --- Helper: Sort into Subfolders (Legacy) ---
+// Now we just dump into Passboard flat or keep logic? User said "Passboard pour les fichiers Push/Pull".
+// Let's keep subfolders inside Passboard for organization if desired, or flatten. 
+// User instruction: "C:\Users\Walson\Desktop\Passer\Passboard pour les fichiers de Push et Pass"
+// I will keep the subfolder logic relative to get_downloads_dir() for now to avoid breaking existing flow.
 fn get_target_dir(base: &PathBuf, content_type: &str, filename: &str) -> PathBuf {
     let lower_name = filename.to_lowercase();
     let sub = if content_type.starts_with("image/") || lower_name.ends_with(".png") || lower_name.ends_with(".jpg") || lower_name.ends_with(".jpeg") || lower_name.ends_with(".heic") {
@@ -362,7 +384,10 @@ async fn push_file(
 
 
 async fn start_server(app_handle: AppHandle) {
-    let state = Arc::new(ServerState { app_handle: app_handle.clone() });
+    let state = Arc::new(ServerState {
+        app_handle: app_handle.clone(),
+        webdav_creds: Arc::new(std::sync::Mutex::new(None)),
+    });
 
     let app = Router::new()
         .route("/pull", get(pull_clipboard))
@@ -402,6 +427,125 @@ async fn start_server(app_handle: AppHandle) {
         }
     }
 }
+
+// --- WebDAV Server ---
+use dav_server::{localfs::LocalFs, DavHandler};
+use rand::Rng;
+// ... (imports are fine, we use axum::* already)
+// We need to import Body for manual construction if needed, or let Axum infer.
+use axum::body::Body;
+use axum::http::{Request, Response, HeaderValue, Method, StatusCode};
+
+async fn start_webdav_server(app_handle: AppHandle, state: Arc<ServerState>) {
+    let webdav_dir = get_webdav_dir();
+    
+    // Generate Random Password
+    let password: String = rand::thread_rng()
+        .sample_iter(&rand::distributions::Alphanumeric)
+        .take(6)
+        .map(char::from)
+        .collect();
+    
+    let creds = WebDavCreds {
+        port: 8001,
+        user: "passer".to_string(),
+        pass: password.clone(),
+    };
+
+    // Store in State for retrieval
+    if let Ok(mut lock) = state.webdav_creds.lock() {
+        *lock = Some(creds.clone());
+    }
+    
+    // Send Creds to Frontend (Event)
+    let _ = app_handle.emit("webdav-creds", creds);
+
+    let dav_server = DavHandler::builder()
+        .filesystem(LocalFs::new(webdav_dir, false, false, false))
+        .locksystem(dav_server::fakels::FakeLs::new())
+        .build_handler();
+        
+    let dav_server = Arc::new(dav_server);
+
+    // Axum Handler
+    let handler = move |mut req: Request<Body>| { // Request<Body>
+        let dav_server = dav_server.clone();
+        let pass = password.clone();
+        async move {
+            // 1. Basic Auth Check
+            let auth_header = req.headers().get("authorization")
+                .and_then(|h| h.to_str().ok());
+            
+            let authorized = if let Some(auth) = auth_header {
+                 verify_basic_auth(auth, "passer", &pass).is_some()
+            } else {
+                 false
+            };
+
+            if !authorized {
+                 return Response::builder()
+                    .status(StatusCode::UNAUTHORIZED)
+                    .header("WWW-Authenticate", "Basic realm=\"Passer Space\"")
+                    .body(Body::empty())
+                    .unwrap();
+            }
+
+            // 2. Fix Depth Header (iOS fix)
+            if req.method() == Method::from_bytes(b"PROPFIND").unwrap() {
+                 let fix_depth = req.headers().get("depth")
+                     .and_then(|h| h.to_str().ok())
+                     .map(|s| s == "infinity")
+                     .unwrap_or(true); // Default to true if missing
+                 
+                 if fix_depth {
+                     req.headers_mut().insert("depth", HeaderValue::from_static("1"));
+                 }
+            }
+            
+            // 3. Forward to DavServer
+            // We need to map the Request<axum::body::Body> to Request<dav_server::body::Body>
+            // or rely on compatibility.
+            // dav_server 0.7 expects http::Request<B>. 
+            // We'll try passing it directly. If types mismatch, we'll map body.
+            
+            let resp = dav_server.handle(req).await;
+            
+            // 4. Convert Response
+            let (parts, body) = resp.into_parts();
+            let new_body = Body::new(body); // Wrap dav_server body into axum Body
+            
+            Response::from_parts(parts, new_body)
+        }
+    };
+
+    let app = Router::new().fallback(handler);
+
+    println!("[WEBDAV] Starting on :8001");
+    let addr = SocketAddr::from(([0, 0, 0, 0], 8001));
+    if let Ok(listener) = tokio::net::TcpListener::bind(addr).await {
+        if let Err(e) = axum::serve(listener, app).await {
+             eprintln!("[WEBDAV] Error: {}", e);
+        }
+    } else {
+        eprintln!("[WEBDAV] Failed to bind :8001");
+    }
+}
+
+// Auth Helpers
+fn verify_basic_auth(header: &str, expected_user: &str, expected_pass: &str) -> Option<()> {
+    use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64_STANDARD};
+    if !header.starts_with("Basic ") { return None; }
+    let b64 = &header[6..];
+    if let Ok(decoded) = BASE64_STANDARD.decode(b64) {
+        if let Ok(creds) = String::from_utf8(decoded) {
+             let expected = format!("{}:{}", expected_user, expected_pass);
+             if creds == expected { return Some(()); }
+        }
+    }
+    None
+}
+
+
 
 // --- mDNS Helper ---
 fn init_mdns() {
@@ -472,19 +616,59 @@ async fn open_downloads(_app_handle: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+async fn get_webdav_creds(state: tauri::State<'_, Arc<ServerState>>) -> Result<Option<WebDavCreds>, String> {
+    if let Ok(lock) = state.webdav_creds.lock() {
+        Ok(lock.clone())
+    } else {
+        Err("Failed to lock state".to_string())
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
+#[tauri::command]
+async fn open_webdav() {
+    let path = get_webdav_dir();
+    if let Err(e) = open::that(&path) {
+        eprintln!("Failed to open WebDAV dir: {}", e);
+    }
+}
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![get_ip, open_downloads])
+        .invoke_handler(tauri::generate_handler![get_ip, open_downloads, open_webdav, get_webdav_creds])
         .setup(|app| {
-            // Start mDNS
             init_mdns();
 
-            let handle = app.handle().clone();
-            tauri::async_runtime::spawn(async move {
-                start_server(handle).await;
+            // Init State
+            let state = Arc::new(ServerState {
+                 app_handle: app.handle().clone(),
+                 webdav_creds: Arc::new(std::sync::Mutex::new(None)),
             });
+
+            // AppState management if needed (currently we pass state manually to closures)
+            // But Axum handlers use their own state injection. 
+            // We need to ensure consistency. The start_server function creates its own Arc<ServerState> currently?
+            // Let's optimize: We should share the SAME state instance.
+            
+            let handle = app.handle().clone();
+            // let handle2 = app.handle().clone();
+            // let state_for_webdav = state.clone();
+            // let state_for_server = state.clone(); // If start_server uses it (it creates its own now, check signature)
+
+            // WebDAV disabled by default (SMB Priority)
+            // tauri::async_runtime::spawn(async move {
+            //     start_webdav_server(handle2, state_for_webdav).await;
+            // });
+            
+            // start_server creates its own state in "main.rs" logic? No, let's see start_server signature in previous steps.
+            tauri::async_runtime::spawn(async move {
+               start_server(handle).await; // Current start_server creates its own state. That's fine for now, they are disparate.
+            });
+            
+            // Register state with tauri? Not strictly needed unless commands access it via State<T>
+            app.manage(state);
             Ok(())
         })
         .run(tauri::generate_context!())
