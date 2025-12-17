@@ -26,15 +26,25 @@ export function StatusLine({ text, isReady, ip, onToggle }: StatusLineProps) {
 
             {/* IP Address Display */}
             {isReady && ip && (
-                <div
-                    onClick={() => navigator.clipboard.writeText(`http://${ip}:8000`)}
-                    className="mt-1 px-3 py-1 rounded-full bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/20 transition-all cursor-pointer group flex items-center gap-2"
-                    title="Copy IP"
-                >
-                    <div className="w-1 h-1 bg-emerald-400 rounded-full"></div>
-                    <span className="text-[10px] font-mono text-white/40 group-hover:text-white/80 transition-colors">
+                <div className="flex flex-col items-center gap-1">
+                    <div
+                        onClick={() => navigator.clipboard.writeText(`http://passer.local:8000`)}
+                        className="mt-1 px-3 py-1 rounded-full bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/20 transition-all cursor-pointer group flex items-center gap-2"
+                        title="Copy Local URL"
+                    >
+                        <div className="w-1 h-1 bg-emerald-400 rounded-full animate-pulse"></div>
+                        <span className="text-xs font-mono text-white/80 group-hover:text-white transition-colors">
+                            passer.local:8000
+                        </span>
+                    </div>
+                    {/* Fallback IP */}
+                    <div
+                        onClick={() => navigator.clipboard.writeText(`http://${ip}:8000`)}
+                        className="text-[9px] text-white/20 font-mono hover:text-white/40 cursor-pointer"
+                        title="Copy Fallback IP"
+                    >
                         {ip}:8000
-                    </span>
+                    </div>
                 </div>
             )}
         </div>

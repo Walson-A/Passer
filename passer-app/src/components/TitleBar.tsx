@@ -5,12 +5,9 @@ export function TitleBar() {
     const close = () => getCurrentWindow().close();
 
     return (
-        <div className="h-12 w-full flex items-center justify-end px-4 relative z-50">
-            {/* DRAG REGION: Absolute layer acting as the background */}
-            <div data-tauri-drag-region className="absolute inset-0 z-0 bg-transparent" />
-
-            {/* CONTROLS: Explicitly on top of the drag region */}
-            <div className="flex gap-3 relative z-10">
+        <div data-tauri-drag-region className="h-12 w-full flex items-center justify-end px-4 gap-4 z-50 pt-2">
+            {/* Controls */}
+            <div className="flex gap-3">
                 <button
                     onClick={minimize}
                     className="p-2 rounded-full hover:bg-white/10 transition-colors cursor-pointer group"

@@ -32,10 +32,8 @@ struct LogEvent {
 
 // --- Helper: Get Download Dir ---
 fn get_downloads_dir() -> PathBuf {
-    // Basic implementation: UserProfile/Downloads/Passer_Received
-    // In a real app we might use the `dirs` crate, but env var is fine for prototype
     let user_profile = std::env::var("USERPROFILE").unwrap_or_else(|_| "C:\\".to_string());
-    let path = PathBuf::from(user_profile).join("Downloads").join("Passer_Received");
+    let path = PathBuf::from(user_profile).join("Desktop").join("PasserFiles");
     let _ = fs::create_dir_all(&path);
     path
 }
@@ -60,14 +58,14 @@ fn get_target_dir(base: &PathBuf, content_type: &str, filename: &str) -> PathBuf
     path
 }
 
-use std::io::Write; // Ensure Write trait is imported for Zip
+use std::io::Write;
 
 async fn pull_clipboard(State(state): State<Arc<ServerState>>) -> impl axum::response::IntoResponse {
     let state_clone = state.clone();
-    let (content_type, body) = tokio::task::spawn_blocking(move || {
+    
+    // Use proper error handling in spawned task
+    let result = tokio::task::spawn_blocking(move || {
         // 1. Check for Files (via Native Windows API)
-        // Using clipboard-win crate is much faster and reliable than PowerShell
-        
         let file_list_result: Result<Vec<String>, _> = clipboard_win::get_clipboard(clipboard_win::formats::FileList);
 
         if let Ok(file_paths) = file_list_result {
@@ -83,16 +81,13 @@ async fn pull_clipboard(State(state): State<Arc<ServerState>>) -> impl axum::res
                 let mut zip = zip::ZipWriter::new(cursor);
                 
                 let options = zip::write::SimpleFileOptions::default()
-                    .compression_method(zip::CompressionMethod::Stored); // Faster, less CPU
+                    .compression_method(zip::CompressionMethod::Stored);
 
                 for path_str in file_paths {
                     let path = std::path::Path::new(&path_str);
                     if path.exists() && path.is_file() {
                         let filename = path.file_name().unwrap_or_default().to_string_lossy();
-                        
-                        // Start file in zip
                         if let Ok(_) = zip.start_file(filename, options) {
-                            // Read file content
                             if let Ok(content) = fs::read(path) {
                                 let _ = zip.write_all(&content);
                             }
@@ -101,12 +96,12 @@ async fn pull_clipboard(State(state): State<Arc<ServerState>>) -> impl axum::res
                 }
 
                 if let Ok(_) = zip.finish() {
-                    return ("application/zip", zip_buffer);
+                    return Ok::<(&str, Vec<u8>), String>(("application/zip", zip_buffer));
                 }
             }
         }
 
-        let mut clipboard = arboard::Clipboard::new().unwrap();
+        let mut clipboard = arboard::Clipboard::new().map_err(|e| e.to_string())?;
 
         // 2. Try Image
         if let Ok(image) = clipboard.get_image() {
@@ -120,33 +115,44 @@ async fn pull_clipboard(State(state): State<Arc<ServerState>>) -> impl axum::res
                 image.height as u32, 
                 image::ColorType::Rgba8.into()
             ) {
-               return ("image/png", png_buffer);
+               return Ok(("image/png", png_buffer));
             }
         }
 
         // 3. Fallback to Text
         let text = clipboard.get_text().unwrap_or_default();
         let json = serde_json::json!({ "text": text });
-        ("application/json", serde_json::to_vec(&json).unwrap())
+        Ok(("application/json", serde_json::to_vec(&json).unwrap()))
     })
-    .await
-    .unwrap();
+    .await;
 
-    // Log what we are sending
-    let log_msg = if content_type == "application/zip" {
-        format!("PULL: Sending ZIP Archive ({} bytes)", body.len())
-    } else if content_type == "image/png" {
-        format!("PULL: Sending Image ({} bytes)", body.len())
-    } else {
-        format!("PULL: Sending Text ({:.50}...)", String::from_utf8_lossy(&body))
-    };
+    match result {
+        Ok(Ok((content_type, body))) => {
+             // Log success
+            let log_msg = if content_type == "application/zip" {
+                format!("PULL: Sending ZIP Archive ({} bytes)", body.len())
+            } else if content_type == "image/png" {
+                format!("PULL: Sending Image ({} bytes)", body.len())
+            } else {
+                format!("PULL: Sending Text ({:.50}...)", String::from_utf8_lossy(&body))
+            };
 
-    let _ = state.app_handle.emit("log", LogEvent {
-        message: log_msg,
-        kind: "info".to_string(),
-    });
+            let _ = state.app_handle.emit("log", LogEvent {
+                message: log_msg,
+                kind: "info".to_string(),
+            });
 
-    ([(axum::http::header::CONTENT_TYPE, content_type)], body)
+            ([(axum::http::header::CONTENT_TYPE, content_type)], body)
+        },
+        _ => {
+             // Fallback error response
+             let _ = state.app_handle.emit("log", LogEvent {
+                message: "PULL: Failed to read clipboard or internal error".to_string(),
+                kind: "error".to_string(),
+            });
+            ([(axum::http::header::CONTENT_TYPE, "application/json")], serde_json::to_vec(&serde_json::json!({"error": "Failed to read clipboard"})).unwrap())
+        }
+    }
 }
 
 async fn push_clipboard(
@@ -160,18 +166,22 @@ async fn push_clipboard(
         kind: "success".to_string(),
     });
 
-    tokio::task::spawn_blocking(move || {
-        let mut clipboard = arboard::Clipboard::new().unwrap();
-        if let Err(e) = clipboard.set_text(text) {
-            eprintln!("Failed to set clipboard: {}", e);
-        }
+    let result = tokio::task::spawn_blocking(move || {
+        let mut clipboard = arboard::Clipboard::new().map_err(|e| e.to_string())?;
+        clipboard.set_text(text).map_err(|e| e.to_string())
     })
-    .await
-    .unwrap();
+    .await;
 
-    Json(serde_json::json!({ "status": "success" }))
+    match result {
+        Ok(Ok(_)) => Json(serde_json::json!({ "status": "success" })),
+        Ok(Err(e)) => {
+            Json(serde_json::json!({ "status": "error", "message": format!("Clipboard error: {}", e) }))
+        },
+        Err(e) => {
+             Json(serde_json::json!({ "status": "error", "message": format!("Task join error: {}", e) }))
+        }
+    }
 }
-
 
 async fn push_image(
     State(state): State<Arc<ServerState>>,
@@ -179,11 +189,9 @@ async fn push_image(
 ) -> Json<serde_json::Value> {
     let mut image_bytes = Vec::new();
 
-    // 1. Read Multipart Frame
     while let Some(field) = multipart.next_field().await.unwrap_or(None) {
         if let Some(content_type) = field.content_type() {
             if content_type.starts_with("image/") {
-                // Log content type
                 let _ = state.app_handle.emit("log", LogEvent {
                     message: format!("Receiving image type: {}", content_type),
                     kind: "info".to_string(),
@@ -191,7 +199,7 @@ async fn push_image(
 
                 if let Ok(bytes) = field.bytes().await {
                     image_bytes = bytes.to_vec();
-                    break; // Only take the first image
+                    break;
                 }
             }
         }
@@ -210,39 +218,38 @@ async fn push_image(
         kind: "success".to_string(),
     });
 
-    // 2. Process & Clip Logic
     let processed = tokio::task::spawn_blocking(move || {
-        match image::load_from_memory(&image_bytes) {
-            Ok(img) => {
-                let rgba = img.into_rgba8();
-                let (w, h) = rgba.dimensions();
-                let params = arboard::ImageData {
-                    width: w as usize,
-                    height: h as usize,
-                    bytes: Cow::Owned(rgba.into_vec()),
-                };
+        let img = image::load_from_memory(&image_bytes).map_err(|e| format!("Decode: {}", e))?;
+        let rgba = img.into_rgba8();
+        let (w, h) = rgba.dimensions();
+        let params = arboard::ImageData {
+            width: w as usize,
+            height: h as usize,
+            bytes: Cow::Owned(rgba.into_vec()),
+        };
 
-                let mut clipboard = arboard::Clipboard::new().unwrap();
-                match clipboard.set_image(params) {
-                    Ok(_) => Ok(()),
-                    Err(e) => Err(format!("Clipboard set error: {}", e)),
-                }
-            },
-            Err(e) => Err(format!("Image decode error: {}", e)),
-        }
+        let mut clipboard = arboard::Clipboard::new().map_err(|e| format!("Clipboard Init: {}", e))?;
+        clipboard.set_image(params).map_err(|e| format!("Clipboard Set: {}", e))
     })
-    .await
-    .unwrap();
+    .await;
 
-    if let Err(e) = processed {
-         let _ = state.app_handle.emit("log", LogEvent {
-            message: format!("PUSH (Image) failed: {}", e),
-            kind: "error".to_string(),
-        });
-        return Json(serde_json::json!({ "status": "error", "message": e }));
+    match processed {
+        Ok(Ok(_)) => Json(serde_json::json!({ "status": "success" })),
+        Ok(Err(e)) => {
+             let _ = state.app_handle.emit("log", LogEvent {
+                message: format!("PUSH (Image) failed: {}", e),
+                kind: "error".to_string(),
+            });
+            Json(serde_json::json!({ "status": "error", "message": e }))
+        },
+        Err(e) => {
+             let _ = state.app_handle.emit("log", LogEvent {
+                message: format!("PUSH (Image) fatal: {}", e),
+                kind: "error".to_string(),
+            });
+            Json(serde_json::json!({ "status": "error", "message": "Internal Server Error" }))
+        }
     }
-
-    Json(serde_json::json!({ "status": "success" }))
 }
 
 async fn push_file(
@@ -253,19 +260,13 @@ async fn push_file(
     let mut saved_files: Vec<String> = Vec::new();
     let mut count = 0;
 
-    // Process all files in the multipart form
     while let Some(field_result) = multipart.next_field().await.transpose() {
         match field_result {
             Ok(field) => {
                 let content_type = field.content_type().unwrap_or("application/octet-stream").to_string();
                 let filename = field.file_name().unwrap_or("unknown_file").to_string();
-                let field_name = field.name().unwrap_or("unknown_field").to_string();
+                let _field_name = field.name().unwrap_or("unknown_field").to_string();
                 
-                let _ = state.app_handle.emit("log", LogEvent {
-                    message: format!("Processing field: {} (File: {}, Type: {})", field_name, filename, content_type),
-                    kind: "info".to_string(),
-                });
-
                 let target_dir = get_target_dir(&download_base, &content_type, &filename);
                 let target_path = target_dir.join(&filename);
                 
@@ -286,11 +287,6 @@ async fn push_file(
                             });
                         }
                      }
-                } else {
-                     let _ = state.app_handle.emit("log", LogEvent {
-                        message: "Failed to read bytes from field".to_string(),
-                        kind: "error".to_string(),
-                    });
                 }
             },
             Err(e) => {
@@ -298,72 +294,49 @@ async fn push_file(
                     message: format!("Error reading multipart field: {}", e),
                     kind: "error".to_string(),
                 });
-                break; // Stop loop on error
+                break;
             }
         }
     }
 
     if saved_files.is_empty() {
-        let _ = state.app_handle.emit("log", LogEvent {
-            message: "PUSH (Files) failed: No files saved".to_string(),
-            kind: "error".to_string(),
-        });
-        return Json(serde_json::json!({ "status": "error", "message": "No files received" }));
+        return Json(serde_json::json!({ "status": "error", "message": "No files saved" }));
     }
 
     let _ = state.app_handle.emit("log", LogEvent {
-        message: format!("PUSH: Received {} files. Saving to Clipboard...", count),
+        message: format!("PUSH: Received {} files. Injecting to Clipboard...", count),
         kind: "success".to_string(),
     });
 
-    // Clipboard Injection (HDROP) with Smart Append
     let paths_clone = saved_files.clone();
-    let _download_base_str = download_base.to_string_lossy().to_string(); // Check against download folder
-
+    
+    // Use Native Clipboard (clipboard-win) instead of PowerShell
     let clipboard_res = tokio::task::spawn_blocking(move || {
-        use std::process::Command;
-
-        // 1. Try to get current clipboard files (Smart Append)
-        let mut final_paths = paths_clone.clone();
+        // We will try to APPEND to existing files if possible, similar to Smart Append
+        // But for simplicity and robustness in "clean" version, let's just Set the new files.
+        // If we want append, we read first.
         
-        // PowerShell command to get current file paths
-        let read_cmd = "Get-Clipboard -Format FileDropList | Select-Object -ExpandProperty FullName";
+        let mut final_paths = paths_clone;
         
-        let output_read = Command::new("powershell")
-            .args(["-NoProfile", "-Command", read_cmd])
-            .output();
-
-        if let Ok(o) = output_read {
-            if o.status.success() {
-                let stdout = String::from_utf8_lossy(&o.stdout);
-                let current_lines: Vec<&str> = stdout.trim().split(|c| c == '\r' || c == '\n').filter(|s| !s.trim().is_empty()).collect();
-                
-                // Smart Append Logic: 
-                // Only append if the clipboard contains files from our App (to avoid mess) OR if we decide to just append always.
-                // Let's be aggressive: Append always if it's files.
-                // Actually safer: Append if the current clipboard has at least 1 valid file path.
-                
-                if !current_lines.is_empty() {
-                     // Check if they are valid paths (basic check)
-                     let mut new_list: Vec<String> = current_lines.iter().map(|s| s.trim().to_string()).collect();
-                     for new_f in &paths_clone {
-                         // Avoid duplicates
-                         if !new_list.contains(new_f) {
-                             new_list.push(new_f.clone());
-                         }
-                     }
-                     final_paths = new_list;
-                }
-            }
+        // Optional: Smart Append Logic (Native)
+        if let Ok(existing_paths) = clipboard_win::get_clipboard::<Vec<String>, _>(clipboard_win::formats::FileList) {
+             let mut current_set: Vec<String> = existing_paths.into_iter().collect();
+             for new_p in &final_paths {
+                 if !current_set.contains(new_p) {
+                     current_set.push(new_p.clone());
+                 }
+             }
+             final_paths = current_set;
         }
 
-        // 2. Set Clipboard with Final List
+        // Set Clipboard using PowerShell (Native crate doesn't support Set FileList easily)
         let path_args = final_paths.join("\",\"");
         let formatted_paths = format!("\"{}\"", path_args); 
         
+        // This command sets the clipboard to the list of files
         let write_cmd = format!("Set-Clipboard -Path {}", formatted_paths);
         
-        let output_write = Command::new("powershell")
+        let output_write = std::process::Command::new("powershell")
             .args(["-NoProfile", "-Command", &write_cmd])
             .output();
             
@@ -372,22 +345,19 @@ async fn push_file(
             Err(e) => Err(e.to_string()),
         }
     })
-    .await
-    .unwrap();
-    
-    // Note: I removed the direct clipboard-win usage inside the closure to swap to PowerShell strategy 
-    // because encoding CF_HDROP manually in Rust is error-prone without `dropfiles` crate.
-    // PowerShell is built-in and handles the OS complexity.
+    .await;
 
-    if let Err(e) = clipboard_res {
-         let _ = state.app_handle.emit("log", LogEvent {
-            message: format!("Clipboard injection failed: {}", e),
-            kind: "error".to_string(),
-        });
-        return Json(serde_json::json!({ "status": "error", "message": e }));
+    match clipboard_res {
+        Ok(Ok(_)) => Json(serde_json::json!({ "status": "success", "count": count })),
+        Ok(Err(e)) => {
+             let _ = state.app_handle.emit("log", LogEvent {
+                message: format!("Clipboard injection failed: {}", e),
+                kind: "error".to_string(),
+            });
+            Json(serde_json::json!({ "status": "error", "message": e }))
+        },
+        Err(e) => Json(serde_json::json!({ "status": "error", "message": format!("Thread Error: {}", e) }))
     }
-
-    Json(serde_json::json!({ "status": "success", "count": count }))
 }
 
 
@@ -399,13 +369,12 @@ async fn start_server(app_handle: AppHandle) {
         .route("/push", post(push_clipboard))
         .route("/push/image", post(push_image))
         .route("/push/file", post(push_file))
-        .layer(axum::extract::DefaultBodyLimit::disable()) // Allow unlimited body size
+        .layer(axum::extract::DefaultBodyLimit::disable())
         .layer(CorsLayer::permissive())
         .with_state(state);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 8000));
     
-    // Log startup to Console AND Frontend
     println!(" [SERVER] Attempting to bind to http://0.0.0.0:8000"); 
     let _ = app_handle.emit("log", LogEvent {
         message: format!("Server starting on http://0.0.0.0:8000"),
@@ -434,6 +403,50 @@ async fn start_server(app_handle: AppHandle) {
     }
 }
 
+// --- mDNS Helper ---
+fn init_mdns() {
+    std::thread::spawn(|| {
+        if let Ok(mdns) = mdns_sd::ServiceDaemon::new() {
+            // Advertise "passer.local" service
+            // Service Type: _passer._tcp.local.
+            // Instance Name: passer
+            // Port: 8000
+            let service_type = "_passer._tcp.local.";
+            let instance_name = "passer";
+            let host_name = "passer.local.";
+            let port = 8000;
+            let properties = [("version", "1.0")];
+
+            let my_ip = local_ip_address::local_ip().unwrap_or("127.0.0.1".parse().unwrap());
+            
+            // Create service info
+            // Note: hostname is tricky, mdns-sd might force the OS hostname or allow custom.
+            // standard register uses the default logic.
+            
+            // Explicitly constructing ServiceInfo to try and satisfy "passer.local" requirement
+            if let Ok(service_info) = mdns_sd::ServiceInfo::new(
+                service_type,
+                instance_name,
+                host_name,
+                my_ip.to_string().as_str(),
+                port,
+                &properties[..]
+            ) {
+                if let Err(e) = mdns.register(service_info) {
+                    eprintln!("mDNS Register Error: {}", e);
+                } else {
+                    println!("mDNS Service Registered: {}.{} -> {}", instance_name, service_type, host_name);
+                }
+                
+                // Keep the daemon alive
+                loop {
+                    std::thread::sleep(std::time::Duration::from_secs(60));
+                }
+            }
+        }
+    });
+}
+
 #[tauri::command]
 fn get_ip() -> String {
     local_ip_address::local_ip()
@@ -444,11 +457,6 @@ fn get_ip() -> String {
 #[tauri::command]
 async fn open_downloads(_app_handle: AppHandle) -> Result<(), String> {
     let path = get_downloads_dir();
-    // Use the opener plugin logic or just shell open if simple
-    // Since we have the opener plugin, let's use it via the app handle or just use the plugin in JS?
-    // Actually, opener plugin is best used from JS. 
-    // But since we need the specific path which is calculated in Rust, let's open it here.
-    // We can use `open::that` shorthand if we had the crate, but we check if tauri_plugin_opener can be called from Rust or just use `std::process::Command` for explorer.
     
     #[cfg(target_os = "windows")]
     {
@@ -470,6 +478,9 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![get_ip, open_downloads])
         .setup(|app| {
+            // Start mDNS
+            init_mdns();
+
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 start_server(handle).await;

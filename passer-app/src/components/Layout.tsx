@@ -2,14 +2,16 @@ import { ReactNode } from "react";
 import { TitleBar } from "./TitleBar";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
+type ResizeDirection = 'East' | 'North' | 'NorthEast' | 'NorthWest' | 'South' | 'SouthEast' | 'SouthWest' | 'West';
+
 interface LayoutProps {
     children: ReactNode;
 }
 
 export function Layout({ children }: LayoutProps) {
-    const handleResize = async () => {
+    const startResize = async (direction: ResizeDirection) => {
         try {
-            await getCurrentWindow().startResizeDragging("SouthEast");
+            await getCurrentWindow().startResizeDragging(direction);
         } catch (error) {
             console.error(error);
         }
@@ -25,7 +27,6 @@ export function Layout({ children }: LayoutProps) {
             <div className="relative w-full h-full rounded-[32px] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)] overflow-hidden bg-[#141414]/90 backdrop-blur-md" >
 
                 <div className="flex flex-col h-full">
-
                     {/* Draggable TitleBar - z-50 */}
                     <div className="relative z-50 pt-3 px-4">
                         <TitleBar />
@@ -37,12 +38,32 @@ export function Layout({ children }: LayoutProps) {
                     </div>
                 </div>
 
-                {/* Custom Resize Handle (Bottom Right) 
-                    Fixes the "offset" feel by making the visual corner interactive 
+                {/* --- Custom Resize Handles (Invisible) --- 
+                    These provide a 40px grab area at each corner for resizing.
                 */}
+
+                {/* Top Left */}
                 <div
-                    className="absolute bottom-0 right-0 w-10 h-10 z-[999] cursor-nwse-resize hover:bg-white/5 active:bg-white/10 rounded-tl-2xl transition-all"
-                    onMouseDown={handleResize}
+                    className="absolute top-0 left-0 w-10 h-10 z-[999] cursor-nwse-resize rounded-br-2xl"
+                    onMouseDown={() => startResize("NorthWest")}
+                />
+
+                {/* Top Right */}
+                <div
+                    className="absolute top-0 right-0 w-10 h-10 z-[999] cursor-nesw-resize rounded-bl-2xl"
+                    onMouseDown={() => startResize("NorthEast")}
+                />
+
+                {/* Bottom Left */}
+                <div
+                    className="absolute bottom-0 left-0 w-10 h-10 z-[999] cursor-nesw-resize rounded-tr-2xl"
+                    onMouseDown={() => startResize("SouthWest")}
+                />
+
+                {/* Bottom Right */}
+                <div
+                    className="absolute bottom-0 right-0 w-10 h-10 z-[999] cursor-nwse-resize rounded-tl-2xl"
+                    onMouseDown={() => startResize("SouthEast")}
                 />
             </div>
         </div>
