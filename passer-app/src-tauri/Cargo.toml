@@ -39,4 +39,5 @@ base64 = "0.21"
 headers = "0.3" 
 open = "5.0" # For auth headers handling if needed
 tauri-plugin-autostart = "2.5.1"
+html-escape = "0.2.13"
 
