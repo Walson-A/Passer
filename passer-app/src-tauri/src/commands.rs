@@ -46,3 +46,36 @@ pub async fn open_webdav() {
         eprintln!("Failed to open WebDAV dir: {}", e);
     }
 }
+
+#[tauri::command]
+pub async fn set_window_on_top(app_handle: tauri::AppHandle, state: bool) -> Result<(), String> {
+    use tauri::Manager;
+    if let Some(window) = app_handle.get_webview_window("main") {
+        window.set_always_on_top(state).map_err(|e| e.to_string())?;
+        Ok(())
+    } else {
+        Err("Window not found".to_string())
+    }
+}
+#[tauri::command]
+pub async fn handle_file_drop(paths: Vec<String>) -> Result<(), String> {
+    let target_dir = get_webdav_dir();
+    
+    for path_str in paths {
+        let source_path = std::path::Path::new(&path_str);
+        if source_path.exists() {
+            let filename = source_path.file_name()
+                .ok_or_else(|| "Invalid filename".to_string())?;
+            let target_path = target_dir.join(filename);
+            
+            // If it's a file, copy it. If it's a directory, we might need recursive copy or just ignore.
+            // For now, let's stick to files for simplicity and robustness.
+            if source_path.is_file() {
+                std::fs::copy(source_path, &target_path)
+                    .map_err(|e| format!("Failed to copy file {:?}: {}", source_path, e))?;
+            }
+        }
+    }
+    
+    Ok(())
+}

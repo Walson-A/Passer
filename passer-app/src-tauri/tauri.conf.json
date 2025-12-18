@@ -13,13 +13,13 @@
     "windows": [
       {
         "title": "passer-app",
-        "width": 400,
+        "width": 390,
         "height": 520,
         "decorations": false,
         "transparent": true,
         "shadow": false,
-        "minWidth": 380,
-        "minHeight": 500
+        "minWidth": 390,
+        "minHeight": 520
       }
     ],
     "security": {

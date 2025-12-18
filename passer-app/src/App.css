@@ -3,20 +3,34 @@
 :root {
   --font-sans: "Inter", "SF Pro Display", system-ui, sans-serif;
 
-  /* Palette - Adjusted for visibility */
-  --bg-primary: #151515;
-  /* Darker Anthracite */
-  --accent-warm: #f5d045;
-  /* Warm Yellow */
-  --text-primary: #ffffff;
-  --text-secondary: rgba(255, 255, 255, 0.7);
-  --glass-border: rgba(255, 255, 255, 0.15);
-  --glass-bg: rgba(20, 20, 20, 0.85);
-  /* Much more opaque */
+  /* Refined Palette (Restrained) */
+  --bg-primary: #0F0F0F;
+  /* Deep Black */
+  --bg-card: rgba(255, 255, 255, 0.03);
+  --border-subtle: rgba(255, 255, 255, 0.08);
+
+  --text-primary: #FFFFFF;
+  --text-secondary: #9CA3AF;
+  /* Gray-400 */
+  --text-tertiary: #6B7280;
+  /* Gray-500 */
+
+  /* Status Colors (Desaturated) */
+  --status-success: #10B981;
+  /* Emerald-500 */
+  --status-error: #EF4444;
+  /* Red-500 */
+  --status-pending: #F59E0B;
+  /* Amber-500 */
+
+  /* Glassmorphism */
+  --glass-bg: rgba(20, 20, 20, 0.6);
+  --glass-border: rgba(255, 255, 255, 0.05);
+  --backdrop: blur(24px);
 
   /* Easings */
   --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  --ease-apple: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 body {
@@ -28,31 +42,51 @@ body {
   user-select: none;
 }
 
-html {
-  background-color: transparent !important;
-}
-
-/* Ensure the root element fills the window */
 #root {
   width: 100%;
   height: 100vh;
 }
 
 /* Animations */
-@keyframes shimmer {
-  0% {
-    opacity: 0.3;
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
   }
 
-  50% {
-    opacity: 0.6;
-  }
-
-  100% {
-    opacity: 0.3;
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.5s var(--ease-out-expo) forwards;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out forwards;
+}
+
+/* Utilities */
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: var(--backdrop);
+  -webkit-backdrop-filter: var(--backdrop);
+  border: 1px solid var(--glass-border);
+}
+
+/* Restored Animations for GlassCard */
 @keyframes flux-push {
   0% {
     transform: translateX(-100%) skewX(-15deg);
@@ -93,38 +127,99 @@ html {
   }
 }
 
-@keyframes fade-in-up {
+
+.animate-flux-push {
+  animation: flux-push 1.5s linear infinite;
+}
+
+.animate-flux-pull {
+  animation: flux-pull 1.5s linear infinite;
+}
+
+.animate-fade-in-up {
+  animation: slide-up 0.4s var(--ease-out-expo) forwards;
+}
+
+@keyframes strong-ping {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.8;
+  }
+
+  80% {
+    transform: scale(2);
+    opacity: 0;
+  }
+
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+.animate-strong-ping {
+  animation: strong-ping 0.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+/* Custom Clean Scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  transition: background 0.3s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Scrollbar Corner */
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Elastic Slide-In Animation */
+@keyframes elastic-slide-in {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(-20px) scale(0.95);
   }
 
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
 }
 
-.animate-shimmer {
-  animation: shimmer 3s infinite ease-in-out;
+.animate-elastic-slide-in {
+  animation: elastic-slide-in 0.6s var(--ease-spring) forwards;
 }
 
-.animate-flux-push {
-  animation: flux-push 1.2s var(--ease-apple) forwards;
+@keyframes glow-flash {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+
+  30% {
+    box-shadow: 0 0 20px 2px rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+    border-color: rgba(255, 255, 255, 0.1);
+  }
 }
 
-.animate-flux-pull {
-  animation: flux-pull 1.2s var(--ease-apple) forwards;
-}
-
-.animate-fade-in-up {
-  animation: fade-in-up 0.4s var(--ease-apple) forwards;
-}
-
-.glass-panel {
-  background: var(--glass-bg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid var(--glass-border);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+.animate-glow-flash {
+  animation: glow-flash 2s ease-out infinite;
 }

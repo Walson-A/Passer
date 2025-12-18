@@ -1,11 +1,10 @@
 import { useState, useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { Layout } from "./components/Layout";
-import { GlassCard } from "./components/GlassCard";
-import { StatusLine } from "./components/StatusLine";
+import { ServerStatusBar } from "./components/ServerStatusBar";
 import { ControlFooter } from "./components/ControlFooter";
-import { HistoryWidget } from "./components/HistoryWidget";
-import { PasserSpace } from "./components/PasserSpace";
+import { Passboard } from "./components/Passboard";
+import { DropZone } from "./components/DropZone";
 import "./App.css";
 
 interface LogEntry {
@@ -14,11 +13,14 @@ interface LogEntry {
 }
 
 function App() {
-  const [status, setStatus] = useState<"idle" | "pushing" | "pulling" | "success">("idle");
-  const [statusText, setStatusText] = useState("Ready to pair");
-  const [history, setHistory] = useState<{ name: string, time: string, type: string }[]>([]);
+  const [status, setStatus] = useState<"idle" | "pushing" | "pulling" | "success" | "sync-success">("idle");
   const [ip, setIp] = useState<string | null>(null);
   const [isServerOn, setIsServerOn] = useState(true);
+
+  const handleDropSuccess = () => {
+    setStatus("sync-success");
+    setTimeout(() => setStatus("idle"), 2500);
+  };
 
   // Fetch IP on mount
   useEffect(() => {
@@ -41,43 +43,28 @@ function App() {
         if (msg.includes("PUSH")) {
           // Incoming from Phone
           setStatus("pushing");
-          setStatusText("Receiving...");
 
           // Reset to success/idle after animation
           setTimeout(() => {
             setStatus("success");
-            setStatusText(msg.includes("File") ? "Files received" : "Data received");
-
-            // Add to history (Mock parsing)
-            setHistory(prev => [{
-              name: "Received Item",
-              time: "Just now",
-              type: msg.includes("Image") ? "IMG" : "FILE"
-            }, ...prev.slice(0, 2)]);
 
             setTimeout(() => {
               setStatus("idle");
-              setStatusText("Ready");
             }, 2000);
           }, 1500);
         }
         else if (msg.includes("PULL")) {
           // Outgoing to Phone
           setStatus("pulling");
-          setStatusText("Sending to iPhone...");
 
           setTimeout(() => {
             setStatus("success");
-            setStatusText("Sent successfully");
             setTimeout(() => {
               setStatus("idle");
-              setStatusText("Ready");
             }, 2000);
           }, 1500);
         }
-        else if (msg.includes("Server listening")) {
-          setStatusText("Ready");
-        }
+        // Server listening notification handled by isServerOn state
       });
     }
 
@@ -87,36 +74,26 @@ function App() {
     };
   }, []);
 
-  const toggleServer = () => {
-    setIsServerOn(!isServerOn);
-  };
-
   return (
     <Layout>
-      <div className="flex-1 flex flex-col items-center pt-8 px-6">
+      {/* Main Container */}
+      <div className="flex-1 flex flex-col h-full min-h-0">
 
-        {/* Main Card */}
-        <GlassCard status={isServerOn ? status : "idle"} />
-        {/* Status Text */}
-        <StatusLine
-          text={statusText}
+        {/* Server Status Bar (Passive) */}
+        <ServerStatusBar
+          status={isServerOn ? status : "idle"}
           isReady={isServerOn}
           ip={ip || undefined}
-          onToggle={toggleServer}
         />
 
-        {/* WebDAV Space */}
-        <PasserSpace />
-
-        {/* Recent History */}
-        <HistoryWidget items={history} />
-
-        {/* Spacer */}
-        <div className="flex-1"></div>
+        {/* Passboard Feed (Main Focus) */}
+        <Passboard />
 
         {/* Footer Controls */}
-        <ControlFooter />
+        <ControlFooter isTransferring={status === 'pushing' || status === 'pulling'} />
       </div>
+
+      <DropZone onDropSuccess={handleDropSuccess} />
     </Layout>
   );
 }

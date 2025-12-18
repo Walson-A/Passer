@@ -24,7 +24,7 @@ export function Layout({ children }: LayoutProps) {
              The rounded-[32px] creates the modern window shape.
              Using minimal border instead of heavy shadow to align with window edge.
             */}
-            <div className="relative w-full h-full rounded-[32px] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)] overflow-hidden bg-[#141414]/90 backdrop-blur-md" >
+            <div className="relative w-full h-full rounded-[32px] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)] overflow-hidden bg-[#141414]/94 backdrop-blur-md" >
 
                 <div className="flex flex-col h-full">
                     {/* Draggable TitleBar - z-50 */}
