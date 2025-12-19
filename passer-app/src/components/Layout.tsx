@@ -33,8 +33,15 @@ export function Layout({ children }: LayoutProps) {
                     </div>
 
                     {/* Main Content Area */}
-                    <div className="flex-1 flex flex-col relative z-10 p-4 overflow-hidden">
+                    <div className="flex-1 flex flex-col relative z-10 p-4 pb-0 overflow-hidden">
                         {children}
+                    </div>
+
+                    {/* Slogo Signature Bar (Always at bottom) */}
+                    <div className="h-8 flex items-center justify-center shrink-0 pointer-events-none select-none pb-4">
+                        <span className="text-[7.5px] font-black uppercase tracking-[0.4em] text-white/20 leading-none">
+                            Copy anywhere. Paste everywhere.
+                        </span>
                     </div>
                 </div>
 

@@ -14,20 +14,33 @@ interface LogEntry {
 
 function App() {
   const [status, setStatus] = useState<"idle" | "pushing" | "pulling" | "success" | "sync-success">("idle");
-  const [ip, setIp] = useState<string | null>(null);
   const [isServerOn, setIsServerOn] = useState(true);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+
+  const toggleServer = async () => {
+    if (isTransitioning) return;
+    setIsTransitioning(true);
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      const newState = await invoke<string>("toggle_server");
+      // Use logical state based on backend response
+      // But also wait for animation
+      setTimeout(() => {
+        setIsServerOn(newState === "on");
+        setIsTransitioning(false);
+      }, 500);
+    } catch (e) {
+      console.error("Toggle failed", e);
+      setIsTransitioning(false);
+    }
+  };
 
   const handleDropSuccess = () => {
     setStatus("sync-success");
-    setTimeout(() => setStatus("idle"), 2500);
+    setTimeout(() => setStatus("idle"), 400);
   };
 
-  // Fetch IP on mount
-  useEffect(() => {
-    import("@tauri-apps/api/core").then(({ invoke }) => {
-      invoke<string>("get_ip").then(setIp).catch(console.error);
-    });
-  }, []);
+  // Fetch IP logic removed as it's not used in current UI
 
   // Listen for backend logs
   useEffect(() => {
@@ -50,8 +63,8 @@ function App() {
 
             setTimeout(() => {
               setStatus("idle");
-            }, 2000);
-          }, 1500);
+            }, 700);
+          }, 800);
         }
         else if (msg.includes("PULL")) {
           // Outgoing to Phone
@@ -61,8 +74,8 @@ function App() {
             setStatus("success");
             setTimeout(() => {
               setStatus("idle");
-            }, 2000);
-          }, 1500);
+            }, 700);
+          }, 800);
         }
         // Server listening notification handled by isServerOn state
       });
@@ -83,7 +96,8 @@ function App() {
         <ServerStatusBar
           status={isServerOn ? status : "idle"}
           isReady={isServerOn}
-          ip={ip || undefined}
+          onClick={toggleServer}
+          isTransitioning={isTransitioning}
         />
 
         {/* Passboard Feed (Main Focus) */}

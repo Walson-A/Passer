@@ -7,6 +7,7 @@ use std::borrow::Cow;
 use tauri::Emitter;
 
 use crate::types::{ServerState, ClipboardContent, LogEvent};
+use crate::paths::get_cache_dir;
 
 // Helper function to strip HTML tags and decode entities
 fn strip_html_tags(html: &str) -> String {
@@ -121,7 +122,7 @@ pub async fn pull_clipboard(State(state): State<Arc<ServerState>>) -> impl IntoR
             } else if content_type == "image/png" {
                 format!("PULL: Sending Image ({} bytes)", body.len())
             } else {
-                format!("PULL: Sending Text ({:.50}...)", String::from_utf8_lossy(&body))
+                format!("PULL: Sending Text ({})", String::from_utf8_lossy(&body))
             };
 
             let _ = state.app_handle.emit("log", LogEvent {
@@ -149,7 +150,7 @@ pub async fn push_clipboard(
     let text = payload.text.clone();
 
     let _ = state.app_handle.emit("log", LogEvent {
-        message: format!("PUSH (Text) received: {:.50}...", text),
+        message: format!("PUSH (Text) received: {}", text),
         kind: "success".to_string(),
     });
 
@@ -200,8 +201,14 @@ pub async fn push_image(
         return Json(serde_json::json!({ "status": "error", "message": "No image found" }));
     }
 
+    // Save to cache for preview display in history
+    let cache_dir = get_cache_dir();
+    let cache_filename = format!("pushed_{}.png", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis());
+    let cache_path = cache_dir.join(&cache_filename);
+    let _ = std::fs::write(&cache_path, &image_bytes);
+
     let _ = state.app_handle.emit("log", LogEvent {
-        message: format!("PUSH (Image) received: {} bytes", image_bytes.len()),
+        message: format!("PUSH (Image) received: {} bytes. Cache: {:?}", image_bytes.len(), cache_path),
         kind: "success".to_string(),
     });
 

@@ -6,12 +6,22 @@ export interface HistoryItem {
     id: string;
     type: 'image' | 'video' | 'text' | 'archive' | 'file';
     direction: 'incoming' | 'outgoing';
+    target: 'clipboard' | 'folder';
     name: string;
-    description: string; // e.g., "4.2 MB" or "copied content"
+    fileSize?: string; // e.g., "4.2 MB" for images/files only
     status: 'pending' | 'success' | 'error';
     timestamp: number;
     rawPath?: string; // For opening file/thumbnail
 }
+
+const normalizePath = (path: string) => {
+    return path
+        .replace(/^"/, "")
+        .replace(/"$/, "")
+        .replace(/\\\\/g, "/")
+        .replace(/\\/g, "/")
+        .trim();
+};
 
 export function useHistory() {
     const [history, setHistory] = useState<HistoryItem[]>([]);
@@ -20,11 +30,27 @@ export function useHistory() {
         setHistory(prev => [item, ...prev].slice(0, 50)); // Keep last 50
     }, []);
 
-    const updateStatus = useCallback((id: string, status: 'success' | 'error') => {
-        setHistory(prev => prev.map(item =>
-            item.id === id ? { ...item, status } : item
-        ));
+    const clearHistory = useCallback(() => {
+        setHistory([]);
     }, []);
+
+    const deleteHistoryItem = useCallback(async (id: string) => {
+        // Find the item to check if it has a cache file
+        const item = history.find(h => h.id === id);
+
+        if (item?.rawPath && item.rawPath.includes('.cache')) {
+            // Delete the cache file
+            try {
+                const { invoke } = await import('@tauri-apps/api/core');
+                await invoke('delete_cache_file', { filePath: item.rawPath });
+            } catch (e) {
+                console.error('Failed to delete cache file:', e);
+            }
+        }
+
+        // Remove from history
+        setHistory(prev => prev.filter(h => h.id !== id));
+    }, [history]);
 
     useEffect(() => {
         // Listen for standard logs and attempt to parse them into history items
@@ -43,30 +69,30 @@ export function useHistory() {
             if (message.startsWith("PULL: Sending")) {
                 let type: HistoryItem['type'] = 'file';
                 let name = "Unknown";
-                let description = "";
+                let fileSize: string | undefined = undefined;
 
                 if (message.includes("ZIP Archive")) {
                     type = 'archive';
                     name = "File Batch";
-                    const size = message.match(/\((\d+) bytes\)/);
-                    if (size) description = formatBytes(parseInt(size[1]));
+                    const sizeMatch = message.match(/\((\d+) bytes\)/);
+                    if (sizeMatch) fileSize = formatBytes(parseInt(sizeMatch[1]));
                 } else if (message.includes("Image")) {
                     type = 'image';
                     name = "Image";
-                    const size = message.match(/\((\d+) bytes\)/);
-                    if (size) description = formatBytes(parseInt(size[1]));
+                    const sizeMatch = message.match(/\((\d+) bytes\)/);
+                    if (sizeMatch) fileSize = formatBytes(parseInt(sizeMatch[1]));
                 } else if (message.includes("Text")) {
                     type = 'text';
-                    name = "Clipboard Text";
-                    description = "Copied to iOS";
+                    name = "Clipboard Content";
                 }
 
                 addHistoryItem({
                     id,
                     type,
                     direction: 'outgoing',
+                    target: type === 'text' ? 'clipboard' : 'folder',
                     name,
-                    description,
+                    fileSize,
                     status: kind === 'success' || kind === 'info' ? 'success' : 'error',
                     timestamp: now
                 });
@@ -76,48 +102,51 @@ export function useHistory() {
             // "PUSH (Text) received: ..."
             // "PUSH (Image) received: 1234 bytes"
             else if (message.startsWith("PUSH")) {
-                // Ignore PUSH logs that are just precursors to file saves 
-                // We prefer the informatio from "Saved to" which contains the real path and filename.
-                if (message.includes("(Image)") || message.includes("(File)") || message.includes("Received")) {
-                    return;
-                }
-
-                let type: HistoryItem['type'] = 'file';
-                let name = "Received";
-                let description = "";
-                let direction: HistoryItem['direction'] = 'incoming';
+                let type: HistoryItem['type'] = 'text';
+                let name = "Clipboard Content";
+                let fileSize: string | undefined = undefined;
+                let rawPath: string | undefined = undefined;
 
                 if (message.includes("(Text)")) {
-                    type = 'text';
-                    name = "Clipboard Text";
-                    const content = message.split("received: ").pop()?.replace(/\.\.\.$/, "");
-                    description = content || "Copied to PC";
+                    const content = message.split("received: ").pop()?.trim() || "";
+                    if (!content) return; // Skip empty text
+                    name = content;
+                } else if (message.includes("(Image)")) {
+                    type = 'image';
+                    name = "";
+                    fileSize = undefined;
+                    // Extract cache path
+                    const cacheMatch = message.match(/Cache: "([^"]+)"/);
+                    if (cacheMatch) rawPath = normalizePath(cacheMatch[1]);
+                } else {
+                    // Ignore precursor logs like "PUSH: Received X files"
+                    return;
                 }
 
                 addHistoryItem({
                     id,
                     type,
-                    direction,
+                    direction: 'incoming',
+                    target: 'clipboard',
                     name,
-                    description,
+                    fileSize,
+                    rawPath,
                     status: kind === 'success' || kind === 'info' ? 'success' : 'error',
                     timestamp: now
                 });
             }
-            // "Saved to: C:\Users\...\Downloads\..."
-            // Rust {:?} formatting adds quotes and escapes backslashes
+            // "Saved to: C:\Users\...\Downloads\... (1234 bytes)"
             else if (message.includes("Saved to ")) {
-                let fullPath = message.split("Saved to ").pop()?.trim() || "";
+                // Regex to extract path inside quotes and size: Saved to "C:\..." (1234 bytes)
+                const pathMatch = message.match(/Saved to "([^"]+)"/);
+                let fullPath = pathMatch ? pathMatch[1] : message.split("Saved to ")[1]?.split(' (')[0]?.trim() || "";
 
-                // Strip quotes if present (Rust PathBuf {:?} formatting)
-                fullPath = fullPath.replace(/^"/, "").replace(/"$/, "");
+                // Extract file size if present
+                const sizeMatch = message.match(/\((\d+) bytes\)/);
+                let fileSize: string | undefined = undefined;
+                if (sizeMatch) fileSize = formatBytes(parseInt(sizeMatch[1]));
 
-                // Normalize backslashes and forward slashes
-                // convertFileSrc works best with normalized separators
-                fullPath = fullPath.replace(/\\\\/g, "/").replace(/\\/g, "/");
-
-                // Debug log to help identify path issues in the console
-                console.log("[Passer] File received at:", fullPath);
+                fullPath = normalizePath(fullPath);
 
                 const filename = fullPath.split('/').pop() || "File";
                 const ext = filename.split('.').pop()?.toLowerCase();
@@ -132,11 +161,12 @@ export function useHistory() {
                     id,
                     type,
                     direction: 'incoming',
+                    target: 'folder',
                     name: filename,
-                    description: "Saved to Downloads",
+                    fileSize,
+                    rawPath: fullPath,
                     status: 'success',
                     timestamp: now,
-                    rawPath: fullPath
                 });
             }
 
@@ -147,11 +177,7 @@ export function useHistory() {
         };
     }, [addHistoryItem]);
 
-    const clearHistory = useCallback(() => {
-        setHistory([]);
-    }, []);
-
-    return { history, clearHistory };
+    return { history, clearHistory, deleteHistoryItem };
 }
 
 function formatBytes(bytes: number, decimals = 1) {

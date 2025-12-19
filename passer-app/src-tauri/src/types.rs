@@ -35,3 +35,18 @@ pub struct LogEvent {
     pub message: String,
     pub kind: String, // "info", "error", "success"
 }
+
+// Server Control State
+pub struct ServerControl {
+    pub tx: std::sync::Mutex<Option<tokio::sync::broadcast::Sender<()>>>,
+    pub app_handle: AppHandle,
+}
+
+impl ServerControl {
+    pub fn new(app_handle: AppHandle) -> Self {
+        Self {
+            tx: std::sync::Mutex::new(None),
+            app_handle,
+        }
+    }
+}

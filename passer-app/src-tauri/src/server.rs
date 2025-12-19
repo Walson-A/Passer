@@ -10,7 +10,7 @@ use crate::types::{ServerState, LogEvent};
 use crate::clipboard;
 use crate::files;
 
-pub async fn start_server(app_handle: AppHandle) {
+pub async fn start_server(app_handle: AppHandle, mut rx: tokio::sync::broadcast::Receiver<()>) {
     let state = ServerState::new(app_handle.clone());
 
     let app = Router::new()
@@ -33,19 +33,45 @@ pub async fn start_server(app_handle: AppHandle) {
     match tokio::net::TcpListener::bind(addr).await {
         Ok(listener) => {
             println!(" [SERVER] Listening on http://0.0.0.0:8000");
-             let _ = app_handle.emit("log", LogEvent {
+            let _ = app_handle.emit("log", LogEvent {
                 message: "Server listening successfully!".to_string(),
                 kind: "success".to_string(),
             });
-            if let Err(e) = axum::serve(listener, app).await {
+            
+            // Serve with graceful shutdown
+            if let Err(e) = axum::serve(listener, app)
+                .with_graceful_shutdown(async move {
+                    let _ = rx.recv().await;
+                    println!(" [SERVER] Shutdown signal received");
+                })
+                .await 
+            {
                 eprintln!(" [SERVER] Error serving: {}", e);
             }
+            
+            let _ = app_handle.emit("server-stopped", ());
+            let _ = app_handle.emit("log", LogEvent {
+                message: "Server stopped.".to_string(),
+                kind: "info".to_string(),
+            });
         },
         Err(e) => {
-            let err_msg = format!("FAILED TO BIND PORT 8000: {}", e);
+            // Check if it's a port already in use error
+            let err_msg = if e.kind() == std::io::ErrorKind::AddrInUse {
+                format!(
+                    "Port 8000 is already in use. Please close the application using this port and restart Passer.\n\nError details: {}",
+                    e
+                )
+            } else {
+                format!(
+                    "Failed to start server on port 8000.\n\nError: {}\n\nPlease check your network configuration and firewall settings.",
+                    e
+                )
+            };
+            
             eprintln!(" [SERVER] FATAL ERROR: {}", err_msg);
-             let _ = app_handle.emit("log", LogEvent {
-                message: err_msg,
+            let _ = app_handle.emit("log", LogEvent {
+                message: err_msg.clone(),
                 kind: "error".to_string(),
             });
         }

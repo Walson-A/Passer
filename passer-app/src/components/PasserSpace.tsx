@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { X, ExternalLink, Layers, MonitorSmartphone, Link2, Power, Check } from "lucide-react";
+import { PremiumTooltip } from "./PremiumTooltip";
 
 interface Props {
     isTransferring?: boolean;
@@ -39,45 +40,38 @@ export function PasserSpace({ isTransferring = false }: Props) {
     return (
         <div className="relative">
             {/* The Trigger Button */}
-            <button
-                ref={triggerRef}
-                onClick={toggleOpen}
-                className={`
-                    group relative w-10 h-10 rounded-full flex items-center justify-center 
-                    transition-all duration-300 ease-out z-50
-                    hover:-translate-y-0.5 active:scale-95
-                    ${isOpen
-                        ? "bg-white/10 backdrop-blur-xl border border-white/20 shadow-[0_0_20px_rgba(255,255,255,0.1)] scale-105"
-                        : "bg-transparent border-transparent hover:bg-white/[0.08]"
-                    }
-                `}
-            >
-                {/*
-                [x] Indiquer le statut du périphérique (simulation "No active devices")
-                [x] Peaufiner les effets de survol sur les détails de connexion
-                [/] Implémenter le Drag & Drop pour le Space
-                    [ ] Créer l'overlay visuel `DropZone` (Glassmorphism + Blur)
-                    [ ] Écouter les événements Tauri `drag-drop` et `file-drop`
-                    [ ] Créer la commande Rust `handle_file_drop` pour copier les fichiers
-                    [ ] Lier le feedback visuel (Barre de statut émeraude lors de la copie)
-                */}
-                <div className={`transition-all duration-300 ${isOpen ? "rotate-90 scale-90" : ""}`}>
-                    {isOpen ?
-                        <X className="w-5 h-5 text-white/80" strokeWidth={2} /> :
-                        <Layers className={`w-4.5 h-4.5 transition-colors ${isActive ? "text-white/40 group-hover:text-blue-400" : "text-white/10"}`} strokeWidth={2} />
-                    }
-                </div>
-
-                <span
+            <PremiumTooltip label="Passer Space">
+                <button
+                    ref={triggerRef}
+                    onClick={toggleOpen}
                     className={`
-                    absolute top-0.5 right-0.5 w-2 h-2 rounded-full transition-all duration-300
-                    ${isActive
-                            ? "bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.8)] border border-[#1a1a1a]"
-                            : "bg-white/10 border border-white/5 opacity-50"}
-                    ${isActive ? (isTransferring ? "animate-pulse" : !isOpen ? "animate-pulse-slow opacity-60" : "opacity-0") : ""}
+                        group relative w-10 h-10 rounded-full flex items-center justify-center 
+                        transition-all duration-300 ease-out z-50
+                        hover:-translate-y-0.5 active:scale-95
+                        ${isOpen
+                            ? "bg-white/10 backdrop-blur-xl border border-white/20 shadow-[0_0_20px_rgba(255,255,255,0.1)] scale-105"
+                            : "bg-transparent border-transparent hover:bg-white/[0.08]"
+                        }
                     `}
-                />
-            </button>
+                >
+                    <div className={`transition-all duration-300 ${isOpen ? "rotate-90 scale-90" : ""}`}>
+                        {isOpen ?
+                            <X className="w-5 h-5 text-white/80" strokeWidth={1.5} /> :
+                            <Layers className={`w-4.5 h-4.5 transition-colors ${isActive ? "text-white/50 group-hover:text-blue-400" : "text-white/10"}`} strokeWidth={1.5} />
+                        }
+                    </div>
+
+                    <span
+                        className={`
+                        absolute top-0.5 right-0.5 w-2 h-2 rounded-full transition-all duration-300
+                        ${isActive
+                                ? "bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.8)] border border-[#1a1a1a]"
+                                : "bg-white/10 border border-white/5 opacity-50"}
+                        ${isActive ? (isTransferring ? "animate-pulse" : !isOpen ? "animate-pulse-slow opacity-60" : "opacity-0") : ""}
+                        `}
+                    />
+                </button>
+            </PremiumTooltip>
 
             {/* The Floating Panel */}
             <div
@@ -168,7 +162,7 @@ export function PasserSpace({ isTransferring = false }: Props) {
                         <div className="p-5 bg-white/[0.04] border-t border-white/[0.06]">
                             <div className="flex flex-col gap-2.5">
                                 <div className="flex items-center gap-2 px-0.5 text-white/50">
-                                    <MonitorSmartphone className="w-3.5 h-3.5" />
+                                    <MonitorSmartphone className="w-3.5 h-3.5" strokeWidth={1.5} />
                                     <span className="text-[9px] font-black uppercase tracking-widest">Connect Device</span>
                                 </div>
 
@@ -188,11 +182,11 @@ export function PasserSpace({ isTransferring = false }: Props) {
 
                                     <div className="flex items-center gap-2 relative z-10">
                                         {copied ? (
-                                            <Check className="w-3.5 h-3.5 text-white animate-in zoom-in-50 duration-300" />
+                                            <Check className="w-3.5 h-3.5 text-white animate-in zoom-in-50 duration-300" strokeWidth={1.5} />
                                         ) : (
                                             <>
                                                 <span className="text-[9px] font-black uppercase text-white/30 group-hover:text-blue-400 transition-colors">Copy</span>
-                                                <Link2 className="w-3.5 h-3.5 text-white/30 group-hover:text-blue-400 transition-colors" />
+                                                <Link2 className="w-3.5 h-3.5 text-white/30 group-hover:text-blue-400 transition-colors" strokeWidth={1.5} />
                                             </>
                                         )}
                                     </div>

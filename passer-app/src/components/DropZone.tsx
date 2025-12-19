@@ -17,7 +17,7 @@ export function DropZone({ onDropSuccess }: Props) {
         const unlistenDragEnter = webview.onDragDropEvent((event) => {
             if (event.payload.type === "enter") {
                 setIsHovering(true);
-            } else if (event.payload.type === "leave" || event.payload.type === "cancel") {
+            } else if (event.payload.type === "leave") {
                 setIsHovering(false);
             } else if (event.payload.type === "drop") {
                 setIsHovering(false);
@@ -62,7 +62,7 @@ export function DropZone({ onDropSuccess }: Props) {
                             <ArrowDownToLine className="w-4 h-4 text-blue-400" />
                         </div>
                         <h2 className="text-xl font-black text-white uppercase tracking-[0.1em]">
-                            Drop to <span className="text-blue-400 underline decoration-2 underline-offset-4">Sync</span>
+                            Drop to <span className="text-blue-400 underline decoration-2 underline-offset-4">Space</span>
                         </h2>
                     </div>
                     <p className="text-[10px] font-bold text-white/40 tracking-wide leading-relaxed max-w-[200px] mx-auto uppercase">

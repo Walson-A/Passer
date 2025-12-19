@@ -30,7 +30,9 @@ pub fn run() {
             commands::open_webdav,
             commands::get_webdav_creds,
             commands::handle_file_drop,
-            commands::set_window_on_top
+            commands::set_window_on_top,
+            commands::toggle_server,
+            commands::delete_cache_file
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
@@ -45,10 +47,16 @@ pub fn run() {
             // Enable Auto-Start
             let _ = app.autolaunch().enable();
             
+            // Init Server Control
+            let title_control = ServerControl::new(app.handle().clone());
+            let (tx, rx) = tokio::sync::broadcast::channel(1);
+            *title_control.tx.lock().unwrap() = Some(tx);
+            app.manage(title_control);
+
             // Start HTTP Server
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
-               server::start_server(handle).await;
+               server::start_server(handle, rx).await;
             });
             
             // Setup System Tray

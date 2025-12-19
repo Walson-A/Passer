@@ -6,7 +6,7 @@ use std::sync::Arc;
 use tauri::Emitter;
 
 use crate::types::{ServerState, LogEvent};
-use crate::paths::{get_downloads_dir, get_target_dir};
+use crate::paths::{get_downloads_dir, get_target_dir, get_unique_file_path};
 
 pub async fn push_file(
     State(state): State<Arc<ServerState>>,
@@ -24,13 +24,22 @@ pub async fn push_file(
                 let _field_name = field.name().unwrap_or("unknown_field").to_string();
                 
                 let target_dir = get_target_dir(&download_base, &content_type, &filename);
-                let target_path = target_dir.join(&filename);
+                let initial_path = target_dir.join(&filename);
+                
+                // Get unique file path (handles collisions by renaming)
+                let target_path = get_unique_file_path(initial_path);
+                let was_renamed = target_path != target_dir.join(&filename);
                 
                 if let Ok(bytes) = field.bytes().await {
                      match std::fs::write(&target_path, &bytes) {
                         Ok(_) => {
+                            let log_message = if was_renamed {
+                                format!("Saved to {:?} ({} bytes) (renamed to avoid collision)", target_path, bytes.len())
+                            } else {
+                                format!("Saved to {:?} ({} bytes)", target_path, bytes.len())
+                            };
                             let _ = state.app_handle.emit("log", LogEvent {
-                               message: format!("Saved to {:?}", target_path),
+                               message: log_message,
                                kind: "info".to_string(),
                            });
                             saved_files.push(target_path.to_string_lossy().to_string());

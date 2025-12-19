@@ -1,8 +1,10 @@
 use std::sync::Arc;
 use tauri::AppHandle;
 
-use crate::types::{ServerState, WebDavCreds};
-use crate::paths::{get_downloads_dir, get_webdav_dir};
+use crate::types::{ServerState, WebDavCreds, ServerControl, LogEvent};
+use crate::paths::{get_downloads_dir, get_webdav_dir, get_unique_file_path};
+use crate::server;
+use tauri::Emitter;
 
 #[tauri::command]
 pub fn get_ip() -> String {
@@ -66,7 +68,10 @@ pub async fn handle_file_drop(paths: Vec<String>) -> Result<(), String> {
         if source_path.exists() {
             let filename = source_path.file_name()
                 .ok_or_else(|| "Invalid filename".to_string())?;
-            let target_path = target_dir.join(filename);
+            let initial_target = target_dir.join(filename);
+            
+            // Get unique file path to avoid collisions
+            let target_path = get_unique_file_path(initial_target);
             
             // If it's a file, copy it. If it's a directory, we might need recursive copy or just ignore.
             // For now, let's stick to files for simplicity and robustness.
@@ -75,6 +80,63 @@ pub async fn handle_file_drop(paths: Vec<String>) -> Result<(), String> {
                     .map_err(|e| format!("Failed to copy file {:?}: {}", source_path, e))?;
             }
         }
+    }
+    
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn toggle_server(state: tauri::State<'_, ServerControl>) -> Result<String, String> {
+    let mut tx_lock = state.tx.lock().map_err(|_| "Failed to lock server control".to_string())?;
+    
+    if let Some(tx) = tx_lock.as_ref() {
+        // Server is running -> Stop it
+        let _ = tx.send(());
+        *tx_lock = None;
+        println!(" [SERVER] Stopped by user toggle");
+        // log emission is handled in server.rs 'server-stopped'
+        // But we return state "off"
+        Ok("off".to_string())
+    } else {
+        // Server is stopped -> Start it
+        let (tx, rx) = tokio::sync::broadcast::channel(1);
+        *tx_lock = Some(tx);
+        
+        let app_handle = state.app_handle.clone();
+        tauri::async_runtime::spawn(async move {
+            server::start_server(app_handle, rx).await;
+        });
+        
+        // Emit events
+        let _ = state.app_handle.emit("server-started", ());
+        let _ = state.app_handle.emit("log", LogEvent {
+            message: "Server resumed by user.".to_string(),
+            kind: "info".to_string(),
+        });
+        
+        println!(" [SERVER] Resumed by user toggle");
+        Ok("on".to_string())
+    }
+}
+
+#[tauri::command]
+pub async fn delete_cache_file(file_path: String) -> Result<(), String> {
+    use crate::paths::get_cache_dir;
+    use std::path::Path;
+    
+    let cache_dir = get_cache_dir();
+    let file_path_buf = Path::new(&file_path);
+    
+    // Security: Ensure the file is within the cache directory
+    if !file_path_buf.starts_with(&cache_dir) {
+        return Err("Invalid path: file is not in cache directory".to_string());
+    }
+    
+    // Delete the file if it exists
+    if file_path_buf.exists() {
+        std::fs::remove_file(file_path_buf)
+            .map_err(|e| format!("Failed to delete cache file: {}", e))?;
+        println!(" [CACHE] Deleted: {:?}", file_path_buf);
     }
     
     Ok(())
