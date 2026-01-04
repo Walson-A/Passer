@@ -1,5 +1,5 @@
 <align align="center">
-  <img src="public/Logo%20Passer%20Final.png" width="160" height="160" alt="Passer Logo">
+  <img src="src-tauri/icons/Logo%20Passer%20Final.png" width="160" height="160" alt="Passer Logo">
   <h1>Passer</h1>
   <p><b>The seamless bridge between your iPhone and PC.</b></p>
 
@@ -14,7 +14,7 @@
 **Passer** is a ultra-fast, cross-device clipboard and file transfer utility designed for maximum productivity. It bridges the gap between **Windows and iOS**, allowing you to sync your workflow across your devices instantly.
 
 <p align="center">
-  <img src="public/Screenshot.png" width="800" alt="Passer Showcase">
+  <img src="src-tauri/icons/Screenshot.png" width="800" alt="Passer Showcase">
 </p>
 
 ## 📱 iPhone ↔️ PC Workflow (iOS Shortcuts)
@@ -23,13 +23,13 @@ Passer leverages **iOS Shortcuts** to provide a deeply integrated experience on 
 
 - **📤 Push**: Send anything from your iPhone (Clipboard, Files, Photos, Text) directly to your PC.
 - **📥 Pull**: Retrieve your PC's current clipboard and save it to your iPhone instantly.
-- **� Pass**: Send content to your PC directly from the **Apple Share Sheet** in any app.
+- **🔗 Pass**: Send content to your PC directly from the **Apple Share Sheet** in any app.
 
 ### 🔗 Get the iOS Shortcuts
 *Add these shortcuts to your iPhone to start passing:*
-- [ ] [**Push Shortcut**](https://www.icloud.com/shortcuts/dd0caf23b72042beb73ed2b4f175477c)
-- [ ] [**Pull Shortcut**](https://www.icloud.com/shortcuts/4293d6e1253249efa1b6401f4648641e)
-- [ ] [**Pass Shortcut**](https://www.icloud.com/shortcuts/6a6fa41ddc2a452cb19b9f245b1709e6)
+- [x] [**Push Shortcut**](https://www.icloud.com/shortcuts/dd0caf23b72042beb73ed2b4f175477c)
+- [x] [**Pull Shortcut**](https://www.icloud.com/shortcuts/4293d6e1253249efa1b6401f4648641e)
+- [x] [**Pass Shortcut**](https://www.icloud.com/shortcuts/6a6fa41ddc2a452cb19b9f245b1709e6)
 
 ---
 
