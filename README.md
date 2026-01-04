@@ -1,5 +1,5 @@
 <align align="center">
-  <img src="src-tauri/icons/Logo%20Passer%20Final.png" width="160" height="160" alt="Passer Logo">
+  <img src="passer-app/src-tauri/icons/Logo%20Passer%20Final.png" width="160" height="160" alt="Passer Logo">
   <h1>Passer</h1>
   <p><b>The seamless bridge between your iPhone and PC.</b></p>
 
@@ -14,7 +14,7 @@
 **Passer** is a ultra-fast, cross-device clipboard and file transfer utility designed for maximum productivity. It bridges the gap between **Windows and iOS**, allowing you to sync your workflow across your devices instantly.
 
 <p align="center">
-  <img src="src-tauri/icons/Screenshot.png" width="800" alt="Passer Showcase">
+  <img src="passer-app/src-tauri/icons/Screenshot.png" width="800" alt="Passer Showcase">
 </p>
 
 ## 📱 iPhone ↔️ PC Workflow (iOS Shortcuts)
