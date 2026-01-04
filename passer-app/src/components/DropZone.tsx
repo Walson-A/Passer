@@ -12,28 +12,39 @@ export function DropZone({ onDropSuccess }: Props) {
     const [isHovering, setIsHovering] = useState(false);
 
     useEffect(() => {
-        const webview = getCurrentWebview();
+        let unlisten: (() => void) | undefined;
 
-        const unlistenDragEnter = webview.onDragDropEvent((event) => {
-            if (event.payload.type === "enter") {
-                setIsHovering(true);
-            } else if (event.payload.type === "leave") {
-                setIsHovering(false);
-            } else if (event.payload.type === "drop") {
-                setIsHovering(false);
-                const paths = event.payload.paths;
-                if (paths.length > 0) {
-                    invoke("handle_file_drop", { paths })
-                        .then(() => {
-                            onDropSuccess();
-                        })
-                        .catch(console.error);
-                }
+        async function setup() {
+            try {
+                const webview = getCurrentWebview();
+                if (!webview) return;
+
+                unlisten = await webview.onDragDropEvent((event) => {
+                    if (event.payload.type === "enter") {
+                        setIsHovering(true);
+                    } else if (event.payload.type === "leave") {
+                        setIsHovering(false);
+                    } else if (event.payload.type === "drop") {
+                        setIsHovering(false);
+                        const paths = event.payload.paths;
+                        if (paths.length > 0) {
+                            invoke("handle_file_drop", { paths })
+                                .then(() => {
+                                    onDropSuccess();
+                                })
+                                .catch(console.error);
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error("Failed to setup DropZone:", error);
             }
-        });
+        }
+
+        setup();
 
         return () => {
-            unlistenDragEnter.then(u => u());
+            if (unlisten) unlisten();
         };
     }, [onDropSuccess]);
 

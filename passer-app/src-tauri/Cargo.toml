@@ -1,8 +1,8 @@
 [package]
-name = "passer-app"
-version = "0.1.0"
-description = "Passer - Local File Transfer"
-authors = ["you"]
+name = "passer"
+version = "1.0.0"
+description = "Passer - Cross-device clipboard"
+authors = ["Walson Argan René"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
