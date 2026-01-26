@@ -1,50 +1,58 @@
 {
+  "nav": {
+    "features": "Fonctionnalités",
+    "shortcuts": "Raccourcis",
+    "download": "Télécharger",
+    "language": "Langue"
+  },
   "hero": {
     "title": "Passer",
-    "subtitle": "Le pont invisible entre votre iPhone et votre PC.",
-    "description": "Un utilitaire de transfert de fichiers et de presse-papiers ultra-rapide conçu pour une productivité maximale.",
+    "subtitle": "Unifiez votre iPhone et votre PC.",
+    "description": "Arrêtez de vous envoyer des e-mails. Passer est le moyen le plus rapide de synchroniser votre presse-papiers et de transférer des fichiers sur votre réseau local.",
     "download_windows": "Télécharger pour Windows",
-    "get_shortcuts": "Obtenir les Raccourcis iOS",
-    "version": "v1.0.0"
+    "get_shortcuts": "Obtenir les Raccourcis",
+    "version": "v1.0.0",
+    "available_now": "Disponible Maintenant"
   },
   "features": {
-    "title": "Fonctionnalités Clés",
+    "title": "Pourquoi Passer ?",
     "instant_sync": {
       "title": "Synchro Instantanée",
-      "description": "Copiez sur PC, collez sur iPhone (et vice versa) via votre réseau local."
+      "description": "Copiez sur PC, collez sur iPhone. Simple et efficace. Tout se fait via votre Wi-Fi local."
     },
     "passer_space": {
       "title": "Espace Passer",
-      "description": "Un serveur WebDAV local qui transforme votre PC en disque partagé sans fil pour votre iPhone."
+      "description": "Transformez votre PC en disque sans fil. Accédez à vos fichiers directement depuis l'app Fichiers."
     },
     "premium_ux": {
-      "title": "UX Premium",
-      "description": "Une interface Windows élégante et glassmorphique qui s'ancre en bas à droite de votre écran."
+      "title": "Conçu pour Windows 11",
+      "description": "Une interface glassmorphique élégante qui s'intègre parfaitement à votre bureau."
     },
     "privacy_first": {
-      "title": "Confidentialité Avant Tout",
-      "description": "Tout reste sur votre réseau local. Pas de cloud, pas de serveurs externes."
+      "title": "Privé & Sécurisé",
+      "description": "Pas de cloud, pas de comptes, aucune donnée ne sort de votre réseau. Vos fichiers vous appartiennent."
     }
   },
   "shortcuts": {
-    "title": "Workflow iPhone ↔️ PC",
-    "subtitle": "Passer utilise les Raccourcis iOS pour une expérience profondément intégrée.",
+    "title": "Intégration iOS Puissante",
+    "subtitle": "Utilisez les Raccourcis Apple pour déclencher des actions instantanément.",
     "push": {
-      "title": "Push",
-      "description": "Envoyez tout (Presse-papiers, Fichiers, Photos, Texte) de l'iPhone vers le PC."
+      "title": "Push vers PC",
+      "description": "Envoyez photos, fichiers ou texte depuis le menu de partage de votre iPhone vers votre ordinateur."
     },
     "pull": {
-      "title": "Pull",
-      "description": "Récupérez le presse-papiers actuel de votre PC et enregistrez-le instantanément sur votre iPhone."
+      "title": "Pull depuis PC",
+      "description": "Récupérez le contenu du presse-papiers de votre PC sur votre iPhone en un seul geste."
     },
     "pass": {
-      "title": "Pass",
-      "description": "Envoyez du contenu vers votre PC directement depuis la feuille de partage Apple."
+      "title": "Passer Rapide",
+      "description": "Le moyen le plus rapide de déposer un fichier ou un lien dans votre workflow de bureau."
     },
-    "add_button": "Ajouter le Raccourci"
+    "add_button": "Ajouter à Siri"
   },
   "footer": {
-    "built_with": "Fait avec ❤️ pour la vitesse et la simplicité.",
-    "author": "Créé par Walson Argan René"
+    "copyright": "© 2024 Passer. Tous droits réservés.",
+    "built_with": "Conçu avec précision.",
+    "author": "Design & Développement par Walson Argan René"
   }
 }

@@ -4,31 +4,23 @@
   --font-sans: "Inter", "SF Pro Display", system-ui, sans-serif;
 
   /* Refined Palette (Restrained) */
-  --bg-primary: #0F0F0F;
-  /* Deep Black */
+  --bg-primary: #050505; /* Deepest Black */
   --bg-card: rgba(255, 255, 255, 0.03);
   --border-subtle: rgba(255, 255, 255, 0.08);
 
   --text-primary: #FFFFFF;
   --text-secondary: #9CA3AF;
-  /* Gray-400 */
   --text-tertiary: #6B7280;
-  /* Gray-500 */
 
-  /* Status Colors (Desaturated) */
   --status-success: #10B981;
-  /* Emerald-500 */
   --status-error: #EF4444;
-  /* Red-500 */
   --status-pending: #F59E0B;
-  /* Amber-500 */
 
   /* Glassmorphism */
-  --glass-bg: rgba(20, 20, 20, 0.6);
-  --glass-border: rgba(255, 255, 255, 0.05);
-  --backdrop: blur(24px);
+  --glass-bg: rgba(20, 20, 20, 0.4);
+  --glass-border: rgba(255, 255, 255, 0.06);
+  --backdrop: blur(12px);
 
-  /* Easings */
   --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -40,33 +32,26 @@ body {
   color: var(--text-primary);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
+  scroll-behavior: smooth;
 }
 
 #root {
   width: 100%;
 }
 
-/* Animations from App.css */
-@keyframes slide-up {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
+.perspective-1000 {
+  perspective: 1000px;
+}
 
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+/* Animations */
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes fade-in {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .animate-slide-up {
@@ -85,146 +70,38 @@ body {
   border: 1px solid var(--glass-border);
 }
 
-@keyframes flux-push {
-  0% {
-    transform: translateX(-100%) skewX(-15deg);
-    opacity: 0;
-  }
-  20% { opacity: 1; }
-  80% { opacity: 1; }
-  100% {
-    transform: translateX(200%) skewX(-15deg);
-    opacity: 0;
-  }
+@keyframes pulse-slow {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.05); }
 }
 
-@keyframes flux-pull {
-  0% {
-    transform: translateX(200%) skewX(15deg);
-    opacity: 0;
-  }
-  20% { opacity: 1; }
-  80% { opacity: 1; }
-  100% {
-    transform: translateX(-100%) skewX(15deg);
-    opacity: 0;
-  }
+@keyframes pulse-slower {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.1); }
 }
 
-.animate-flux-push {
-  animation: flux-push 1.5s linear infinite;
+.animate-pulse-slow {
+  animation: pulse-slow 8s ease-in-out infinite;
 }
 
-.animate-flux-pull {
-  animation: flux-pull 1.5s linear infinite;
+.animate-pulse-slower {
+  animation: pulse-slower 12s ease-in-out infinite;
 }
 
-.animate-fade-in-up {
-  animation: slide-up 0.4s var(--ease-out-expo) forwards;
-}
-
-@keyframes strong-ping {
-  0% {
-    transform: scale(0.8);
-    opacity: 0.8;
-  }
-  80% {
-    transform: scale(2);
-    opacity: 0;
-  }
-  100% {
-    transform: scale(2.2);
-    opacity: 0;
-  }
-}
-
-.animate-strong-ping {
-  animation: strong-ping 0.8s cubic-bezier(0, 0, 0.2, 1) infinite;
-}
-
-/* Custom Clean Scrollbar */
+/* Scrollbar */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: #050505;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.1);
   border-radius: 10px;
-  transition: background 0.3s ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.15);
-}
-
-::-webkit-scrollbar-corner {
-  background: transparent;
-}
-
-@keyframes slide-in-visceral {
-  0% {
-    opacity: 0;
-    transform: translateY(-40px) scale(0.9);
-    filter: blur(10px);
-  }
-  60% {
-    opacity: 1;
-    transform: translateY(10px) scale(1.02);
-    filter: blur(0);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-    filter: blur(0);
-  }
-}
-
-.animate-slide-in-visceral {
-  animation: slide-in-visceral 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
-}
-
-@keyframes shake-subtle {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-2px); }
-  75% { transform: translateX(2px); }
-}
-
-.animate-shake-subtle {
-  animation: shake-subtle 0.4s ease-in-out;
-}
-
-@keyframes pulse-success {
-  0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
-  60% { box-shadow: 0 0 0 4px rgba(16, 185, 129, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
-}
-
-.animate-pulse-success {
-  animation: pulse-success 0.6s ease-out 1;
-}
-
-@keyframes pulse-error {
-  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
-  70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
-}
-
-.animate-pulse-error {
-  animation: pulse-error 1s ease-out infinite;
-}
-
-@keyframes flux-gradient {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-
-.bg-flux-active {
-  background-size: 200% 200%;
-  animation: flux-gradient 2s linear infinite;
+  background: rgba(255, 255, 255, 0.2);
 }
