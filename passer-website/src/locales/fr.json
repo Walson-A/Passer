@@ -1,0 +1,50 @@
+{
+  "hero": {
+    "title": "Passer",
+    "subtitle": "Le pont invisible entre votre iPhone et votre PC.",
+    "description": "Un utilitaire de transfert de fichiers et de presse-papiers ultra-rapide conçu pour une productivité maximale.",
+    "download_windows": "Télécharger pour Windows",
+    "get_shortcuts": "Obtenir les Raccourcis iOS",
+    "version": "v1.0.0"
+  },
+  "features": {
+    "title": "Fonctionnalités Clés",
+    "instant_sync": {
+      "title": "Synchro Instantanée",
+      "description": "Copiez sur PC, collez sur iPhone (et vice versa) via votre réseau local."
+    },
+    "passer_space": {
+      "title": "Espace Passer",
+      "description": "Un serveur WebDAV local qui transforme votre PC en disque partagé sans fil pour votre iPhone."
+    },
+    "premium_ux": {
+      "title": "UX Premium",
+      "description": "Une interface Windows élégante et glassmorphique qui s'ancre en bas à droite de votre écran."
+    },
+    "privacy_first": {
+      "title": "Confidentialité Avant Tout",
+      "description": "Tout reste sur votre réseau local. Pas de cloud, pas de serveurs externes."
+    }
+  },
+  "shortcuts": {
+    "title": "Workflow iPhone ↔️ PC",
+    "subtitle": "Passer utilise les Raccourcis iOS pour une expérience profondément intégrée.",
+    "push": {
+      "title": "Push",
+      "description": "Envoyez tout (Presse-papiers, Fichiers, Photos, Texte) de l'iPhone vers le PC."
+    },
+    "pull": {
+      "title": "Pull",
+      "description": "Récupérez le presse-papiers actuel de votre PC et enregistrez-le instantanément sur votre iPhone."
+    },
+    "pass": {
+      "title": "Pass",
+      "description": "Envoyez du contenu vers votre PC directement depuis la feuille de partage Apple."
+    },
+    "add_button": "Ajouter le Raccourci"
+  },
+  "footer": {
+    "built_with": "Fait avec ❤️ pour la vitesse et la simplicité.",
+    "author": "Créé par Walson Argan René"
+  }
+}

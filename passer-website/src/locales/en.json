@@ -1,0 +1,50 @@
+{
+  "hero": {
+    "title": "Passer",
+    "subtitle": "The seamless bridge between your iPhone and PC.",
+    "description": "A ultra-fast, cross-device clipboard and file transfer utility designed for maximum productivity.",
+    "download_windows": "Download for Windows",
+    "get_shortcuts": "Get iOS Shortcuts",
+    "version": "v1.0.0"
+  },
+  "features": {
+    "title": "Key Features",
+    "instant_sync": {
+      "title": "Instant Sync",
+      "description": "Copy on PC, paste on iPhone (or vice versa) over your local network."
+    },
+    "passer_space": {
+      "title": "Passer Space",
+      "description": "A local WebDAV server that turns your PC into a wireless shared drive for your iPhone."
+    },
+    "premium_ux": {
+      "title": "Premium UX",
+      "description": "A sleek, glassmorphic Windows interface that docks at the bottom-right of your screen."
+    },
+    "privacy_first": {
+      "title": "Privacy First",
+      "description": "Everything stays on your local network. No cloud, no external servers."
+    }
+  },
+  "shortcuts": {
+    "title": "iPhone ↔️ PC Workflow",
+    "subtitle": "Passer leverages iOS Shortcuts for a deeply integrated experience.",
+    "push": {
+      "title": "Push",
+      "description": "Send anything (Clipboard, Files, Photos, Text) from iPhone to PC."
+    },
+    "pull": {
+      "title": "Pull",
+      "description": "Retrieve your PC's current clipboard and save it to your iPhone instantly."
+    },
+    "pass": {
+      "title": "Pass",
+      "description": "Send content to your PC directly from the Apple Share Sheet."
+    },
+    "add_button": "Add Shortcut"
+  },
+  "footer": {
+    "built_with": "Built with ❤️ for speed and simplicity.",
+    "author": "Created by Walson Argan René"
+  }
+}
