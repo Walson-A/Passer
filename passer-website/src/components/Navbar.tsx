@@ -1,7 +1,61 @@
 import { useTranslation } from 'react-i18next';
-import { Menu, X, Globe } from 'lucide-react';
+import { Menu, X, Github } from 'lucide-react';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+
+// Simple SVG Flags
+const USFlag = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 1235 650" className={className} xmlns="http://www.w3.org/2000/svg">
+    <rect width="1235" height="650" fill="#B22234"/>
+    <rect width="1235" height="100" y="100" fill="#fff"/>
+    <rect width="1235" height="100" y="300" fill="#fff"/>
+    <rect width="1235" height="100" y="500" fill="#fff"/>
+    <rect width="494" height="350" fill="#3C3B6E"/>
+    {/* Simplified stars pattern (dots) for small size visibility */}
+    <g fill="#fff">
+        <circle cx="50" cy="50" r="20" />
+        <circle cx="150" cy="50" r="20" />
+        <circle cx="250" cy="50" r="20" />
+        <circle cx="350" cy="50" r="20" />
+        <circle cx="450" cy="50" r="20" />
+
+        <circle cx="100" cy="100" r="20" />
+        <circle cx="200" cy="100" r="20" />
+        <circle cx="300" cy="100" r="20" />
+        <circle cx="400" cy="100" r="20" />
+
+        <circle cx="50" cy="150" r="20" />
+        <circle cx="150" cy="150" r="20" />
+        <circle cx="250" cy="150" r="20" />
+        <circle cx="350" cy="150" r="20" />
+        <circle cx="450" cy="150" r="20" />
+
+        <circle cx="100" cy="200" r="20" />
+        <circle cx="200" cy="200" r="20" />
+        <circle cx="300" cy="200" r="20" />
+        <circle cx="400" cy="200" r="20" />
+
+        <circle cx="50" cy="250" r="20" />
+        <circle cx="150" cy="250" r="20" />
+        <circle cx="250" cy="250" r="20" />
+        <circle cx="350" cy="250" r="20" />
+        <circle cx="450" cy="250" r="20" />
+
+        <circle cx="100" cy="300" r="20" />
+        <circle cx="200" cy="300" r="20" />
+        <circle cx="300" cy="300" r="20" />
+        <circle cx="400" cy="300" r="20" />
+    </g>
+  </svg>
+);
+
+const FRFlag = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 3 2" className={className} xmlns="http://www.w3.org/2000/svg">
+    <rect width="1" height="2" fill="#002395"/>
+    <rect width="1" height="2" x="1" fill="#FFFFFF"/>
+    <rect width="1" height="2" x="2" fill="#ED2939"/>
+  </svg>
+);
 
 export const Navbar = () => {
   const { i18n, t } = useTranslation();
@@ -16,17 +70,22 @@ export const Navbar = () => {
     { name: t('nav.shortcuts'), href: '#shortcuts' },
   ];
 
+  const scrollToTop = (e: React.MouseEvent) => {
+    e.preventDefault();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   return (
     <nav className="fixed top-0 left-0 w-full z-50 px-6 py-4 backdrop-blur-md bg-black/50 border-b border-white/5 transition-all">
       <div className="max-w-7xl mx-auto flex justify-between items-center">
         {/* Logo */}
-        <div className="flex items-center gap-3">
-          <img src="/logo.png" alt="Passer Logo" className="w-8 h-8 rounded-lg" />
-          <span className="text-xl font-bold tracking-tight text-white">Passer</span>
-        </div>
+        <a href="#" onClick={scrollToTop} className="flex items-center gap-3 group">
+          <img src="/logo.png" alt="Passer Logo" className="w-8 h-8 rounded-lg group-hover:scale-105 transition-transform" />
+          <span className="text-xl font-bold tracking-tight text-white group-hover:text-gray-200 transition-colors">Passer</span>
+        </a>
 
         {/* Desktop Nav */}
-        <div className="hidden md:flex items-center gap-8">
+        <div className="hidden md:flex items-center gap-6">
           {navLinks.map((link) => (
             <a
               key={link.name}
@@ -39,12 +98,33 @@ export const Navbar = () => {
 
           <div className="w-px h-4 bg-white/10" />
 
+          {/* Github Link */}
+          <a
+            href="https://github.com/Walson-A/Passer"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-gray-400 hover:text-white transition-colors"
+            aria-label="Star on GitHub"
+          >
+            <Github className="w-5 h-5" />
+          </a>
+
+          {/* Language Switcher */}
           <button
             onClick={toggleLanguage}
             className="flex items-center gap-2 text-sm font-medium text-gray-300 hover:text-white transition-colors px-3 py-1.5 rounded-full hover:bg-white/5"
           >
-            <Globe className="w-4 h-4" />
-            {i18n.language === 'en' ? '🇺🇸 English' : '🇫🇷 Français'}
+            {i18n.language === 'en' ? (
+                <>
+                    <USFlag className="w-5 h-3.5 rounded-[2px]" />
+                    <span>English</span>
+                </>
+            ) : (
+                <>
+                    <FRFlag className="w-5 h-3.5 rounded-[2px]" />
+                    <span>Français</span>
+                </>
+            )}
           </button>
 
           <a
@@ -85,6 +165,17 @@ export const Navbar = () => {
                   {link.name}
                 </a>
               ))}
+
+              <a
+                href="https://github.com/Walson-A/Passer"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 text-gray-300 hover:text-white text-lg font-medium"
+              >
+                <Github className="w-5 h-5" />
+                GitHub
+              </a>
+
               <hr className="border-white/10" />
               <button
                 onClick={() => {
@@ -93,8 +184,17 @@ export const Navbar = () => {
                 }}
                 className="flex items-center gap-2 text-gray-300 hover:text-white text-lg font-medium"
               >
-                 <Globe className="w-5 h-5" />
-                 {i18n.language === 'en' ? 'Switch to French' : 'Passer en Anglais'}
+                 {i18n.language === 'en' ? (
+                    <>
+                        <FRFlag className="w-5 h-3.5 rounded-[2px]" />
+                        <span>Passer en Français</span>
+                    </>
+                 ) : (
+                    <>
+                        <USFlag className="w-5 h-3.5 rounded-[2px]" />
+                        <span>Switch to English</span>
+                    </>
+                 )}
               </button>
             </div>
           </motion.div>
