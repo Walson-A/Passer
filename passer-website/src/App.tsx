@@ -6,7 +6,8 @@ import { Footer } from '@/components/layout/Footer';
 
 function App() {
   return (
-    <div className="min-h-screen bg-[#0F0F0F] text-white selection:bg-blue-500/30">
+    <div className="min-h-screen bg-black text-white selection:bg-white/10 selection:text-white relative">
+      <div className="noise-overlay" />
       <Navbar />
       <main>
         <Hero />

@@ -13,9 +13,17 @@ The project is divided into two main parts:
 - **`src/components/`**: Modular React components, designed with glassmorphism in mind.
 
 ### 2. `passer-website/` (The Landing Page)
-- **Vite + React**: A high-performance landing page.
-- **TailwindCSS 4**: Used for modern, utility-first styling.
-- **Framer Motion**: For smooth, premium animations.
+- **Vite + React 19**: A high-performance landing page.
+- **Path Aliases**: Uses `@/` to point to the `src/` directory for cleaner imports.
+- **Modular Components**:
+    - `src/components/layout/`: Global elements (Navbar, Footer).
+    - `src/components/sections/`: Page sections (Hero, Features, Shortcuts).
+    - `src/components/ui/`: Reusable premium animation components (Reveal, TiltCard).
+- **Internationalization (i18n)**:
+    - Multi-language support (EN/FR) using `react-i18next`.
+    - Strict ESLint rule: `eslint-plugin-i18next` prevents any hardcoded strings in JSX.
+    - All content resides in `src/locales/`.
+- **Styling**: TailwindCSS 4 + Framer Motion.
 
 ## 🛠️ Development Standards
 

@@ -1,57 +1,60 @@
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import { Download, Smartphone, ArrowRight } from 'lucide-react';
+import { Reveal } from '@/components/ui/Reveal';
 
 export const Hero = () => {
   const { t } = useTranslation();
 
   return (
-    <section className="relative min-h-screen flex flex-col justify-center items-center text-center px-4 pt-32 pb-20 overflow-hidden bg-black">
-      {/* Background Effects */}
-      <div className="absolute inset-0 bg-[url('/grid.svg')] bg-center [mask-image:linear-gradient(180deg,white,rgba(255,255,255,0))]" />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-blue-500/10 rounded-full blur-[140px] -z-10 animate-pulse-slow" />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-purple-500/10 rounded-full blur-[120px] -z-10 translate-x-40 translate-y-20 animate-pulse-slower" />
+    <section className="relative min-h-[90vh] flex flex-col justify-center items-center text-center px-4 pt-40 pb-20 overflow-hidden bg-black">
+      {/* Background Effects (Mesh Gradients) */}
+      <div className="absolute inset-0 bg-[url('/grid.svg')] bg-center [mask-image:radial-gradient(ellipse_at_center,white,transparent)] opacity-20" />
+      
+      <div className="mesh-blob w-[600px] h-[600px] bg-blue-600 top-[-10%] left-[-10%] animate-pulse-slow" />
+      <div className="mesh-blob w-[500px] h-[500px] bg-purple-600 bottom-[-10%] right-[-10%] animate-pulse-slower" />
+      <div className="mesh-blob w-[400px] h-[400px] bg-blue-400 top-[20%] right-[10%] opacity-10 animate-pulse-slow" />
 
-      <motion.div
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, ease: "easeOut" }}
-        className="max-w-4xl mx-auto z-10"
-      >
-        <div className="mb-8 inline-flex items-center gap-2 px-3 py-1 rounded-full border border-white/10 bg-white/5 text-sm text-gray-400 hover:text-white transition-colors cursor-pointer hover:border-white/20">
-            <span className="flex h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
-            {t('hero.version')} {t('hero.available_now')}
-        </div>
+      <div className="max-w-5xl mx-auto z-10">
+        <Reveal delay={0.2} blur scale yOffset={0}>
+          <h1 className="text-6xl md:text-9xl font-bold mb-8 tracking-tighter bg-clip-text text-transparent bg-gradient-to-b from-white via-white to-white/30 drop-shadow-2xl leading-[0.9]">
+            {t('hero.title')}
+          </h1>
+        </Reveal>
+        
+        <Reveal delay={0.4} blur scale yOffset={0}>
+          <p className="text-2xl md:text-4xl text-white/90 mb-8 font-medium max-w-3xl mx-auto leading-tight tracking-tight">
+            {t('hero.subtitle')}
+          </p>
+        </Reveal>
 
-        <h1 className="text-5xl md:text-8xl font-bold mb-6 tracking-tight bg-clip-text text-transparent bg-gradient-to-b from-white to-white/40 drop-shadow-sm">
-          {t('hero.title')}
-        </h1>
-        <p className="text-xl md:text-3xl text-gray-400 mb-8 font-light max-w-2xl mx-auto leading-relaxed">
-          {t('hero.subtitle')}
-        </p>
-        <p className="text-lg text-gray-500 mb-12 max-w-xl mx-auto">
-            {t('hero.description')}
-        </p>
+        <Reveal delay={0.6} blur yOffset={0}>
+          <p className="text-lg md:text-xl text-gray-500 mb-12 max-w-2xl mx-auto font-light leading-relaxed">
+              {t('hero.description')}
+          </p>
+        </Reveal>
 
-        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-          <a
-            href="/passer-setup.exe"
-            download
-            className="group relative px-8 py-4 bg-white text-black rounded-full font-bold text-lg flex items-center gap-3 hover:scale-105 hover:shadow-[0_0_40px_-10px_rgba(255,255,255,0.3)] transition-all duration-300"
-          >
-            <Download className="w-5 h-5 group-hover:translate-y-0.5 transition-transform" />
-            {t('hero.download_windows')}
-          </a>
-          <a
-            href="#shortcuts"
-            className="group px-8 py-4 glass-panel rounded-full font-semibold text-lg flex items-center gap-3 hover:bg-white/10 hover:border-white/20 transition-all text-white"
-          >
-            <Smartphone className="w-5 h-5" />
-            {t('hero.get_shortcuts')}
-            <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
-          </a>
-        </div>
-      </motion.div>
+        <Reveal delay={0.8} yOffset={20}>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+            <a
+              href="/passer-setup.exe"
+              download
+              className="group relative px-8 py-4 bg-white text-black rounded-full font-bold text-lg flex items-center gap-3 hover:scale-105 hover:shadow-[0_0_40px_-10px_rgba(255,255,255,0.3)] transition-all duration-300 glow-button"
+            >
+              <Download className="w-5 h-5 group-hover:translate-y-0.5 transition-transform" />
+              {t('hero.download_windows')}
+            </a>
+            <a
+              href="#shortcuts"
+              className="group px-8 py-4 glass-panel rounded-full font-semibold text-lg flex items-center gap-3 hover:bg-white/10 hover:border-white/20 transition-all text-white"
+            >
+              <Smartphone className="w-5 h-5" />
+              {t('hero.get_shortcuts')}
+              <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+            </a>
+          </div>
+        </Reveal>
+      </div>
 
       {/* Screenshot Container */}
       <motion.div

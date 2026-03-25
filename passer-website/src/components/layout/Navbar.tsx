@@ -76,12 +76,12 @@ export const Navbar = () => {
   };
 
   return (
-    <nav className="fixed top-0 left-0 w-full z-50 px-6 py-4 backdrop-blur-md bg-black/50 border-b border-white/5 transition-all">
+    <nav className="fixed top-0 left-0 w-full z-50 px-6 py-4 backdrop-blur-xl bg-black/20 border-b border-white/[0.03] transition-all">
       <div className="max-w-7xl mx-auto flex justify-between items-center">
         {/* Logo */}
         <a href="#" onClick={scrollToTop} className="flex items-center gap-3 group">
-          <img src="/logo.png" alt="Passer Logo" className="w-8 h-8 rounded-lg group-hover:scale-105 transition-transform" />
-          <span className="text-xl font-bold tracking-tight text-white group-hover:text-gray-200 transition-colors">{t('hero.title')}</span>
+          <img src="/logo.png" alt="Passer Logo" className="w-7 h-7 rounded-lg group-hover:scale-110 transition-all duration-500 ease-spring" />
+          <span className="text-lg font-bold tracking-tighter text-white/90 group-hover:text-white transition-colors">{t('hero.title')}</span>
         </a>
 
         {/* Desktop Nav */}

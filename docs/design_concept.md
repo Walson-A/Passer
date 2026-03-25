@@ -17,16 +17,19 @@ Passer's visual identity is built on transparency, depth, and high-performance a
 ## 2. Glassmorphism Utilities
 
 - **Backdrop Blur:** Minimum `12px` for panels and overlays.
-- **Borders:** Ultra-thin (`1px`) with low opacity (`rgba(255, 255, 255, 0.08)`).
+- **Borders:** Ultra-thin (`1px`) with low opacity (`rgba(255, 255, 255, 0.05)`).
 - **Shadows:** Soft, large-radius shadows to lift interactive elements.
+- **Texture:** A subtle **Noise Overlay** (0.03 opacity) is applied globally to create a tactile, high-end paper-like feel.
 
 ## 3. Typography & Motion
 
-- **Font:** Inter or SF Pro Display (San Francisco). Focus on tight tracking and semi-bold weights for headings.
+- **Font:** Inter or SF Pro Display (San Francisco). Focus on tight tracking (`tracking-tighter`) and semi-bold weights for headings.
 - **Animations:**
-    - Use "Spring" physics for most transitions (`framer-motion`).
-    - Scroll-triggered reveals for the landing page.
-    - Hover states should include a 3D tilt or a subtle "glow" expansion.
+    - **Crystal Reveal**: Elements transition from `blur(12px)` and `scale(1.05)` to clear state, creating a "focusing" effect.
+    - **Staggered Entrance**: Hero components appear in sequence to guide user attention.
+    - **3D Tilt Interaction**: Feature and Shortcut cards react to mouse position with smooth 3D tilting.
+    - **Smooth Scroll Reveal**: Section-level "slide-up" animations using `framer-motion`'s `whileInView`.
+    - **CTA Glow**: Primary actions have a soft, pulsing glow on hover to indicate priority.
 
 ## 4. UI Layout (App)
 

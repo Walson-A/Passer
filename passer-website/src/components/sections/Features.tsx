@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
-import { motion } from 'framer-motion';
 import { Zap, HardDrive, Layout, Shield } from 'lucide-react';
+import { Reveal } from '@/components/ui/Reveal';
+import { TiltCard } from '@/components/ui/TiltCard';
 
 export const Features = () => {
   const { t } = useTranslation();
@@ -27,30 +28,29 @@ export const Features = () => {
   return (
     <section id="features" className="py-24 px-4 relative">
       <div className="max-w-6xl mx-auto">
-        <h2 className="text-3xl md:text-5xl font-bold text-center mb-16 text-white">
-          {t('features.title')}
-        </h2>
+        <Reveal>
+          <h2 className="text-3xl md:text-5xl font-bold text-center mb-16 text-white tracking-tight">
+            {t('features.title')}
+          </h2>
+        </Reveal>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           {features.map((feature, index) => (
-            <motion.div
-              key={index}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-              viewport={{ once: true }}
-              className="glass-panel p-6 rounded-2xl hover:bg-white/5 transition-colors border border-white/5"
-            >
-              <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-4 border border-white/5">
-                {feature.icon}
-              </div>
-              <h3 className="text-xl font-semibold mb-2 text-white">
-                {t(`features.${feature.titleKey}.title`)}
-              </h3>
-              <p className="text-gray-400 text-sm leading-relaxed">
-                {t(`features.${feature.titleKey}.description`)}
-              </p>
-            </motion.div>
+            <Reveal key={index} delay={index * 0.1}>
+              <TiltCard className="h-full">
+                <div className="glass-panel p-8 rounded-[32px] hover:bg-white/[0.04] transition-all duration-500 border border-white/[0.05] group h-full">
+                  <div className="w-14 h-14 rounded-2xl bg-white/[0.03] flex items-center justify-center mb-6 border border-white/[0.05] group-hover:scale-110 transition-transform duration-500">
+                    {feature.icon}
+                  </div>
+                  <h3 className="text-2xl font-bold mb-3 text-white tracking-tight">
+                    {t(`features.${feature.titleKey}.title`)}
+                  </h3>
+                  <p className="text-gray-400 text-sm leading-relaxed font-light">
+                    {t(`features.${feature.titleKey}.description`)}
+                  </p>
+                </div>
+              </TiltCard>
+            </Reveal>
           ))}
         </div>
       </div>
