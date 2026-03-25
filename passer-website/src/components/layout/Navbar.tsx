@@ -81,7 +81,7 @@ export const Navbar = () => {
         {/* Logo */}
         <a href="#" onClick={scrollToTop} className="flex items-center gap-3 group">
           <img src="/logo.png" alt="Passer Logo" className="w-8 h-8 rounded-lg group-hover:scale-105 transition-transform" />
-          <span className="text-xl font-bold tracking-tight text-white group-hover:text-gray-200 transition-colors">Passer</span>
+          <span className="text-xl font-bold tracking-tight text-white group-hover:text-gray-200 transition-colors">{t('hero.title')}</span>
         </a>
 
         {/* Desktop Nav */}
@@ -117,12 +117,12 @@ export const Navbar = () => {
             {i18n.language === 'en' ? (
                 <>
                     <USFlag className="w-5 h-3.5 rounded-[2px]" />
-                    <span>English</span>
+                    <span>{t('nav.english')}</span>
                 </>
             ) : (
                 <>
                     <FRFlag className="w-5 h-3.5 rounded-[2px]" />
-                    <span>Français</span>
+                    <span>{t('nav.french')}</span>
                 </>
             )}
           </button>
@@ -173,7 +173,7 @@ export const Navbar = () => {
                 className="flex items-center gap-2 text-gray-300 hover:text-white text-lg font-medium"
               >
                 <Github className="w-5 h-5" />
-                GitHub
+                {t('nav.github')}
               </a>
 
               <hr className="border-white/10" />
@@ -187,12 +187,12 @@ export const Navbar = () => {
                  {i18n.language === 'en' ? (
                     <>
                         <FRFlag className="w-5 h-3.5 rounded-[2px]" />
-                        <span>Passer en Français</span>
+                        <span>{t('nav.switch_to_french')}</span>
                     </>
                  ) : (
                     <>
                         <USFlag className="w-5 h-3.5 rounded-[2px]" />
-                        <span>Switch to English</span>
+                        <span>{t('nav.switch_to_english')}</span>
                     </>
                  )}
               </button>

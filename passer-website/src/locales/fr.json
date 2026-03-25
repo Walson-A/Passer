@@ -3,7 +3,12 @@
     "features": "Fonctionnalités",
     "shortcuts": "Raccourcis",
     "download": "Télécharger",
-    "language": "Langue"
+    "language": "Langue",
+    "english": "English",
+    "french": "Français",
+    "switch_to_french": "Passer en Français",
+    "switch_to_english": "Switch to English",
+    "github": "GitHub"
   },
   "hero": {
     "title": "Passer",
@@ -51,7 +56,7 @@
     "add_button": "Ajouter à Siri"
   },
   "footer": {
-    "copyright": "© 2024 Passer. Tous droits réservés.",
+    "copyright": "© {{year}} Passer. Tous droits réservés.",
     "built_with": "Conçu avec précision.",
     "author": "Design & Développement par Walson Argan René"
   }

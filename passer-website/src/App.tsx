@@ -1,8 +1,8 @@
-import { Navbar } from './components/Navbar';
-import { Hero } from './components/Hero';
-import { Features } from './components/Features';
-import { Shortcuts } from './components/Shortcuts';
-import { Footer } from './components/Footer';
+import { Navbar } from '@/components/layout/Navbar';
+import { Hero } from '@/components/sections/Hero';
+import { Features } from '@/components/sections/Features';
+import { Shortcuts } from '@/components/sections/Shortcuts';
+import { Footer } from '@/components/layout/Footer';
 
 function App() {
   return (

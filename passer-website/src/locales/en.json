@@ -3,7 +3,12 @@
     "features": "Features",
     "shortcuts": "Shortcuts",
     "download": "Download",
-    "language": "Language"
+    "language": "Language",
+    "english": "English",
+    "french": "Français",
+    "switch_to_french": "Passer en Français",
+    "switch_to_english": "Switch to English",
+    "github": "GitHub"
   },
   "hero": {
     "title": "Passer",
@@ -51,7 +56,7 @@
     "add_button": "Add to Siri"
   },
   "footer": {
-    "copyright": "© 2024 Passer. All rights reserved.",
+    "copyright": "© {{year}} Passer. All rights reserved.",
     "built_with": "Crafted with precision.",
     "author": "Designed & Developed by Walson Argan René"
   }

@@ -1,0 +1,28 @@
+
+> passer-website@0.0.0 lint
+> eslint .
+
+
+C:\Users\Walson\Documents\Passer\passer-website\src\components\Footer.tsx
+  11:26  error  disallow literal string: <p className="text-gray-500 text-sm font-medium">
+          ┬® {currentYear} Passer. {t('footer.copyright').replace('┬® 2024 Passer. ', '')}
+        </p>  i18next/no-literal-string
+
+C:\Users\Walson\Documents\Passer\passer-website\src\components\Navbar.tsx
+   84:117  error  disallow literal string: <span className="text-xl font-bold tracking-tight text-white group-hover:text-gray-200 transition-colors">Passer</span>                                                                                                                                                                                                                                         i18next/no-literal-string
+  120:27   error  disallow literal string: <span>English</span>                                                                                                                                                                                                                                                                                                                                            i18next/no-literal-string
+  125:27   error  disallow literal string: <span>Fran├ºais</span>                                                                                                                                                                                                                                                                                                                                           i18next/no-literal-string
+  175:47   error  disallow literal string: <a
+                href="https://github.com/Walson-A/Passer"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 text-gray-300 hover:text-white text-lg font-medium"
+              >
+                <Github className="w-5 h-5" />
+                GitHub
+              </a>  i18next/no-literal-string
+  190:31   error  disallow literal string: <span>Passer en Fran├ºais</span>                                                                                                                                                                                                                                                                                                                                 i18next/no-literal-string
+  195:31   error  disallow literal string: <span>Switch to English</span>                                                                                                                                                                                                                                                                                                                                  i18next/no-literal-string
+
+Ô£û 7 problems (7 errors, 0 warnings)
+
