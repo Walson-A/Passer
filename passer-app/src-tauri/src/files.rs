@@ -20,8 +20,17 @@ pub async fn push_file(
         match field_result {
             Ok(field) => {
                 let content_type = field.content_type().unwrap_or("application/octet-stream").to_string();
-                let filename = field.file_name().unwrap_or("unknown_file").to_string();
+                let raw_filename = field.file_name().unwrap_or("unknown_file").to_string();
                 let _field_name = field.name().unwrap_or("unknown_field").to_string();
+
+                // Security: keep only the base name so a client cannot escape the target
+                // directory via path separators, `..`, or an absolute path.
+                let filename = std::path::Path::new(&raw_filename)
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .filter(|n| !n.is_empty() && *n != "." && *n != "..")
+                    .unwrap_or("unknown_file")
+                    .to_string();
                 
                 let target_dir = get_target_dir(&download_base, &content_type, &filename);
                 let initial_path = target_dir.join(&filename);
@@ -74,41 +83,32 @@ pub async fn push_file(
     });
 
     let paths_clone = saved_files.clone();
-    
-    // Use Native Clipboard (clipboard-win) instead of PowerShell
-    let clipboard_res = tokio::task::spawn_blocking(move || {
-        // We will try to APPEND to existing files if possible, similar to Smart Append
-        // But for simplicity and robustness in "clean" version, let's just Set the new files.
-        // If we want append, we read first.
-        
-        let mut final_paths = paths_clone;
-        
-        // Optional: Smart Append Logic (Native)
-        if let Ok(existing_paths) = clipboard_win::get_clipboard::<Vec<String>, _>(clipboard_win::formats::FileList) {
-             let mut current_set: Vec<String> = existing_paths.into_iter().collect();
-             for new_p in &final_paths {
-                 if !current_set.contains(new_p) {
-                     current_set.push(new_p.clone());
-                 }
-             }
-             final_paths = current_set;
+
+    // Inject the received files into the Windows clipboard as a native file list
+    // (CF_HDROP) via clipboard-win. This replaces the previous `Set-Clipboard`
+    // PowerShell call, which allowed command injection through crafted filenames.
+    let clipboard_res = tokio::task::spawn_blocking(move || -> Result<usize, String> {
+        use clipboard_win::Setter;
+
+        // Smart append: start from whatever is already on the clipboard, then add
+        // the new files (deduplicated) so successive pushes accumulate.
+        let mut final_paths: Vec<String> =
+            clipboard_win::get_clipboard::<Vec<String>, _>(clipboard_win::formats::FileList)
+                .unwrap_or_default();
+        for new_p in paths_clone {
+            if !final_paths.contains(&new_p) {
+                final_paths.push(new_p);
+            }
         }
 
-        // Set Clipboard using PowerShell (Native crate doesn't support Set FileList easily)
-        let path_args = final_paths.join("\",\"");
-        let formatted_paths = format!("\"{}\"", path_args); 
-        
-        // This command sets the clipboard to the list of files
-        let write_cmd = format!("Set-Clipboard -Path {}", formatted_paths);
-        
-        let output_write = std::process::Command::new("powershell")
-            .args(["-NoProfile", "-Command", &write_cmd])
-            .output();
-            
-        match output_write {
-            Ok(o) => if o.status.success() { Ok(final_paths.len()) } else { Err(format!("PS Error: {:?}", o)) },
-            Err(e) => Err(e.to_string()),
-        }
+        let _clip = clipboard_win::Clipboard::new_attempts(10)
+            .map_err(|e| format!("Open clipboard: {}", e))?;
+        let _ = clipboard_win::raw::empty();
+        clipboard_win::formats::FileList
+            .write_clipboard(&final_paths)
+            .map_err(|e| format!("Set FileList: {}", e))?;
+
+        Ok(final_paths.len())
     })
     .await;
 

@@ -4,8 +4,8 @@
   <p><b>The seamless bridge between your iPhone and PC.</b></p>
 
   [![Tauri](https://img.shields.io/badge/Tauri-v2-FFC107?logo=tauri&logoColor=white)](https://tauri.app/)
-  [![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)](https://react.dev/)
-  [![Vite](https://img.shields.io/badge/Vite-6-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
+  [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev/)
+  [![Vite](https://img.shields.io/badge/Vite-7-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
   [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 </align>
 
@@ -48,11 +48,14 @@ For non-developers, grab the latest installer directly from the project root:
 2. Launch and start passing!
 
 ### Development Setup
-If you want to build from source:
+If you want to build from source (requires [Rust](https://www.rust-lang.org/tools/install) and [Node.js](https://nodejs.org/)):
 
 ```bash
 # Clone the repository
 git clone https://github.com/Walson-A/Passer.git
+
+# Move into the desktop app
+cd Passer/passer-app
 
 # Install dependencies
 npm install

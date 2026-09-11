@@ -124,20 +124,28 @@ pub async fn delete_cache_file(file_path: String) -> Result<(), String> {
     use crate::paths::get_cache_dir;
     use std::path::Path;
     
-    let cache_dir = get_cache_dir();
     let file_path_buf = Path::new(&file_path);
-    
-    // Security: Ensure the file is within the cache directory
-    if !file_path_buf.starts_with(&cache_dir) {
+
+    // Nothing to do if the file is already gone.
+    if !file_path_buf.exists() {
+        return Ok(());
+    }
+
+    // Security: resolve both paths to their canonical form before comparing, so a
+    // path containing `..` cannot escape the cache directory (component-based
+    // `starts_with` alone would accept `<cache>/../../secret`).
+    let cache_dir = std::fs::canonicalize(get_cache_dir())
+        .map_err(|e| format!("Failed to resolve cache directory: {}", e))?;
+    let target = std::fs::canonicalize(file_path_buf)
+        .map_err(|e| format!("Failed to resolve file path: {}", e))?;
+
+    if !target.starts_with(&cache_dir) {
         return Err("Invalid path: file is not in cache directory".to_string());
     }
-    
-    // Delete the file if it exists
-    if file_path_buf.exists() {
-        std::fs::remove_file(file_path_buf)
-            .map_err(|e| format!("Failed to delete cache file: {}", e))?;
-        println!(" [CACHE] Deleted: {:?}", file_path_buf);
-    }
-    
+
+    std::fs::remove_file(&target)
+        .map_err(|e| format!("Failed to delete cache file: {}", e))?;
+    println!(" [CACHE] Deleted: {:?}", target);
+
     Ok(())
 }

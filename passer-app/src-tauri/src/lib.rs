@@ -26,8 +26,6 @@ pub fn run() {
             commands::get_ip,
             commands::open_downloads,
             commands::open_webdav,
-            commands::open_downloads,
-            commands::open_webdav,
             commands::get_webdav_creds,
             commands::handle_file_drop,
             commands::set_window_on_top,

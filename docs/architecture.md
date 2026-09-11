@@ -7,7 +7,7 @@ Passer is a seamless bridge between iPhone and PC, built with Tauri (v2) and Rea
 The project is divided into two main parts:
 
 ### 1. `passer-app/` (The Desktop Application)
-- **`src-tauri/`**: Rust backend (Tauri). Handles system-level operations, WebDAV server, and iOS Shortcut integration via REST API.
+- **`src-tauri/`**: Rust backend (Tauri). Handles system-level operations, the local HTTP file/clipboard server, and iOS Shortcut integration via REST API.
 - **`src/`**: React frontend. Built with Vite and TailwindCSS. Features a premium glassmorphic UI that docks at the bottom-right.
 - **`src/hooks/`**: Custom hooks for managing state and IPC (Inter-Process Communication) with Rust.
 - **`src/components/`**: Modular React components, designed with glassmorphism in mind.

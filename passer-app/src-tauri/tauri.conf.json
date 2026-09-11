@@ -27,7 +27,7 @@
       "assetProtocol": {
         "enable": true,
         "scope": [
-          "C:\\Users\\Walson\\Desktop\\Passer\\**"
+          "$DESKTOP/Passer/**"
         ]
       }
     }

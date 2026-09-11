@@ -3,7 +3,6 @@ use axum::{
     Router,
 };
 use std::net::SocketAddr;
-use tower_http::cors::CorsLayer;
 use tauri::{AppHandle, Emitter};
 
 use crate::types::{ServerState, LogEvent};
@@ -19,7 +18,6 @@ pub async fn start_server(app_handle: AppHandle, mut rx: tokio::sync::broadcast:
         .route("/push/image", post(clipboard::push_image))
         .route("/push/file", post(files::push_file))
         .layer(axum::extract::DefaultBodyLimit::disable())
-        .layer(CorsLayer::permissive())
         .with_state(state);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 8000));
