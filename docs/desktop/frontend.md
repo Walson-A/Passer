@@ -22,5 +22,8 @@ The primary feed component representing the history of transfers. Instead of a d
 ### `DropZone.tsx`
 A graceful full-screen absolute layover that captures dragging events. Highly optimized to prevent unwanted browser default behaviours.
 
+### `Settings.tsx`
+A glass modal opened from the footer gear. Reads and writes real preferences over IPC: a **Launch on startup** toggle (`get_autostart` / `set_autostart`), a copyable server address, and the app version (`get_app_version`).
+
 ## ♻️ State Management (`useHistory.ts`)
-A custom hook that coordinates adding, deleting, and updating clipboard and file history objects locally, allowing for instant feedback without waiting for complex backend roundtrips.
+A custom hook that coordinates adding, deleting, and updating history objects locally. It listens for the backend's structured **`transfer`** events (typed `{ kind, direction, target, name, path, size }` payloads) rather than parsing human-readable log strings, so the feed stays robust as log wording changes.

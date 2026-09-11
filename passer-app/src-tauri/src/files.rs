@@ -5,7 +5,7 @@ use axum::{
 use std::sync::Arc;
 use tauri::Emitter;
 
-use crate::types::{ServerState, LogEvent};
+use crate::types::{ServerState, LogEvent, TransferEvent};
 use crate::paths::{get_downloads_dir, get_target_dir, get_unique_file_path};
 
 pub async fn push_file(
@@ -51,6 +51,15 @@ pub async fn push_file(
                                message: log_message,
                                kind: "info".to_string(),
                            });
+                            // Structured event for the history feed.
+                            let _ = state.app_handle.emit("transfer", TransferEvent {
+                                kind: "file".to_string(),
+                                direction: "incoming".to_string(),
+                                target: "folder".to_string(),
+                                name: Some(filename.clone()),
+                                path: Some(target_path.to_string_lossy().to_string()),
+                                size: Some(bytes.len() as u64),
+                            });
                             saved_files.push(target_path.to_string_lossy().to_string());
                             count += 1;
                         },

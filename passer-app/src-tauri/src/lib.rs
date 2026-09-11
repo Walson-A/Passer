@@ -30,7 +30,10 @@ pub fn run() {
             commands::handle_file_drop,
             commands::set_window_on_top,
             commands::toggle_server,
-            commands::delete_cache_file
+            commands::delete_cache_file,
+            commands::get_autostart,
+            commands::set_autostart,
+            commands::get_app_version
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
@@ -42,8 +45,13 @@ pub fn run() {
             // Initialize mDNS
             mdns::init_mdns();
 
-            // Enable Auto-Start
-            let _ = app.autolaunch().enable();
+            // Enable auto-start on first run only, so a user who later disables it
+            // from the Settings panel is not overridden on every launch.
+            let init_marker = get_passer_base_dir().join(".initialized");
+            if !init_marker.exists() {
+                let _ = app.autolaunch().enable();
+                let _ = std::fs::write(&init_marker, b"1");
+            }
             
             // Init Server Control
             let title_control = ServerControl::new(app.handle().clone());

@@ -36,6 +36,18 @@ pub struct LogEvent {
     pub kind: String, // "info", "error", "success"
 }
 
+/// Structured transfer event consumed by the history feed. Replaces the
+/// previous approach of regex-parsing human-readable log strings.
+#[derive(Serialize, Clone)]
+pub struct TransferEvent {
+    pub kind: String,        // "text" | "image" | "file"
+    pub direction: String,   // "incoming" | "outgoing"
+    pub target: String,      // "clipboard" | "folder"
+    pub name: Option<String>,
+    pub path: Option<String>,
+    pub size: Option<u64>,
+}
+
 // Server Control State
 pub struct ServerControl {
     pub tx: std::sync::Mutex<Option<tokio::sync::broadcast::Sender<()>>>,

@@ -5,6 +5,7 @@ use crate::types::{ServerState, WebDavCreds, ServerControl, LogEvent};
 use crate::paths::{get_downloads_dir, get_webdav_dir, get_unique_file_path};
 use crate::server;
 use tauri::Emitter;
+use tauri_plugin_autostart::ManagerExt;
 
 #[tauri::command]
 pub fn get_ip() -> String {
@@ -117,6 +118,26 @@ pub async fn toggle_server(state: tauri::State<'_, ServerControl>) -> Result<Str
         println!(" [SERVER] Resumed by user toggle");
         Ok("on".to_string())
     }
+}
+
+#[tauri::command]
+pub fn get_autostart(app_handle: AppHandle) -> Result<bool, String> {
+    app_handle.autolaunch().is_enabled().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn set_autostart(app_handle: AppHandle, enabled: bool) -> Result<(), String> {
+    let manager = app_handle.autolaunch();
+    if enabled {
+        manager.enable().map_err(|e| e.to_string())
+    } else {
+        manager.disable().map_err(|e| e.to_string())
+    }
+}
+
+#[tauri::command]
+pub fn get_app_version(app_handle: AppHandle) -> String {
+    app_handle.package_info().version.to_string()
 }
 
 #[tauri::command]

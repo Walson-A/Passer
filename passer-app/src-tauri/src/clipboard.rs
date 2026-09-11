@@ -6,7 +6,7 @@ use std::sync::Arc;
 use std::borrow::Cow;
 use tauri::Emitter;
 
-use crate::types::{ServerState, ClipboardContent, LogEvent};
+use crate::types::{ServerState, ClipboardContent, LogEvent, TransferEvent};
 use crate::paths::get_cache_dir;
 
 // Helper function to strip HTML tags and decode entities
@@ -161,7 +161,19 @@ pub async fn push_clipboard(
     .await;
 
     match result {
-        Ok(Ok(_)) => Json(serde_json::json!({ "status": "success" })),
+        Ok(Ok(_)) => {
+            if !payload.text.trim().is_empty() {
+                let _ = state.app_handle.emit("transfer", TransferEvent {
+                    kind: "text".to_string(),
+                    direction: "incoming".to_string(),
+                    target: "clipboard".to_string(),
+                    name: Some(payload.text),
+                    path: None,
+                    size: None,
+                });
+            }
+            Json(serde_json::json!({ "status": "success" }))
+        },
         Ok(Err(e)) => {
             Json(serde_json::json!({ "status": "error", "message": format!("Clipboard error: {}", e) }))
         },
@@ -206,6 +218,7 @@ pub async fn push_image(
     let cache_filename = format!("pushed_{}.png", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis());
     let cache_path = cache_dir.join(&cache_filename);
     let _ = std::fs::write(&cache_path, &image_bytes);
+    let image_len = image_bytes.len() as u64;
 
     let _ = state.app_handle.emit("log", LogEvent {
         message: format!("PUSH (Image) received: {} bytes. Cache: {:?}", image_bytes.len(), cache_path),
@@ -228,7 +241,17 @@ pub async fn push_image(
     .await;
 
     match processed {
-        Ok(Ok(_)) => Json(serde_json::json!({ "status": "success" })),
+        Ok(Ok(_)) => {
+            let _ = state.app_handle.emit("transfer", TransferEvent {
+                kind: "image".to_string(),
+                direction: "incoming".to_string(),
+                target: "clipboard".to_string(),
+                name: None,
+                path: Some(cache_path.to_string_lossy().to_string()),
+                size: Some(image_len),
+            });
+            Json(serde_json::json!({ "status": "success" }))
+        },
         Ok(Err(e)) => {
              let _ = state.app_handle.emit("log", LogEvent {
                 message: format!("PUSH (Image) failed: {}", e),

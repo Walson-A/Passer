@@ -1,14 +1,18 @@
 
+import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Settings, Folder } from "lucide-react";
+import { Settings as SettingsIcon, Folder } from "lucide-react";
 import { PasserSpace } from "./PasserSpace";
 import { PremiumTooltip } from "./PremiumTooltip";
+import { Settings } from "./Settings";
 
 interface ControlFooterProps {
     isTransferring?: boolean;
 }
 
 export function ControlFooter({ isTransferring }: ControlFooterProps) {
+    const [settingsOpen, setSettingsOpen] = useState(false);
+
     const openDownloads = async () => {
         try {
             await invoke("open_downloads");
@@ -22,9 +26,10 @@ export function ControlFooter({ isTransferring }: ControlFooterProps) {
             {/* Settings (Left) */}
             <PremiumTooltip label="Settings">
                 <button
+                    onClick={() => setSettingsOpen(true)}
                     className="text-white/80 hover:text-white transition-all duration-300 p-2.5 hover:bg-white/[0.08] rounded-full cursor-pointer active:scale-95 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/20 group"
                 >
-                    <Settings className="w-5 h-5 opacity-60 group-hover:opacity-100 transition-opacity" strokeWidth={1.5} />
+                    <SettingsIcon className="w-5 h-5 opacity-60 group-hover:opacity-100 transition-opacity" strokeWidth={1.5} />
                 </button>
             </PremiumTooltip>
 
@@ -43,6 +48,8 @@ export function ControlFooter({ isTransferring }: ControlFooterProps) {
                 </button>
             </PremiumTooltip>
 
+            {/* Settings Modal */}
+            <Settings open={settingsOpen} onClose={() => setSettingsOpen(false)} />
         </div>
     );
 }
