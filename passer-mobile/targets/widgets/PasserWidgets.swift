@@ -4,17 +4,33 @@ import WidgetKit
 
 @main
 struct PasserWidgets: WidgetBundle {
+  // The controls need iOS 18. Two complete lists, rather than an `if` around the controls,
+  // keep the widgets on iOS 17: a conditional inside the builder has left bundles empty there.
   var body: some Widget {
+    if #available(iOSApplicationExtension 18.0, *) {
+      return withControls
+    } else {
+      return widgets
+    }
+  }
+
+  @WidgetBundleBuilder
+  private var widgets: some Widget {
     ActionWidget()
     LaunchPadWidget()
-    if #available(iOS 18.0, *) {
-      SendClipboardControl()
-      PullControl()
-      SendScreenshotControl()
-      SendAndDeleteScreenshotControl()
-      SendPhotoControl()
-      SendFileControl()
-    }
+  }
+
+  @available(iOSApplicationExtension 18.0, *)
+  @WidgetBundleBuilder
+  private var withControls: some Widget {
+    ActionWidget()
+    LaunchPadWidget()
+    SendClipboardControl()
+    PullControl()
+    SendScreenshotControl()
+    SendAndDeleteScreenshotControl()
+    SendPhotoControl()
+    SendFileControl()
   }
 }
 
