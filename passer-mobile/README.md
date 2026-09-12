@@ -27,7 +27,7 @@ Builds run on EAS (cloud macOS), so no Mac is needed. The EAS project is `@walso
 1. **Register the iPhone once:** run `eas device:create`, open the link on the iPhone and install the profile. Developer Mode must be on (Settings › Privacy & Security).
 2. **Build:** run `eas build --platform ios --profile preview`. The first build asks for your Apple ID to create the certificate and provisioning profile; later builds reuse them.
 3. **Install:** open the link EAS prints, or scan its QR code, on the iPhone.
-4. **Ship JavaScript changes without rebuilding:** run `eas update --channel preview --message "…"`. The app picks the update up the next time it starts. Changes to native modules or `app.config.ts` need a new build.
+4. **Ship JavaScript changes without rebuilding:** run `eas update --channel preview --message "…"`. The app picks the update up the next time it starts. Changes to native modules or `app.config.ts` need a new build. The App Store build listens on the `production` channel instead.
 
 A new iPhone needs `eas device:create` and a new build, because internal builds carry their device list.
 

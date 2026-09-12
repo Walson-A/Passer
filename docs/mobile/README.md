@@ -26,6 +26,7 @@ The owner widened Phase 1 beyond the spec's original scope. It includes:
 | Languages | English and French, following the device language |
 | Distribution | TestFlight first, public App Store listing from Phase 2 |
 | Testing | EAS preview builds (internal distribution) plus EAS Update |
+| OTA updates | Kept in the App Store build, checked automatically at launch on the `production` channel. An app that can't be updated quickly is a dead app. |
 
 ## Layout
 
@@ -84,7 +85,7 @@ passer-mobile/
   - the runtime version and channel;
   - after a crash, the previous fatal JavaScript error message.
 
-  No transferred content is sent. Still open: whether to keep OTA updates in the App Store build, and how to disclose them in the privacy label.
+  No transferred content is sent. OTA updates stay on in the App Store build (owner decision, 2026-09-12). Declare these requests when filling in the App Store privacy details in Phase 2.
 
 ## Design implementation
 
