@@ -9,6 +9,7 @@ import { PressableScale } from '@/components/ui/pressable-scale';
 import { format, t } from '@/i18n';
 import { detectClipboard, onClipboardChange, type ClipboardContent } from '@/platform/clipboard';
 import { haptic } from '@/platform/haptics';
+import { isPasteButtonAvailable, PasteButton } from '@/platform/paste-button';
 import { useTheme } from '@/theme/theme';
 import { radius } from '@/theme/tokens';
 
@@ -140,10 +141,10 @@ function PasteControl({
 }) {
   const { colors } = useTheme();
 
-  if (Clipboard.isPasteButtonAvailable) {
+  if (isPasteButtonAvailable) {
     return (
       <View style={styles.pasteSlot}>
-        <Clipboard.ClipboardPasteButton
+        <PasteButton
           acceptedContentTypes={['plain-text', 'url', 'image']}
           imageOptions={{ format: 'png' }}
           backgroundColor={colors.paste.background}

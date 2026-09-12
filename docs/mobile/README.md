@@ -101,6 +101,10 @@ Known gap, noted by the owner: the middle of the conduit feels empty when idle.
 
 `src/theme/tokens.ts` mirrors the mockups. Motion runs on the UI thread through Reanimated shared values, using `.get()`/`.set()` as the React Compiler requires. With Reduce Motion on, every travel animation becomes a fade.
 
+## The bench
+
+`npx expo start --web` renders the real screens in a browser, inside an iPhone frame, facing a fake PC that answers exactly like the desktop. It has regimes for first launch, a sleeping PC, a slow network and a rejected token, and it switches appearance, language and device. The web build exists only for the bench; the app never runs in a browser. See [bench.md](bench.md).
+
 ## Not done yet
 
 - **Real-device checks:** the Local Network prompt, `.local` resolution on iOS, paste button sizing in French, upload progress.

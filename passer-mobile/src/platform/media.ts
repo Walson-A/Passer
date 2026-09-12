@@ -6,31 +6,11 @@ import { requestPermissionsAsync, saveToLibraryAsync } from 'expo-media-library/
 import { isAvailableAsync, shareAsync } from 'expo-sharing';
 
 import type { UploadFile } from '@/core/client';
+import { safeName, timestamp, withExtension } from '@/utils/file-names';
 
-export type PickedPhoto = UploadFile & { width: number; height: number };
+import type { PickedPhoto } from './media-types';
 
-function pad(value: number): string {
-  return String(value).padStart(2, '0');
-}
-
-/** `2026-09-12 14.32.05`: sortable, and legal in Windows file names. */
-function timestamp(date = new Date()): string {
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}.${pad(date.getMinutes())}.${pad(date.getSeconds())}`;
-}
-
-/** Characters Windows refuses in file names, plus control characters. */
-const UNSAFE_FILE_NAME = /[\\/:*?"<>|\x00-\x1f]/g;
-
-/** The PC keeps only the base name, so separators and reserved characters are replaced here. */
-function safeName(name: string, fallback: string): string {
-  const cleaned = name.replace(UNSAFE_FILE_NAME, ' ').trim();
-  return cleaned || fallback;
-}
-
-function withExtension(name: string, extension: string): string {
-  const stem = name.replace(/\.[^.]+$/, '');
-  return `${stem}.${extension}`;
-}
+export type { PickedPhoto } from './media-types';
 
 /** `File.size` is 0 for a missing file; the UI shows an unknown size instead. */
 function sizeOf(file: File): number | null {

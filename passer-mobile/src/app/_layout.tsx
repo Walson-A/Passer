@@ -2,8 +2,8 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { SafeAreaProvider } from '@/platform/safe-area-provider';
 import { ConnectionProvider } from '@/state/connection';
 import { HistoryProvider } from '@/state/history';
 import { PairingsProvider } from '@/state/pairings';

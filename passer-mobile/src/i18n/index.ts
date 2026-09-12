@@ -1,12 +1,10 @@
-import { getLocales } from 'expo-localization';
-
+import { deviceLanguageCode } from './device-language';
 import { en, fr } from './strings';
 
 export type Language = 'en' | 'fr';
 
 function detectLanguage(): Language {
-  const code = getLocales()[0]?.languageCode ?? 'en';
-  return code === 'fr' ? 'fr' : 'en';
+  return deviceLanguageCode() === 'fr' ? 'fr' : 'en';
 }
 
 /** iOS relaunches the app when the system language changes, so reading it once is enough. */

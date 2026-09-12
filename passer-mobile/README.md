@@ -31,6 +31,10 @@ Builds run on EAS (cloud macOS), so no Mac is needed. The EAS project is `@walso
 
 A new iPhone needs `eas device:create` and a new build, because internal builds carry their device list.
 
+## See the screens: the bench
+
+Run `npx expo start --web --port 8090`, then open <http://localhost:8090>. You get the real screens in an iPhone frame, a fake PC, and switches for regime, appearance, language and device. Look at every screen you change there before building. Details and rules: [docs/mobile/bench.md](../docs/mobile/bench.md).
+
 ## Bundle id
 
 `BUNDLE_ID` in `app.config.ts` is `direct.passer.app`, the reverse of the product domain `passer.direct`. Don't change it: App Store Connect ties the app record to it, and a new id installs as a different app that has to be paired again.

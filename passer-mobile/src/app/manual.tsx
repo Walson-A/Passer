@@ -1,4 +1,3 @@
-import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
@@ -8,6 +7,7 @@ import { AppText } from '@/components/ui/app-text';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { parsePairingLink, type PairingParseError } from '@/core/pairing';
 import { t } from '@/i18n';
+import { isPasteButtonAvailable, PasteButton } from '@/platform/paste-button';
 import { setPendingLink } from '@/state/pending-link';
 import { useTheme } from '@/theme/theme';
 import { radius, type as typeScale } from '@/theme/tokens';
@@ -77,8 +77,8 @@ export default function Manual() {
       ) : null}
 
       <View style={styles.actions}>
-        {Clipboard.isPasteButtonAvailable ? (
-          <Clipboard.ClipboardPasteButton
+        {isPasteButtonAvailable ? (
+          <PasteButton
             acceptedContentTypes={['plain-text', 'url']}
             // Icon only: a fixed-width label could clip at large text sizes, and iOS disables a clipped control.
             displayMode="iconOnly"
