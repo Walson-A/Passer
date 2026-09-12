@@ -1,10 +1,20 @@
 
+import { invoke } from "@tauri-apps/api/core";
 import { useHistory } from "../hooks/useHistory";
 import { HistoryItemRow } from "./HistoryItemRow";
-import { Clock, Trash2 } from "lucide-react";
+import { PremiumTooltip } from "./PremiumTooltip";
+import { Clock, Trash2, FolderOpen } from "lucide-react";
 
 export function Passboard() {
     const { history, clearHistory, deleteHistoryItem } = useHistory();
+
+    const openFolder = async () => {
+        try {
+            await invoke("open_downloads");
+        } catch (e) {
+            console.error("Failed to open folder", e);
+        }
+    };
 
     // Filter to only show incoming transfers (PC as receiver)
     const incomingHistory = history.filter(item => item.direction === 'incoming');
@@ -20,15 +30,27 @@ export function Passboard() {
                     <div className="h-px flex-1 bg-gradient-to-r from-white/40 to-transparent" />
                 </div>
 
-                {incomingHistory.length > 0 && (
-                    <button
-                        onClick={clearHistory}
-                        className="ml-3 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/[0.03] border border-white/5 hover:bg-white/[0.08] hover:border-white/10 text-white/40 hover:text-white/80 transition-all duration-300 group shadow-sm active:scale-95"
-                    >
-                        <Trash2 className="w-3 h-3 transition-colors text-white/40 group-hover:text-red-400" />
-                        <span className="text-[8px] font-bold uppercase tracking-widest text-white/40 group-hover:text-white/80">Clear All</span>
-                    </button>
-                )}
+                <div className="ml-3 flex items-center gap-1.5 shrink-0">
+                    {incomingHistory.length > 0 && (
+                        <button
+                            onClick={clearHistory}
+                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/[0.03] border border-white/5 hover:bg-white/[0.08] hover:border-white/10 text-white/40 hover:text-white/80 transition-all duration-300 group shadow-sm active:scale-95 cursor-pointer"
+                        >
+                            <Trash2 className="w-3 h-3 transition-colors text-white/40 group-hover:text-red-400" />
+                            <span className="text-[8px] font-bold uppercase tracking-widest text-white/40 group-hover:text-white/80">Clear All</span>
+                        </button>
+                    )}
+
+                    {/* Acts on the feed you are looking at, so it lives with it. */}
+                    <PremiumTooltip label="Open Passboard folder" size="sm" side="bottom">
+                        <button
+                            onClick={openFolder}
+                            className="p-1.5 rounded-lg bg-white/[0.03] border border-white/5 hover:bg-white/[0.08] hover:border-white/10 text-white/40 hover:text-[var(--accent-warm)] transition-all duration-300 active:scale-95 cursor-pointer"
+                        >
+                            <FolderOpen className="w-3 h-3" strokeWidth={2} />
+                        </button>
+                    </PremiumTooltip>
+                </div>
             </div>
 
             {/* Scrollable Feed Container */}

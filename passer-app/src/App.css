@@ -23,6 +23,11 @@
   --status-pending: #F59E0B;
   /* Amber-500 */
 
+  /* Warm accent, used by the pin toggle and the folder action.
+     Matches the rgba(251,191,36,...) glow already hardcoded alongside it. */
+  --accent-warm: #FBBF24;
+  /* Amber-400 */
+
   /* Glassmorphism */
   --glass-bg: rgba(20, 20, 20, 0.6);
   --glass-border: rgba(255, 255, 255, 0.05);
@@ -31,6 +36,99 @@
   /* Easings */
   --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  /* iOS-like push curve, for hierarchy transitions */
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* --- View navigation ---------------------------------------------------
+   Sibling views (tabs) cross-fade with a slight depth shift: they are peers,
+   so the motion is non-directional. The detail view (Pair a device) pushes in
+   from the right and leaves the same way, because it sits one level deeper -
+   the motion encodes the hierarchy, and the exit mirrors the entrance so the
+   way back is never in doubt.
+   Layers stay mounted so scroll position and state survive a tab switch.     */
+
+.view-layer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  opacity: 0;
+  transform: scale(0.97);
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 180ms var(--ease-out-expo),
+    transform 180ms var(--ease-out-expo),
+    visibility 0s linear 180ms;
+}
+
+.view-layer[data-active="true"] {
+  opacity: 1;
+  transform: scale(1);
+  visibility: visible;
+  pointer-events: auto;
+  transition:
+    opacity 180ms var(--ease-out-expo),
+    transform 180ms var(--ease-out-expo),
+    visibility 0s;
+}
+
+.detail-layer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  transform: translateX(100%);
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    transform 260ms var(--ease-drawer),
+    visibility 0s linear 260ms;
+}
+
+.detail-layer[data-open="true"] {
+  transform: translateX(0);
+  visibility: visible;
+  pointer-events: auto;
+  transition:
+    transform 260ms var(--ease-drawer),
+    visibility 0s;
+}
+
+.tab-indicator {
+  transition: transform 220ms var(--ease-spring);
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  /* Keep the cross-fade (it aids comprehension), drop the movement. */
+  .view-layer,
+  .view-layer[data-active="true"] {
+    transform: none;
+  }
+
+  .detail-layer {
+    transform: none;
+    opacity: 0;
+    transition:
+      opacity 150ms linear,
+      visibility 0s linear 150ms;
+  }
+
+  .detail-layer[data-open="true"] {
+    transform: none;
+    opacity: 1;
+    transition:
+      opacity 150ms linear,
+      visibility 0s;
+  }
+
+  .tab-indicator {
+    transition: none;
+  }
 }
 
 body {

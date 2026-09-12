@@ -1,16 +1,16 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { X, Power, Link2, Check, Rocket, Info, KeyRound, Eye, EyeOff, Copy, RefreshCw, QrCode } from "lucide-react";
-import { PairDevice } from "./PairDevice";
+import { Power, Link2, Check, Rocket, Info, KeyRound, Eye, EyeOff, Copy, RefreshCw, QrCode, ChevronRight } from "lucide-react";
 
 interface Props {
-    open: boolean;
-    onClose: () => void;
+    /** True while this is the visible view - drives loading and state resets. */
+    active: boolean;
+    onOpenPair: () => void;
 }
 
 const SERVER_ADDRESS = "http://passer.local:8000";
 
-export function Settings({ open, onClose }: Props) {
+export function Settings({ active, onOpenPair }: Props) {
     const [autostart, setAutostart] = useState<boolean | null>(null);
     const [savingAutostart, setSavingAutostart] = useState(false);
     const [version, setVersion] = useState<string>("");
@@ -21,12 +21,11 @@ export function Settings({ open, onClose }: Props) {
     const [tokenCopied, setTokenCopied] = useState(false);
     const [regenConfirm, setRegenConfirm] = useState(false);
     const [regenBusy, setRegenBusy] = useState(false);
-    const [pairOpen, setPairOpen] = useState(false);
 
-    // Load current settings when the panel opens.
+    // Load when this becomes the visible view.
     useEffect(() => {
-        if (!open) return;
-        let active = true;
+        if (!active) return;
+        let alive = true;
         (async () => {
             try {
                 const [enabled, ver, tok] = await Promise.all([
@@ -34,7 +33,7 @@ export function Settings({ open, onClose }: Props) {
                     invoke<string>("get_app_version"),
                     invoke<string>("get_pairing_token"),
                 ]);
-                if (!active) return;
+                if (!alive) return;
                 setAutostart(enabled);
                 setVersion(ver);
                 setToken(tok);
@@ -42,24 +41,17 @@ export function Settings({ open, onClose }: Props) {
                 console.error("Failed to load settings", e);
             }
         })();
-        return () => { active = false; };
-    }, [open]);
+        return () => { alive = false; };
+    }, [active]);
 
-    // Reset transient token UI each time the panel opens.
+    // Never leave the secret revealed, or a destructive action armed, behind a
+    // view the user has navigated away from.
     useEffect(() => {
-        if (!open) {
+        if (!active) {
             setTokenVisible(false);
             setRegenConfirm(false);
         }
-    }, [open]);
-
-    // Close on Escape.
-    useEffect(() => {
-        if (!open) return;
-        const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-        window.addEventListener("keydown", onKey);
-        return () => window.removeEventListener("keydown", onKey);
-    }, [open, onClose]);
+    }, [active]);
 
     const toggleAutostart = async () => {
         if (autostart === null || savingAutostart) return;
@@ -109,146 +101,117 @@ export function Settings({ open, onClose }: Props) {
         }
     };
 
-    if (!open) return null;
-
     return (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-5">
-            {/* Backdrop */}
-            <div
-                className="absolute inset-0 bg-black/60 backdrop-blur-[10px] animate-in fade-in duration-300"
-                onClick={onClose}
-            />
+        <div className="flex-1 overflow-y-auto custom-scrollbar px-4 pt-5 pb-2 flex flex-col gap-3">
 
-            {/* Card */}
-            <div className="relative z-10 w-full max-w-[300px] max-h-full overflow-y-auto custom-scrollbar rounded-[26px] bg-[#0d0d0d]/95 border border-white/10 shadow-[0_25px_60px_rgba(0,0,0,0.9)] animate-in zoom-in-95 fade-in duration-300">
-                {/* Header */}
-                <div className="sticky top-0 z-10 flex items-center justify-between px-5 py-4 border-b border-white/[0.06] bg-[#0d0d0d]/95 backdrop-blur-xl">
-                    <span className="text-[11px] font-black uppercase tracking-[0.2em] text-white/70">
-                        Settings
-                    </span>
-                    <button
-                        onClick={onClose}
-                        className="p-1.5 -mr-1.5 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-all duration-200 active:scale-90"
-                    >
-                        <X className="w-4 h-4" strokeWidth={2} />
-                    </button>
-                </div>
-
-                {/* Body */}
-                <div className="p-4 flex flex-col gap-3">
-                    {/* Launch on startup */}
-                    <div className="flex items-center justify-between gap-3 p-3 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
-                        <div className="flex items-center gap-3 min-w-0">
-                            <div className="shrink-0 w-8 h-8 rounded-xl bg-blue-500/15 border border-blue-400/20 flex items-center justify-center">
-                                <Rocket className="w-4 h-4 text-blue-400" strokeWidth={2} />
-                            </div>
-                            <div className="min-w-0">
-                                <p className="text-[11px] font-bold text-white/90 leading-tight">Launch on startup</p>
-                                <p className="text-[9px] text-white/40 leading-tight mt-0.5">Start Passer when you log in</p>
-                            </div>
-                        </div>
-                        <Toggle
-                            checked={!!autostart}
-                            disabled={autostart === null || savingAutostart}
-                            onChange={toggleAutostart}
-                        />
+            {/* Launch on startup */}
+            <div className="flex items-center justify-between gap-3 p-3 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
+                <div className="flex items-center gap-3 min-w-0">
+                    <div className="shrink-0 w-8 h-8 rounded-xl bg-blue-500/15 border border-blue-400/20 flex items-center justify-center">
+                        <Rocket className="w-4 h-4 text-blue-400" strokeWidth={2} />
                     </div>
-
-                    {/* Pairing token */}
-                    <div className="p-3 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex flex-col gap-2.5">
-                        <div className="flex items-center gap-3">
-                            <div className="shrink-0 w-8 h-8 rounded-xl bg-amber-500/15 border border-amber-400/20 flex items-center justify-center">
-                                <KeyRound className="w-4 h-4 text-amber-400" strokeWidth={2} />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                                <p className="text-[11px] font-bold text-white/90 leading-tight">Pairing token</p>
-                                <p className="text-[9px] text-white/40 leading-tight mt-0.5">Required by every device</p>
-                            </div>
-                            <div className="flex items-center gap-0.5 shrink-0">
-                                <IconButton
-                                    label={tokenVisible ? "Hide" : "Reveal"}
-                                    onClick={() => setTokenVisible(v => !v)}
-                                >
-                                    {tokenVisible
-                                        ? <EyeOff className="w-3.5 h-3.5" strokeWidth={2} />
-                                        : <Eye className="w-3.5 h-3.5" strokeWidth={2} />}
-                                </IconButton>
-                                <IconButton label="Copy" onClick={copyToken} active={tokenCopied}>
-                                    {tokenCopied
-                                        ? <Check className="w-3.5 h-3.5 text-emerald-400" strokeWidth={2.5} />
-                                        : <Copy className="w-3.5 h-3.5" strokeWidth={2} />}
-                                </IconButton>
-                            </div>
-                        </div>
-
-                        <div className="px-2.5 py-2 rounded-xl bg-black/50 border border-white/10">
-                            <p className="text-[10px] font-mono font-bold text-white/80 break-all leading-relaxed select-all">
-                                {token
-                                    ? (tokenVisible ? token : "•".repeat(token.length))
-                                    : "…"}
-                            </p>
-                        </div>
-
-                        <button
-                            onClick={regenerateToken}
-                            disabled={regenBusy}
-                            className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg border text-[9px] font-black uppercase tracking-widest transition-all duration-200 active:scale-[0.98] disabled:opacity-40
-                                ${regenConfirm
-                                    ? "bg-red-500/20 border-red-400/40 text-red-300"
-                                    : "bg-white/[0.03] border-white/10 text-white/40 hover:text-white/80 hover:border-white/20"}`}
-                        >
-                            <RefreshCw className={`w-3 h-3 ${regenBusy ? "animate-spin" : ""}`} strokeWidth={2.5} />
-                            {regenConfirm ? "Unpairs all devices — confirm" : "Regenerate"}
-                        </button>
-                    </div>
-
-                    {/* Pair a device */}
-                    <button
-                        onClick={() => setPairOpen(true)}
-                        className="flex items-center gap-3 p-3 rounded-2xl bg-blue-500/10 border border-blue-400/25 hover:bg-blue-500/20 hover:border-blue-400/40 transition-all duration-200 active:scale-[0.99] text-left group"
-                    >
-                        <div className="shrink-0 w-8 h-8 rounded-xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center">
-                            <QrCode className="w-4 h-4 text-blue-300" strokeWidth={2} />
-                        </div>
-                        <div className="min-w-0">
-                            <p className="text-[11px] font-bold text-white/90 leading-tight">Pair a device</p>
-                            <p className="text-[9px] text-white/45 leading-tight mt-0.5">Show the QR code to connect a phone</p>
-                        </div>
-                    </button>
-
-                    {/* Server address */}
-                    <button
-                        onClick={copyAddress}
-                        className={`group flex items-center justify-between gap-3 p-3 rounded-2xl border transition-all duration-200 active:scale-[0.99] text-left
-                            ${copied ? "bg-emerald-500/15 border-emerald-400/30" : "bg-white/[0.03] border-white/[0.06] hover:border-blue-400/30"}`}
-                    >
-                        <div className="flex items-center gap-3 min-w-0">
-                            <div className="shrink-0 w-8 h-8 rounded-xl bg-white/[0.05] border border-white/10 flex items-center justify-center">
-                                <Power className="w-4 h-4 text-emerald-400/80" strokeWidth={2} />
-                            </div>
-                            <div className="min-w-0">
-                                <p className="text-[9px] font-bold uppercase tracking-widest text-white/40 leading-tight">Server address</p>
-                                <p className="text-[11px] font-mono font-bold text-white/85 leading-tight mt-0.5 truncate">{SERVER_ADDRESS}</p>
-                            </div>
-                        </div>
-                        <div className="shrink-0 text-white/40 group-hover:text-blue-400 transition-colors">
-                            {copied
-                                ? <Check className="w-4 h-4 text-emerald-400" strokeWidth={2.5} />
-                                : <Link2 className="w-4 h-4" strokeWidth={2} />}
-                        </div>
-                    </button>
-
-                    {/* Version */}
-                    <div className="flex items-center gap-2 px-1 pt-0.5 text-white/30">
-                        <Info className="w-3 h-3" strokeWidth={2} />
-                        <span className="text-[9px] font-semibold tracking-wide">
-                            Passer{version ? ` v${version}` : ""}
-                        </span>
+                    <div className="min-w-0">
+                        <p className="text-[11px] font-bold text-white/90 leading-tight">Launch on startup</p>
+                        <p className="text-[9px] text-white/40 leading-tight mt-0.5">Start Passer when you log in</p>
                     </div>
                 </div>
+                <Toggle
+                    checked={!!autostart}
+                    disabled={autostart === null || savingAutostart}
+                    onChange={toggleAutostart}
+                />
             </div>
 
-            <PairDevice open={pairOpen} onClose={() => setPairOpen(false)} />
+            {/* Pairing token */}
+            <div className="p-3 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex flex-col gap-2.5">
+                <div className="flex items-center gap-3">
+                    <div className="shrink-0 w-8 h-8 rounded-xl bg-amber-500/15 border border-amber-400/20 flex items-center justify-center">
+                        <KeyRound className="w-4 h-4 text-amber-400" strokeWidth={2} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                        <p className="text-[11px] font-bold text-white/90 leading-tight">Pairing token</p>
+                        <p className="text-[9px] text-white/40 leading-tight mt-0.5">Required by every device</p>
+                    </div>
+                    <div className="flex items-center gap-0.5 shrink-0">
+                        <IconButton
+                            label={tokenVisible ? "Hide" : "Reveal"}
+                            onClick={() => setTokenVisible(v => !v)}
+                        >
+                            {tokenVisible
+                                ? <EyeOff className="w-3.5 h-3.5" strokeWidth={2} />
+                                : <Eye className="w-3.5 h-3.5" strokeWidth={2} />}
+                        </IconButton>
+                        <IconButton label="Copy" onClick={copyToken} active={tokenCopied}>
+                            {tokenCopied
+                                ? <Check className="w-3.5 h-3.5 text-emerald-400" strokeWidth={2.5} />
+                                : <Copy className="w-3.5 h-3.5" strokeWidth={2} />}
+                        </IconButton>
+                    </div>
+                </div>
+
+                <div className="px-2.5 py-2 rounded-xl bg-black/50 border border-white/10">
+                    <p className="text-[10px] font-mono font-bold text-white/80 break-all leading-relaxed select-all">
+                        {token ? (tokenVisible ? token : "•".repeat(token.length)) : "…"}
+                    </p>
+                </div>
+
+                <button
+                    onClick={regenerateToken}
+                    disabled={regenBusy}
+                    className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg border text-[9px] font-black uppercase tracking-widest transition-all duration-200 active:scale-[0.98] disabled:opacity-40 cursor-pointer
+                        ${regenConfirm
+                            ? "bg-red-500/20 border-red-400/40 text-red-300"
+                            : "bg-white/[0.03] border-white/10 text-white/40 hover:text-white/80 hover:border-white/20"}`}
+                >
+                    <RefreshCw className={`w-3 h-3 ${regenBusy ? "animate-spin" : ""}`} strokeWidth={2.5} />
+                    {regenConfirm ? "Unpairs all devices — confirm" : "Regenerate"}
+                </button>
+            </div>
+
+            {/* Pair a device - pushes one level deeper */}
+            <button
+                onClick={onOpenPair}
+                className="flex items-center gap-3 p-3 rounded-2xl bg-blue-500/10 border border-blue-400/25 hover:bg-blue-500/20 hover:border-blue-400/40 transition-all duration-200 active:scale-[0.99] text-left cursor-pointer"
+            >
+                <div className="shrink-0 w-8 h-8 rounded-xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center">
+                    <QrCode className="w-4 h-4 text-blue-300" strokeWidth={2} />
+                </div>
+                <div className="min-w-0 flex-1">
+                    <p className="text-[11px] font-bold text-white/90 leading-tight">Pair a device</p>
+                    <p className="text-[9px] text-white/45 leading-tight mt-0.5">Show the QR code to connect a phone</p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-white/30 shrink-0" strokeWidth={2} />
+            </button>
+
+            {/* Server address */}
+            <button
+                onClick={copyAddress}
+                className={`group flex items-center justify-between gap-3 p-3 rounded-2xl border transition-all duration-200 active:scale-[0.99] text-left cursor-pointer
+                    ${copied ? "bg-emerald-500/15 border-emerald-400/30" : "bg-white/[0.03] border-white/[0.06] hover:border-blue-400/30"}`}
+            >
+                <div className="flex items-center gap-3 min-w-0">
+                    <div className="shrink-0 w-8 h-8 rounded-xl bg-white/[0.05] border border-white/10 flex items-center justify-center">
+                        <Power className="w-4 h-4 text-emerald-400/80" strokeWidth={2} />
+                    </div>
+                    <div className="min-w-0">
+                        <p className="text-[9px] font-bold uppercase tracking-widest text-white/40 leading-tight">Server address</p>
+                        <p className="text-[11px] font-mono font-bold text-white/85 leading-tight mt-0.5 truncate">{SERVER_ADDRESS}</p>
+                    </div>
+                </div>
+                <div className="shrink-0 text-white/40 group-hover:text-blue-400 transition-colors">
+                    {copied
+                        ? <Check className="w-4 h-4 text-emerald-400" strokeWidth={2.5} />
+                        : <Link2 className="w-4 h-4" strokeWidth={2} />}
+                </div>
+            </button>
+
+            {/* Version */}
+            <div className="flex items-center gap-2 px-1 pt-0.5 pb-1 text-white/30">
+                <Info className="w-3 h-3" strokeWidth={2} />
+                <span className="text-[9px] font-semibold tracking-wide">
+                    Passer{version ? ` v${version}` : ""}
+                </span>
+            </div>
         </div>
     );
 }
@@ -263,7 +226,7 @@ function IconButton({ children, label, onClick, active }: {
         <button
             title={label}
             onClick={onClick}
-            className={`p-1.5 rounded-lg transition-all duration-200 active:scale-90
+            className={`p-1.5 rounded-lg transition-all duration-200 active:scale-90 cursor-pointer
                 ${active ? "bg-emerald-500/15 text-emerald-400" : "text-white/40 hover:text-white hover:bg-white/10"}`}
         >
             {children}
@@ -278,7 +241,7 @@ function Toggle({ checked, disabled, onChange }: { checked: boolean; disabled?: 
             aria-checked={checked}
             disabled={disabled}
             onClick={onChange}
-            className={`relative shrink-0 w-10 h-[22px] rounded-full transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed
+            className={`relative shrink-0 w-10 h-[22px] rounded-full transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer
                 ${checked ? "bg-blue-500 shadow-[0_0_12px_rgba(59,130,246,0.4)]" : "bg-white/10 border border-white/15"}`}
         >
             <span

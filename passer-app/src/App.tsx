@@ -2,8 +2,11 @@ import { useState, useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { Layout } from "./components/Layout";
 import { ServerStatusBar } from "./components/ServerStatusBar";
-import { ControlFooter } from "./components/ControlFooter";
+import { TabBar, type View } from "./components/TabBar";
 import { Passboard } from "./components/Passboard";
+import { PasserSpace } from "./components/PasserSpace";
+import { Settings } from "./components/Settings";
+import { PairDevice } from "./components/PairDevice";
 import { DropZone } from "./components/DropZone";
 import "./App.css";
 
@@ -17,14 +20,22 @@ function App() {
   const [isServerOn, setIsServerOn] = useState(true);
   const [isTransitioning, setIsTransitioning] = useState(false);
 
+  const [view, setView] = useState<View>("passboard");
+  const [pairOpen, setPairOpen] = useState(false);
+
+  // Switching destination always leaves the detail view, so a tab tap can never
+  // land the user on a screen they cannot account for.
+  const goTo = (next: View) => {
+    setPairOpen(false);
+    setView(next);
+  };
+
   const toggleServer = async () => {
     if (isTransitioning) return;
     setIsTransitioning(true);
     try {
       const { invoke } = await import("@tauri-apps/api/core");
       const newState = await invoke<string>("toggle_server");
-      // Use logical state based on backend response
-      // But also wait for animation
       setTimeout(() => {
         setIsServerOn(newState === "on");
         setIsTransitioning(false);
@@ -40,8 +51,6 @@ function App() {
     setTimeout(() => setStatus("idle"), 400);
   };
 
-  // Fetch IP logic removed as it's not used in current UI
-
   // Listen for backend logs
   useEffect(() => {
     let unlisten: () => void;
@@ -52,32 +61,20 @@ function App() {
         const kind = event.payload.kind;
         console.log(`LOG [${kind}]:`, msg);
 
-        // State Machine Logic
         if (msg.includes("PUSH")) {
-          // Incoming from Phone
           setStatus("pushing");
-
-          // Reset to success/idle after animation
           setTimeout(() => {
             setStatus("success");
-
-            setTimeout(() => {
-              setStatus("idle");
-            }, 700);
+            setTimeout(() => setStatus("idle"), 700);
           }, 800);
         }
         else if (msg.includes("PULL")) {
-          // Outgoing to Phone
           setStatus("pulling");
-
           setTimeout(() => {
             setStatus("success");
-            setTimeout(() => {
-              setStatus("idle");
-            }, 700);
+            setTimeout(() => setStatus("idle"), 700);
           }, 800);
         }
-        // Server listening notification handled by isServerOn state
       });
     }
 
@@ -89,22 +86,43 @@ function App() {
 
   return (
     <Layout>
-      {/* Main Container */}
-      <div className="flex-1 flex flex-col h-full min-h-0">
+      <div className="flex-1 flex flex-col min-h-0">
 
-        {/* Server Status Bar (Passive) */}
-        <ServerStatusBar
-          status={isServerOn ? status : "idle"}
-          isReady={isServerOn}
-          onClick={toggleServer}
-          isTransitioning={isTransitioning}
-        />
+        {/* Server status stays global: knowing the server is alive should never
+            depend on which view you happen to be standing in. */}
+        <div className="shrink-0 px-4 pt-3">
+          <ServerStatusBar
+            status={isServerOn ? status : "idle"}
+            isReady={isServerOn}
+            onClick={toggleServer}
+            isTransitioning={isTransitioning}
+          />
+        </div>
 
-        {/* Passboard Feed (Main Focus) */}
-        <Passboard />
+        {/* The body. Layers stay mounted so scroll and state survive a switch. */}
+        <div className="relative flex-1 min-h-0">
+          <div className="view-layer" data-active={view === "passboard"}>
+            <Passboard />
+          </div>
 
-        {/* Footer Controls */}
-        <ControlFooter isTransferring={status === 'pushing' || status === 'pulling'} />
+          <div className="view-layer" data-active={view === "space"}>
+            <PasserSpace />
+          </div>
+
+          <div className="view-layer" data-active={view === "settings"}>
+            <Settings
+              active={view === "settings"}
+              onOpenPair={() => setPairOpen(true)}
+            />
+          </div>
+
+          {/* One level deeper than Settings, so it pushes in from the right. */}
+          <div className="detail-layer" data-open={pairOpen}>
+            <PairDevice open={pairOpen} onClose={() => setPairOpen(false)} />
+          </div>
+        </div>
+
+        <TabBar view={view} onChange={goTo} />
       </div>
 
       <DropZone onDropSuccess={handleDropSuccess} />
