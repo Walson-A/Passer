@@ -20,7 +20,7 @@ The owner widened Phase 1 beyond the spec's original scope. It includes:
 | Question | Decision |
 |---|---|
 | Location | `passer-mobile/` in this repo |
-| Bundle id | Must not contain the owner's name. `direct.passer.app` is a placeholder until the domain is bought (`passer.direct` or `passer.sh`). |
+| Bundle id | `direct.passer.app`, the reverse of the product domain `passer.direct`, also used as the Android package. Never the owner's name. It becomes permanent once the App Store Connect record exists. |
 | Home-screen name | Passer, with the desktop icon redrawn as a vector (`passer-mobile/assets/brand/passer-icon.svg`) |
 | Themes | Dark and light from launch. Light is its own design pass, where the dark theme's light becomes ink. |
 | Languages | English and French, following the device language |

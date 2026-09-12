@@ -1,9 +1,8 @@
 import type { ConfigContext, ExpoConfig } from 'expo/config';
 
 /**
- * Reverse of the domain the product will live on. It becomes permanent with
- * the first TestFlight build, because App Store Connect ties the app record to
- * it. Pending the owner's choice between passer.direct and passer.sh.
+ * Reverse of the product domain, passer.direct. Treat it as permanent: App
+ * Store Connect ties the app record to it, and a new id means a new app.
  */
 const BUNDLE_ID = 'direct.passer.app';
 
