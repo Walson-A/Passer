@@ -248,7 +248,7 @@ export const fr: Translation<typeof en> = {
     hintEmpty: 'Copiez quelque chose, puis touchez Coller',
     paste: 'Coller',
     photo: 'Photo',
-    fromPc: 'Depuis le PC',
+    fromPc: 'Du PC',
     file: 'Fichier',
     recent: 'Récents',
     nameHint: 'Ouvre les réglages de ce PC',

@@ -11,7 +11,7 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
-import Svg, { Line } from 'react-native-svg';
+import Svg, { Defs, Line, RadialGradient, Rect, Stop } from 'react-native-svg';
 
 import { useTheme } from '@/theme/theme';
 import { motion } from '@/theme/tokens';
@@ -30,6 +30,7 @@ type ConduitLineProps = {
 };
 
 const COMET_LENGTH = 56;
+const CHANNEL_WIDTH = 180;
 const travelEasing = Easing.bezier(...motion.easing.travel);
 
 /**
@@ -46,9 +47,19 @@ export function ConduitLine({ mode, progress, travel, children }: ConduitLinePro
 
   return (
     <View style={styles.container} onLayout={onLayout}>
-      <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.center]}>
-        <View style={[styles.band, { backgroundColor: colors.conduit.band }]} />
-      </View>
+      {height > 0 ? (
+        // A soft glow along the line, fading out on every side.
+        <Svg pointerEvents="none" width={CHANNEL_WIDTH} height={height} style={styles.channel}>
+          <Defs>
+            <RadialGradient id="conduit-channel" cx="50%" cy="50%" rx="50%" ry="50%">
+              <Stop offset="0" stopColor={colors.conduit.band} stopOpacity={1} />
+              <Stop offset="0.45" stopColor={colors.conduit.band} stopOpacity={0.8} />
+              <Stop offset="1" stopColor={colors.conduit.band} stopOpacity={0} />
+            </RadialGradient>
+          </Defs>
+          <Rect x={0} y={0} width={CHANNEL_WIDTH} height={height} fill="url(#conduit-channel)" />
+        </Svg>
+      ) : null}
 
       {mode === 'offline' ? (
         <Svg pointerEvents="none" width={2} height={height} style={styles.lineSlot}>
@@ -182,8 +193,7 @@ function Comet({ height, travel, reduceMotion }: { height: number; travel: Trave
 
 const styles = StyleSheet.create({
   container: { flex: 1, minHeight: 200 },
-  center: { alignItems: 'center', justifyContent: 'center' },
-  band: { width: '85%', height: '70%', borderRadius: 999, opacity: 0.9 },
+  channel: { position: 'absolute', top: 0, left: '50%', marginLeft: -CHANNEL_WIDTH / 2 },
   lineSlot: { position: 'absolute', top: 0, left: '50%', marginLeft: -1 },
   line: { position: 'absolute', top: 0, bottom: 0, left: '50%', marginLeft: -1, width: 2, borderRadius: 1 },
   pulse: { position: 'absolute', left: 0, right: 0, height: COMET_LENGTH },
