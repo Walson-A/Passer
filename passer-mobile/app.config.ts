@@ -104,8 +104,16 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ['expo-secure-store', { faceIDPermission: false }],
     'expo-localization',
     'expo-sharing',
-    // Android blocks cleartext HTTP by default; the PC API is plain HTTP on the LAN.
-    ['expo-build-properties', { android: { usesCleartextTraffic: true } }],
+    [
+      'expo-build-properties',
+      {
+        // Android blocks cleartext HTTP by default; the PC API is plain HTTP on the LAN.
+        android: { usesCleartextTraffic: true },
+        // iOS 17: the French Siri phrases of the Shortcuts actions live in a String
+        // Catalog, which Xcode refuses for iOS 16. Only iPhone 8 and X stayed on 16.
+        ios: { deploymentTarget: '17.0' },
+      },
+    ],
     // The share extension, from targets/share.
     '@bacons/apple-targets',
     // The Shortcuts actions, from native/shortcuts, compiled into the app.

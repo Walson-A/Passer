@@ -13,8 +13,8 @@ module.exports = (config) => ({
   name: 'PasserShare',
   displayName: 'Passer',
   bundleIdentifier: '.share',
-  // apple-targets defaults to 18.0; the app itself runs from iOS 16.4.
-  deploymentTarget: '16.4',
+  // apple-targets defaults to 18.0; the app itself runs from iOS 17 (see app.config.ts).
+  deploymentTarget: '17.0',
   frameworks: ['SwiftUI', 'UniformTypeIdentifiers', 'ImageIO'],
   // The App Group gives the extension the paired PCs and the keychain group holding the token.
   entitlements: {

@@ -83,7 +83,7 @@ Change both sides together. The bench's fake PC (`bench/fake-pc.ts`) describes t
 ## The share extension (`targets/share`)
 
 `@bacons/apple-targets` generates the extension at prebuild from `targets/share/expo-target.config.js`. It has:
-- the bundle id `direct.passer.app.share`, for iOS 16.4 and later;
+- the bundle id `direct.passer.app.share`, for iOS 17 and later, like the app;
 - the App Group entitlement;
 - our own `Info.plist`. It accepts text, one web link, up to 50 photos, 20 videos and 50 files. It also allows plain HTTP to local addresses: App Transport Security applies per bundle, and `.local` names need the key.
 
@@ -124,7 +124,7 @@ Five of them work from Siri, Spotlight and the Action Button without building a 
 
 Localisation:
 - **Titles, descriptions and parameters** are keys of `Localizable.xcstrings`.
-- **Phrases** are keys of `AppShortcuts.xcstrings`, written with `${applicationName}`.
+- **Phrases** are keys of `AppShortcuts.xcstrings`, written with `${applicationName}`. Xcode only accepts that catalog for iOS 17 and later, which is why the app requires iOS 17 (`expo-build-properties` in `app.config.ts`).
 - **Messages shown while an action runs** come from `IntentText.swift` and `PasserText.swift`, in the app's language.
 
 To check on the iPhone:
