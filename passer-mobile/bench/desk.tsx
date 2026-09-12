@@ -40,6 +40,17 @@ const ROUTE_GROUPS: { title: string; routes: Route[] }[] = [
       { label: 'Réglages', path: '/settings', modal: true },
     ],
   },
+  {
+    title: 'Depuis un widget',
+    routes: [
+      { label: 'Envoyer le presse-papiers', path: '/action/send-clipboard', modal: false },
+      { label: 'Récupérer du PC', path: '/action/pull', modal: false },
+      { label: 'Envoyer la dernière capture', path: '/action/send-screenshot', modal: false },
+      { label: 'Envoyer puis supprimer la capture', path: '/action/send-and-delete-screenshot', modal: false },
+      { label: 'Envoyer une photo', path: '/action/send-photo', modal: false },
+      { label: 'Envoyer un fichier', path: '/action/send-file', modal: false },
+    ],
+  },
 ];
 
 const ROUTES = ROUTE_GROUPS.flatMap((group) => group.routes);

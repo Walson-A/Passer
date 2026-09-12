@@ -17,7 +17,7 @@ const LOCAL_NETWORK_REASON =
 const CAMERA_REASON = 'Passer uses the camera to scan the pairing code shown on your PC.';
 const SAVE_PHOTOS_REASON = 'Passer saves the images you receive from your PC to your photo library.';
 const PHOTOS_REASON =
-  'Passer reads your latest screenshots and photos when you run one of its Shortcuts actions, to send them to your PC.';
+  'Passer reads your latest screenshot or photos when you use one of its widgets or Shortcuts actions, to send them to your PC.';
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
@@ -114,7 +114,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         ios: { deploymentTarget: '17.0' },
       },
     ],
-    // The share extension, from targets/share.
+    // The share extension (targets/share) and the widgets and controls (targets/widgets).
     '@bacons/apple-targets',
     // The Shortcuts actions, from native/shortcuts, compiled into the app.
     './plugins/with-shortcuts',

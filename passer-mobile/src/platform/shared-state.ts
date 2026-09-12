@@ -1,3 +1,4 @@
+import { ExtensionStorage } from '@bacons/apple-targets';
 import { File, Paths } from 'expo-file-system';
 
 import type { AddressKind, PairedPc } from '@/core/types';
@@ -57,6 +58,8 @@ export function shareWithExtensions(patch: { pcs?: PairedPc[]; photoDestination?
     const file = new File(folder, STATE_FILE);
     if (!file.exists) file.create();
     file.write(JSON.stringify({ version: 1, language, photoDestination, pcs }));
+    // The widgets show the paired PC's name. Without the native module (an older build), this does nothing.
+    if (patch.pcs) ExtensionStorage.reloadWidget();
   } catch {
     // The extensions keep the previous copy; the next change writes it again.
   }

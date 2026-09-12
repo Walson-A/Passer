@@ -1,6 +1,9 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Action" : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Action" } } }
+    },
     "Automatic" : {
       "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Automatique" } } }
     },
@@ -25,6 +28,9 @@
     "Get Files from PC" : {
       "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Obtenir les fichiers du PC" } } }
     },
+    "Get PC Clipboard" : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Récupérer du PC" } } }
+    },
     "Get Text from PC" : {
       "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Obtenir le texte du PC" } } }
     },
@@ -34,8 +40,14 @@
     "Number of Photos" : {
       "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Nombre de photos" } } }
     },
+    "Open in Passer" : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Ouvrir dans Passer" } } }
+    },
     "Passboard" : {
       "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Passboard" } } }
+    },
+    "Passer Action" : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Action Passer" } } }
     },
     "PC Clipboard" : {
       "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Presse-papiers du PC" } } }
@@ -48,6 +60,12 @@
     },
     "Reads the text on your PC's clipboard, for the next action." : {
       "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Lit le texte du presse-papiers du PC, pour l'action suivante." } } }
+    },
+    "Send a File" : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Envoyer un fichier" } } }
+    },
+    "Send a Photo" : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Envoyer une photo" } } }
     },
     "Send and Delete Screenshot" : {
       "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Envoyer et supprimer la capture" } } }

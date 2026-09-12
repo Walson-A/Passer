@@ -80,7 +80,7 @@ Changing the regime, device, language or update server relaunches the app, as iO
 
 ## Two ways to look
 
-- **Desk** (a wide window). The screens are on the left, the phone in the middle, and the controls and log on the right. The phone is an iframe the size of the device, so its window, sheets and safe areas are the phone's.
+- **Desk** (a wide window). The screens are on the left, the phone in the middle, and the controls and log on the right. The phone is an iframe the size of the device, so its window, sheets and safe areas are the phone's. Under "Depuis un widget", the screens list also has the `passer://action/<name>` links that widgets open, so each action can be played as it is on the phone.
 - **Phone** (`?bench=phone`, or a window as narrow as a phone). The phone alone, at 1:1. Agents screenshot this view, with the viewport set to the device size (393 × 852 for the iPhone 16).
 
 Both views accept the controls as URL parameters, for example `?bench=phone&regime=slow&scheme=light&language=en&device=iphone-se&update=available`. `&open=/settings` opens a modal route over Home.

@@ -57,6 +57,8 @@ function Screens() {
         <Stack.Screen name="destination" options={{ ...sheet, sheetAllowedDetents: 'fitToContents' }} />
         <Stack.Screen name="recent" options={{ ...sheet, sheetAllowedDetents: [0.6, 1] }} />
         <Stack.Screen name="settings" options={{ ...sheet, sheetAllowedDetents: [1] }} />
+        {/* A widget's link: gone as soon as it has handed its action to Home. */}
+        <Stack.Screen name="action/[name]" options={{ animation: 'none' }} />
       </Stack>
     </>
   );

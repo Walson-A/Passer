@@ -1,6 +1,6 @@
-# Share extension and Shortcuts actions
+# Share extension, widgets and Shortcuts actions
 
-The share extension and the Shortcuts actions are Swift, and they run outside the React Native app. They reach the PC on their own, using the pairing the app made. This page is the contract between the two sides.
+The share extension, the widgets and the Shortcuts actions are Swift, and they run outside the React Native app. The share extension and the actions reach the PC on their own, using the pairing the app made; the widgets open the app on an action. This page is the contract between the two sides.
 
 ## What the app shares with them
 
@@ -65,6 +65,20 @@ The extension and the actions append each transfer they make:
 
 The values are those of `HistoryItem` in `src/state/history.tsx`, and `size` may be missing. The app merges the file into its history when it comes to the front, then deletes it.
 
+### Actions from the controls: `passer-action.json`
+
+A Control Center control writes this file as it brings the app forward:
+
+```json
+{ "action": "send-clipboard", "at": 1757683200000 }
+```
+
+- `src/platform/action-inbox.ts` reads and deletes it when Home mounts and each time the app comes to the front.
+- It looks again for 3 seconds, because the intent may write the file just after the app is in front.
+- An action older than a minute is dropped: the app closed before running it.
+
+The widgets also show the paired PC's name from `passer-state.json`. The app reloads them whenever the pairings change, through `ExtensionStorage.reloadWidget()` from apple-targets.
+
 ## Talking to the PC
 
 `targets/share/_shared/PasserClient.swift` mirrors `src/core/endpoint.ts` and `src/core/client.ts`:
@@ -97,6 +111,52 @@ How it works:
 - **Look.** `ShareView.swift` uses the Conduit vocabulary, and `PasserTheme.swift` mirrors `src/theme/tokens.ts`.
 
 The bench can't show the extension, since SwiftUI only runs on the iPhone.
+
+## The widgets and controls (`targets/widgets`)
+
+`@bacons/apple-targets` generates a WidgetKit extension from `targets/widgets/expo-target.config.js`. It has the bundle id `direct.passer.app.widgets`, runs on iOS 17 and later, and has the App Group entitlement.
+
+| Widget | Where | What it does |
+|---|---|---|
+| Action Passer | Home Screen (small), Lock Screen (round and rectangular) | Opens the one action chosen when editing the widget |
+| Passer | Home Screen (medium) | Home's launch pad: Paste, From PC, Screenshot and Photo |
+| Six controls | Control Center, Lock Screen and Action Button, from iOS 18 | Each opens one action |
+
+The actions are:
+- send the clipboard;
+- get the PC clipboard;
+- send the latest screenshot;
+- send it, then delete it;
+- send a photo;
+- send a file.
+
+### Every widget opens the app
+
+No widget sends anything by itself. The app runs the action, for three reasons:
+- iOS doesn't let an app in the background read the clipboard.
+- The confirmation to delete a photo needs the app in front.
+- The transfer then shows on the conduit, with its progress, haptics and errors.
+
+### How the action reaches Home
+
+- **Widgets** open `passer://action/<name>`. `src/app/action/[name].tsx` hands the action to Home and closes any sheet.
+- **Controls** can't open a custom URL scheme: `OpenURLIntent` only accepts universal links. Their intent, `OpenPasserActionIntent` in `_shared/PasserActions.swift`, sets `openAppWhenRun`. It therefore runs in the app, which writes `passer-action.json`. iOS requires the intent to be compiled into both the app and the extension, which is what `_shared/` does.
+- **Home** (`src/app/index.tsx`) waits until the PC is found or given up on, so that a failure can say why, then runs the action.
+
+The names are in `src/core/app-actions.ts` and in `PasserAction`. Change both together.
+
+### What each action does in the app
+
+- **Send the clipboard.** iOS shows its paste alert, since no paste button was tapped. A refused paste reads as an empty clipboard, and the notice says both.
+- **Screenshots.** The screenshot goes to the PC clipboard, as the Shortcuts action does. Photo access is asked for the first time.
+- **Delete.** The screenshot is deleted only after it arrived, and iOS confirms.
+- **Photo and file.** They open the same pickers as Home's buttons.
+
+### Text and look
+
+- Names and descriptions are keys of `targets/widgets/Localizable.xcstrings`, in the device's language. The intent's title and the action names are also in the app's catalog, since the intent is compiled into both.
+- `WidgetTheme.swift` mirrors `src/theme/tokens.ts`: the solid tile is Home's paste button, and the others are raised.
+- The bench lists the widget links under "Depuis un widget", but it can't show SwiftUI.
 
 ## The Shortcuts actions (`native/shortcuts`)
 
@@ -136,8 +196,8 @@ To check on the iPhone:
 ## Building
 
 - **Swift can't be compiled on Windows.** `eas build --platform ios --profile simulator` compiles the app, the extension and the actions without signing anything.
-- **Signing the extension needs the App Group on its identifier.** EAS registers capabilities only when the build runs with an Apple ID login, not with an App Store Connect API key. If signing fails with "Provisioning profile doesn't support the group.direct.passer.app App Group":
-  1. enable App Groups with `group.direct.passer.app` on `direct.passer.app.share` in the Apple Developer portal;
+- **Signing the extensions needs the App Group on their identifiers.** EAS registers capabilities only when the build runs with an Apple ID login, not with an App Store Connect API key. The first build after adding an extension (`direct.passer.app.share`, then `direct.passer.app.widgets`) therefore runs interactively, with the owner signed in. If signing fails with "Provisioning profile doesn't support the group.direct.passer.app App Group":
+  1. enable App Groups with `group.direct.passer.app` on the extension's identifier in the Apple Developer portal;
   2. delete that identifier's provisioning profile in `eas credentials`;
   3. build again.
 - **Dependencies.** apple-targets 5.0.0 pulls in `@expo/require-utils` 55, whose TypeScript peer rejects TypeScript 6. `package.json` overrides it with the SDK 57 version, so `npm ci` on EAS accepts the lockfile.

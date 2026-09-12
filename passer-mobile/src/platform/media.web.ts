@@ -23,6 +23,18 @@ export function pickFiles(): Promise<UploadFile[]> {
   return benchHost().pickFiles();
 }
 
+export type LatestScreenshot = { photo: PickedPhoto; assetId: string };
+
+export async function latestScreenshot(): Promise<LatestScreenshot | 'denied' | null> {
+  const photo = await benchHost().latestScreenshot();
+  return photo ? { photo, assetId: 'bench-screenshot' } : null;
+}
+
+export async function deletePhoto(_assetId: string): Promise<boolean> {
+  benchHost().log('photos', 'iOS demande de confirmer la suppression, puis la capture est supprimée');
+  return true;
+}
+
 export async function asPassboardFile(photo: UploadFile): Promise<UploadFile> {
   return photo;
 }

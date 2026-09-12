@@ -60,6 +60,7 @@ function start(state: BenchState) {
     transport: network.transport,
     pickPhotos: async () => PHOTOS,
     pickFiles: async () => FILES,
+    latestScreenshot: async () => PHOTOS.find((photo) => photo.mimeType === 'image/png') ?? null,
     insets: DEVICES[state.device].insets,
     updates: {
       // Once restarted onto the update, the server has nothing newer.

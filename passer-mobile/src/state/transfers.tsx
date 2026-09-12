@@ -53,11 +53,16 @@ type TransfersValue = {
   /** Photos picked on the home screen, waiting for the destination sheet. */
   pendingPhotos: PickedPhoto[];
   setPendingPhotos: (photos: PickedPhoto[]) => void;
-  sendText: (text: string) => Promise<void>;
-  sendPastedImage: (dataUri: string) => Promise<void>;
-  sendPhotos: (photos: PickedPhoto[], destination: PhotoDestination) => Promise<void>;
-  sendFiles: (files: UploadFile[]) => Promise<void>;
-  pull: () => Promise<void>;
+  /** Transfers resolve to true when they went through, false when refused, failed or cancelled. */
+  sendText: (text: string) => Promise<boolean>;
+  sendPastedImage: (dataUri: string) => Promise<boolean>;
+  sendPhotos: (photos: PickedPhoto[], destination: PhotoDestination) => Promise<boolean>;
+  sendFiles: (files: UploadFile[]) => Promise<boolean>;
+  pull: () => Promise<boolean>;
+  /** Fails with the usual message when the PC isn't reachable, before anything is read or picked. */
+  ensureReachable: () => boolean;
+  /** A notice in the conduit, for an action that ends before any transfer starts. */
+  inform: (message: string) => void;
   saveImage: (fileUri: string) => Promise<void>;
   shareFiles: (fileUri: string) => Promise<void>;
   cancel: () => void;
@@ -124,17 +129,17 @@ export function TransfersProvider({ children }: { children: ReactNode }) {
   const run = async (
     work: (client: PasserClient, pcKey: string, signal: AbortSignal) => Promise<void>,
     { probe = false }: { probe?: boolean } = {},
-  ) => {
-    if (!pc) return;
+  ): Promise<boolean> => {
+    if (!pc) return false;
     if (running.current) {
       // The running transfer's capsule stays on screen; the tap is refused with a felt and spoken cue.
       haptic.warning();
       announce(t.transfer.busy);
-      return;
+      return false;
     }
     if (connection.status !== 'online') {
       fail('unreachable', format(t.transfer.unreachable, { name: pc.name }));
-      return;
+      return false;
     }
 
     const controller = new AbortController();
@@ -145,6 +150,7 @@ export function TransfersProvider({ children }: { children: ReactNode }) {
     try {
       if (probe) await ping(connection.endpoint.baseUrl, PROBE_TIMEOUT_MS, controller.signal);
       await work(client, pc.key, controller.signal);
+      return true;
     } catch (error) {
       const failure =
         error instanceof PasserError
@@ -157,6 +163,7 @@ export function TransfersProvider({ children }: { children: ReactNode }) {
         if (failure.kind === 'unreachable') retry();
         fail(failure.kind, describeFailure(failure, pc.name));
       }
+      return false;
     } finally {
       running.current = null;
       setActive(null);
@@ -356,6 +363,13 @@ export function TransfersProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const ensureReachable = () => {
+    if (!pc) return false;
+    if (connection.status === 'online') return true;
+    fail('unreachable', format(t.transfer.unreachable, { name: pc.name }));
+    return false;
+  };
+
   const cancel = () => running.current?.abort();
 
   const dismissOutcome = () => setOutcome(null);
@@ -372,6 +386,8 @@ export function TransfersProvider({ children }: { children: ReactNode }) {
         sendPhotos,
         sendFiles,
         pull,
+        ensureReachable,
+        inform: notify,
         saveImage,
         shareFiles,
         cancel,

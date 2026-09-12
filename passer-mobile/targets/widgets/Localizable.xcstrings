@@ -1,0 +1,84 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "Action" : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Action" } } }
+    },
+    "Choose an Action" : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Choisir une action" } } }
+    },
+    "File" : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Fichier" } } }
+    },
+    "From PC" : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Du PC" } } }
+    },
+    "Get PC Clipboard" : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Récupérer du PC" } } }
+    },
+    "Open in Passer" : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Ouvrir dans Passer" } } }
+    },
+    "Opens Passer and copies your PC's clipboard to this iPhone." : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Ouvre Passer et copie le presse-papiers du PC sur cet iPhone." } } }
+    },
+    "Opens Passer and sends what you copied to your PC's clipboard." : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Ouvre Passer et envoie ce que vous avez copié dans le presse-papiers du PC." } } }
+    },
+    "Opens Passer and sends your latest screenshot to your PC's clipboard." : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Ouvre Passer et envoie votre dernière capture dans le presse-papiers du PC." } } }
+    },
+    "Opens Passer on the action you choose: your clipboard, your latest screenshot, a photo or a file." : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Ouvre Passer sur l'action de votre choix : presse-papiers, dernière capture, photo ou fichier." } } }
+    },
+    "Opens Passer on your files, to send some to your PC." : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Ouvre Passer sur vos fichiers, pour en envoyer au PC." } } }
+    },
+    "Opens Passer on your photos, to send some to your PC." : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Ouvre Passer sur vos photos, pour en envoyer au PC." } } }
+    },
+    "Opens Passer, sends your latest screenshot to your PC, then deletes it." : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Ouvre Passer, envoie votre dernière capture au PC, puis la supprime." } } }
+    },
+    "Pair a PC in Passer" : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Associez un PC dans Passer" } } }
+    },
+    "Passer" : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Passer" } } }
+    },
+    "Passer Action" : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Action Passer" } } }
+    },
+    "Paste" : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Coller" } } }
+    },
+    "Paste to your PC, get its clipboard, or send your latest screenshot or a photo, in one tap." : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Collez vers le PC, récupérez son presse-papiers, ou envoyez votre dernière capture ou une photo, en un geste." } } }
+    },
+    "Photo" : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Photo" } } }
+    },
+    "Screenshot" : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Capture" } } }
+    },
+    "Send a File" : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Envoyer un fichier" } } }
+    },
+    "Send a Photo" : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Envoyer une photo" } } }
+    },
+    "Send and Delete Screenshot" : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Envoyer et supprimer la capture" } } }
+    },
+    "Send Clipboard" : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Envoyer le presse-papiers" } } }
+    },
+    "Send Screenshot" : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Envoyer la capture" } } }
+    },
+    "The action this widget opens in Passer." : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "L'action que ce widget ouvre dans Passer." } } }
+    }
+  },
+  "version" : "1.0"
+}

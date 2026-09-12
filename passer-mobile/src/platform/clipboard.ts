@@ -14,6 +14,26 @@ export async function detectClipboard(): Promise<ClipboardContent> {
   return hasText ? 'text' : 'empty';
 }
 
+export type ClipboardRead = { kind: 'text'; text: string } | { kind: 'image'; dataUri: string } | { kind: 'empty' };
+
+/**
+ * Reads the clipboard for a widget's send, where no paste button was tapped:
+ * iOS shows its paste alert. A refused paste reads as an empty clipboard, and
+ * iOS gives no way to tell the two apart.
+ */
+export async function readClipboard(): Promise<ClipboardRead> {
+  const content = await detectClipboard();
+  if (content === 'image') {
+    const image = await Clipboard.getImageAsync({ format: 'png' });
+    return image?.data ? { kind: 'image', dataUri: image.data } : { kind: 'empty' };
+  }
+  if (content === 'text') {
+    const text = await Clipboard.getStringAsync();
+    return text ? { kind: 'text', text } : { kind: 'empty' };
+  }
+  return { kind: 'empty' };
+}
+
 export function onClipboardChange(listener: () => void): { remove: () => void } {
   return Clipboard.addClipboardListener(listener);
 }

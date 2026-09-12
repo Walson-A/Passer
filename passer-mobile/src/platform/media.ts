@@ -2,7 +2,13 @@ import { getDocumentAsync } from 'expo-document-picker';
 import { Directory, File, Paths } from 'expo-file-system';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { launchImageLibraryAsync, UIImagePickerPreferredAssetRepresentationMode } from 'expo-image-picker';
-import { requestPermissionsAsync, saveToLibraryAsync } from 'expo-media-library/legacy';
+import {
+  deleteAssetsAsync,
+  getAssetInfoAsync,
+  getAssetsAsync,
+  requestPermissionsAsync,
+  saveToLibraryAsync,
+} from 'expo-media-library/legacy';
 import { isAvailableAsync, shareAsync } from 'expo-sharing';
 
 import type { UploadFile } from '@/core/client';
@@ -78,6 +84,52 @@ export async function pickFiles(): Promise<UploadFile[]> {
     mimeType: asset.mimeType ?? 'application/octet-stream',
     size: asset.size ?? null,
   }));
+}
+
+export type LatestScreenshot = { photo: PickedPhoto; assetId: string };
+
+const IMAGE_TYPES: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', heic: 'image/heic' };
+
+/**
+ * The newest screenshot, for the widgets' screenshot actions. The app is in
+ * front, so iOS can ask for photo access here the first time.
+ */
+export async function latestScreenshot(): Promise<LatestScreenshot | 'denied' | null> {
+  const permission = await requestPermissionsAsync(false);
+  if (!permission.granted) return 'denied';
+  const page = await getAssetsAsync({
+    first: 1,
+    mediaType: 'photo',
+    mediaSubtypes: ['screenshot'],
+    sortBy: [['creationTime', false]],
+  });
+  const asset = page.assets[0];
+  if (!asset) return null;
+  // The library hands out `ph://` references; uploads need the file, downloaded from iCloud if it has to be.
+  const info = await getAssetInfoAsync(asset, { shouldDownloadFromNetwork: true });
+  if (!info.localUri) return null;
+  const name = safeName(asset.filename, `Screenshot ${timestamp()}.png`);
+  const extension = name.split('.').pop()?.toLowerCase() ?? '';
+  return {
+    assetId: asset.id,
+    photo: {
+      uri: info.localUri,
+      name,
+      mimeType: IMAGE_TYPES[extension] ?? 'image/png',
+      size: null,
+      width: asset.width,
+      height: asset.height,
+    },
+  };
+}
+
+/** Deletes a photo from the library. iOS always asks for confirmation; a refusal returns false. */
+export async function deletePhoto(assetId: string): Promise<boolean> {
+  try {
+    return await deleteAssetsAsync([assetId]);
+  } catch {
+    return false;
+  }
 }
 
 /** A photo as it should land in the Passboard folder: the original file, under its own name. */

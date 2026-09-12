@@ -108,6 +108,7 @@ Known gap, noted by the owner: the middle of the conduit feels empty when idle.
 ## Not done yet
 
 - **Real-device checks:** the Local Network prompt, `.local` resolution on iOS, paste button sizing in French, upload progress.
-- **Share extension and Shortcuts actions:** written, but not yet signed and tried on a phone. See [extensions.md](extensions.md).
+- **Share extension and Shortcuts actions:** built and signed, not yet tried on a phone. See [extensions.md](extensions.md).
+- **Widgets and Control Center controls:** written, not yet built. The first build needs the owner's Apple ID login for the new `direct.passer.app.widgets` identifier.
 - **Later phases:** multiple PCs in the UI, and mDNS discovery (phases 2 and 3).
 - **Device passes:** VoiceOver on a real iPhone, and 60 fps on the transfer animation.

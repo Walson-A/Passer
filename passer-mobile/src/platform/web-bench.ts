@@ -34,6 +34,8 @@ export type BenchHost = {
   transport: FileTransport;
   pickPhotos: () => Promise<PickedPhoto[]>;
   pickFiles: () => Promise<UploadFile[]>;
+  /** The newest screenshot in the photo library, for the widgets' screenshot actions. */
+  latestScreenshot: () => Promise<PickedPhoto | null>;
   insets: EdgeInsets;
   updates: {
     scenario: BenchUpdateScenario;

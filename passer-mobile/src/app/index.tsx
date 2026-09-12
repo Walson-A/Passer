@@ -21,11 +21,14 @@ import { PcNode, type NodeStatus } from '@/components/conduit/pc-node';
 import { Sockets, type SocketContent, type SocketName } from '@/components/conduit/sockets';
 import { SlidersIcon } from '@/components/icons';
 import { PressableScale } from '@/components/ui/pressable-scale';
+import { ACTION_LIFETIME_MS, type AppAction } from '@/core/app-actions';
 import { machineName } from '@/core/endpoint';
 import type { PairedPc } from '@/core/types';
 import { format, t } from '@/i18n';
+import { readClipboard } from '@/platform/clipboard';
 import { haptic } from '@/platform/haptics';
-import { pickFiles, pickPhotos } from '@/platform/media';
+import { deletePhoto, latestScreenshot, pickFiles, pickPhotos } from '@/platform/media';
+import { takeAction, usePendingAction } from '@/state/actions';
 import { useConnection } from '@/state/connection';
 import { latest, useHistory, type HistoryItem } from '@/state/history';
 import { usePairings } from '@/state/pairings';
@@ -137,6 +140,61 @@ function Home({ pc }: { pc: PairedPc }) {
     const files = await pickFiles();
     if (files.length > 0) void transfers.sendFiles(files);
   };
+
+  /** What a widget or a control asked for, run here so the transfer is seen on the conduit. */
+  const runAction = async (action: AppAction) => {
+    switch (action) {
+      case 'pull':
+        await transfers.pull();
+        return;
+      case 'send-photo':
+        await choosePhotos();
+        return;
+      case 'send-file':
+        await chooseFiles();
+        return;
+      case 'send-clipboard': {
+        // Reading shows the iOS paste alert: not for a PC that can't receive.
+        if (!transfers.ensureReachable()) return;
+        const content = await readClipboard();
+        if (content.kind === 'text') {
+          await transfers.sendText(content.text);
+        } else if (content.kind === 'image') {
+          await transfers.sendPastedImage(content.dataUri);
+        } else {
+          haptic.warning();
+          transfers.inform(t.transfer.iphoneClipboardEmpty);
+        }
+        return;
+      }
+      case 'send-screenshot':
+      case 'send-and-delete-screenshot': {
+        if (!transfers.ensureReachable()) return;
+        const found = await latestScreenshot();
+        if (found === null || found === 'denied') {
+          haptic.warning();
+          transfers.inform(found === 'denied' ? t.transfer.photosDenied : t.transfer.noScreenshot);
+          return;
+        }
+        // A screenshot goes to the PC clipboard, ready to paste, as the Shortcuts action does.
+        const sent = await transfers.sendPhotos([found.photo], 'clipboard');
+        if (sent && action === 'send-and-delete-screenshot' && (await deletePhoto(found.assetId))) {
+          transfers.inform(t.transfer.screenshotDeleted);
+        }
+      }
+    }
+  };
+
+  const pendingAction = usePendingAction();
+  useEffect(() => {
+    if (!pendingAction) return;
+    // Right after launch the PC is still being looked for: wait, so a failure can say why.
+    if (connection.status === 'searching' || connection.status === 'none') return;
+    takeAction(pendingAction.key);
+    if (Date.now() - pendingAction.at > ACTION_LIFETIME_MS) return;
+    if (router.canDismiss()) router.dismissAll();
+    void runAction(pendingAction.action);
+  }, [pendingAction, connection.status, router, runAction]);
 
   // Pull the conduit down to fetch the PC clipboard.
   const pullOffset = useSharedValue(0);

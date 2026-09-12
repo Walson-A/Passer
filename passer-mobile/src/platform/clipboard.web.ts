@@ -7,6 +7,15 @@ export async function detectClipboard(): Promise<ClipboardContent> {
   return benchHost().clipboard.read().kind;
 }
 
+export type ClipboardRead = { kind: 'text'; text: string } | { kind: 'image'; dataUri: string } | { kind: 'empty' };
+
+export async function readClipboard(): Promise<ClipboardRead> {
+  const host = benchHost();
+  const value = host.clipboard.read();
+  host.log('clipboard', 'iOS demande d’autoriser le collage, puis Passer lit le presse-papiers');
+  return value.kind === 'image' ? { kind: 'image', dataUri: value.dataUri } : value;
+}
+
 export function onClipboardChange(listener: () => void): { remove: () => void } {
   return { remove: benchHost().clipboard.subscribe(listener) };
 }
