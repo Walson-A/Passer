@@ -74,12 +74,15 @@ export function ServerStatusBar({ status, isReady, onClick, isTransitioning }: S
                                         : 'text-red-500/70 group-hover/status:text-red-400'
                         }
                     `}>
-                        {/* "Passboard" now names a destination, so this describes
-                            the activity instead: what the PC is doing, not where
-                            you are. */}
+                        {/* Everything here is named from this PC's point of view.
+                            At rest it says "Ready", not "Receiving": nothing is
+                            being received while idle, and the transfer labels
+                            cover the moments when something actually is. The
+                            push/pull labels used to be inverted - a phone
+                            pushing to the PC displayed "Pulling". */}
                         {isTransitioning
                             ? (isReady ? "Stopping..." : "Starting...")
-                            : (status === 'pushing' ? "Pulling..." : status === 'pulling' ? "Pushing..." : (status === 'success' || status === 'sync-success' ? "Done!" : (isReady ? "Receiving" : "Paused")))
+                            : (status === 'pushing' ? "Receiving..." : status === 'pulling' ? "Sending..." : (status === 'success' || status === 'sync-success' ? "Done!" : (isReady ? "Ready" : "Paused")))
                         }
                     </span>
                 </div>

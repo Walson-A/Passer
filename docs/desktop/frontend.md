@@ -13,7 +13,18 @@ The app uses TailwindCSS 4 and pure CSS `backdrop-filter` to enforce the "glassm
 `App.tsx` directly listens to Tauri IPC events (`log` queue). When the backend processes `PUSH` or `PULL` events, `App.tsx` updates its state (`idle` -> `pushing` -> `success`), which trickles down to orchestrate smooth UI animations.
 
 ### `ServerStatusBar.tsx`
-A pill-shaped persistent indicator. It displays the active state of the server (On/Off) and temporarily acts as a pulsing activity indicator during active file or clipboard transfers.
+A pill-shaped indicator living in the Passboard view, doubling as the server toggle. Every label is written from this PC's point of view:
+
+| State | Label |
+| ----- | ----- |
+| Listener bound, idle | `Ready` |
+| Server stopped | `Paused` |
+| A device is sending to this PC | `Receiving...` |
+| A device is fetching from this PC | `Sending...` |
+| Just completed | `Done!` |
+| Mid toggle | `Starting...` / `Stopping...` |
+
+It says `Ready` at rest rather than `Receiving`, which would claim an action that is not happening; `Receiving...` is reserved for when a transfer really is in flight. Its on/off state follows `server-started` / `server-stopped` and is seeded from `get_server_status`, so it reflects whether the socket is genuinely bound rather than assuming it is.
 
 ### `Passboard.tsx`
 The primary feed component representing the history of transfers. Instead of a database, this is an ephemeral runtime history, bringing the latest items to the top seamlessly.
