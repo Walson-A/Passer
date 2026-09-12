@@ -1,8 +1,10 @@
 import { createContext, useContext, useRef, useState, type ReactNode } from 'react';
 
 import { PasserClient, type TransferProgress, type UploadFile } from '@/core/client';
+import { ping } from '@/core/endpoint';
 import { PasserError, type PasserErrorKind } from '@/core/errors';
 import { format, t } from '@/i18n';
+import { announce } from '@/platform/accessibility';
 import { copyImageFile, copyText } from '@/platform/clipboard';
 import { fileTransport } from '@/platform/file-transport';
 import { haptic } from '@/platform/haptics';
@@ -10,6 +12,7 @@ import {
   asClipboardImage,
   asPassboardFile,
   asUploadFile,
+  clearOutgoing,
   finalizePulled,
   saveImageToPhotos,
   shareFile,
@@ -65,6 +68,8 @@ const TransfersContext = createContext<TransfersValue | null>(null);
 
 /** Only show a capsule for quick transfers if they take longer than this. */
 const INDICATOR_DELAY_MS = 350;
+/** Uploads and pulls check the PC first, so a sleeping PC fails in seconds rather than minutes. */
+const PROBE_TIMEOUT_MS = 2_500;
 
 function describeFailure(error: PasserError, pcName: string): string {
   switch (error.kind) {
@@ -104,17 +109,31 @@ export function TransfersProvider({ children }: { children: ReactNode }) {
     return lastKey.current;
   };
 
+  const notify = (message: string) => {
+    setOutcome({ kind: 'notice', key: nextKey(), message });
+    announce(message);
+  };
+
+  const fail = (error: PasserErrorKind, message: string) => {
+    haptic.error();
+    setOutcome({ kind: 'failed', key: nextKey(), error, message });
+    announce(message);
+  };
+
   /** One transfer at a time; failures become a designed outcome, never raw text. */
-  const run = async (work: (client: PasserClient, pcKey: string, signal: AbortSignal) => Promise<void>) => {
-    if (running.current || !pc) return;
+  const run = async (
+    work: (client: PasserClient, pcKey: string, signal: AbortSignal) => Promise<void>,
+    { probe = false }: { probe?: boolean } = {},
+  ) => {
+    if (!pc) return;
+    if (running.current) {
+      // The running transfer's capsule stays on screen; the tap is refused with a felt and spoken cue.
+      haptic.warning();
+      announce(t.transfer.busy);
+      return;
+    }
     if (connection.status !== 'online') {
-      haptic.error();
-      setOutcome({
-        kind: 'failed',
-        key: nextKey(),
-        error: 'unreachable',
-        message: format(t.transfer.unreachable, { name: pc.name }),
-      });
+      fail('unreachable', format(t.transfer.unreachable, { name: pc.name }));
       return;
     }
 
@@ -124,6 +143,7 @@ export function TransfersProvider({ children }: { children: ReactNode }) {
     const client = new PasserClient(connection.endpoint, connection.token, fileTransport);
 
     try {
+      if (probe) await ping(connection.endpoint.baseUrl, PROBE_TIMEOUT_MS, controller.signal);
       await work(client, pc.key, controller.signal);
     } catch (error) {
       const failure =
@@ -131,22 +151,23 @@ export function TransfersProvider({ children }: { children: ReactNode }) {
           ? error
           : new PasserError('protocol', error instanceof Error ? error.message : 'Transfer failed');
       if (failure.kind === 'cancelled' || controller.signal.aborted) {
-        setOutcome({ kind: 'notice', key: nextKey(), message: t.transfer.cancelled });
+        notify(t.transfer.cancelled);
       } else {
         if (failure.kind === 'unauthorized') reportUnauthorized();
         if (failure.kind === 'unreachable') retry();
-        haptic.error();
-        setOutcome({ kind: 'failed', key: nextKey(), error: failure.kind, message: describeFailure(failure, pc.name) });
+        fail(failure.kind, describeFailure(failure, pc.name));
       }
     } finally {
       running.current = null;
       setActive(null);
+      clearOutgoing();
     }
   };
 
   const land = (item: HistoryItem, socket: Socket | null, direction: 'up' | 'down') => {
     haptic.success();
     setOutcome({ kind: 'landed', key: nextKey(), direction, socket, item });
+    if (pc) announce(format(direction === 'up' ? t.transfer.sentTo : t.transfer.receivedFrom, { name: pc.name }));
   };
 
   /** Uploads files one by one, reporting progress across the whole batch. */
@@ -177,6 +198,12 @@ export function TransfersProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const stageAll = async (items: UploadFile[], prepare: (item: UploadFile) => Promise<UploadFile>) => {
+    const staged: UploadFile[] = [];
+    for (const item of items) staged.push(await prepare(item));
+    return staged;
+  };
+
   const sendText = (text: string) =>
     run(async (client, pcKey, signal) => {
       if (text.length === 0) return;
@@ -204,102 +231,130 @@ export function TransfersProvider({ children }: { children: ReactNode }) {
     });
 
   const sendPastedImage = (dataUri: string) =>
-    run(async (client, pcKey, signal) => {
-      const file = stagePastedImage(dataUri);
-      await upload(client, signal, [file], 'pc-clipboard', 'image');
-      const item = record({ pcKey, direction: 'sent', kind: 'image', destination: 'pc-clipboard', title: t.transfer.pastedImage, size: file.size });
-      land(item, 'clipboard', 'up');
-    });
+    run(
+      async (client, pcKey, signal) => {
+        const file = stagePastedImage(dataUri);
+        await upload(client, signal, [file], 'pc-clipboard', 'image');
+        const item = record({ pcKey, direction: 'sent', kind: 'image', destination: 'pc-clipboard', title: t.transfer.pastedImage, size: file.size });
+        land(item, 'clipboard', 'up');
+      },
+      { probe: true },
+    );
 
   const sendPhotos = (photos: PickedPhoto[], destination: PhotoDestination) =>
-    run(async (client, pcKey, signal) => {
-      if (photos.length === 0) return;
-      if (destination === 'clipboard') {
-        const file = await asClipboardImage(photos[0]);
-        await upload(client, signal, [file], 'pc-clipboard', 'image');
-        const item = record({ pcKey, direction: 'sent', kind: 'image', destination: 'pc-clipboard', title: photos[0].name, size: file.size });
-        land(item, 'clipboard', 'up');
-        return;
-      }
-      const files = photos.map(asPassboardFile);
-      await upload(client, signal, files, 'passboard', 'image');
-      const item = record({
-        pcKey,
-        direction: 'sent',
-        kind: files.length > 1 ? 'files' : 'image',
-        destination: 'passboard',
-        title: files.length > 1 ? format(t.transfer.photosCount, { count: files.length }) : files[0].name,
-        size: totalSize(files),
-      });
-      land(item, 'passboard', 'up');
-    });
-
-  const sendFiles = (picked: UploadFile[]) =>
-    run(async (client, pcKey, signal) => {
-      if (picked.length === 0) return;
-      const files = picked.map(asUploadFile);
-      await upload(client, signal, files, 'passboard', 'file');
-      const item = record({
-        pcKey,
-        direction: 'sent',
-        kind: files.length > 1 ? 'files' : 'file',
-        destination: 'passboard',
-        title: files.length > 1 ? format(t.transfer.filesCount, { count: files.length }) : files[0].name,
-        size: totalSize(files),
-      });
-      land(item, 'passboard', 'up');
-    });
-
-  const pull = () =>
-    run(async (client, pcKey, signal) => {
-      setActive({
-        direction: 'down',
-        kind: 'text',
-        destination: 'iphone-clipboard',
-        title: t.transfer.receiving,
-        index: 0,
-        count: 1,
-        sent: 0,
-        total: 0,
-      });
-      const result = await client.pull(signal);
-
-      if (result.kind === 'text') {
-        if (result.text.length === 0) {
-          haptic.warning();
-          setOutcome({ kind: 'notice', key: nextKey(), message: t.transfer.pcClipboardEmpty });
+    run(
+      async (client, pcKey, signal) => {
+        if (photos.length === 0) return;
+        if (destination === 'clipboard') {
+          const file = await asClipboardImage(photos[0]);
+          await upload(client, signal, [file], 'pc-clipboard', 'image');
+          const item = record({ pcKey, direction: 'sent', kind: 'image', destination: 'pc-clipboard', title: photos[0].name, size: file.size });
+          land(item, 'clipboard', 'up');
           return;
         }
-        await copyText(result.text);
-        const item = record({ pcKey, direction: 'received', kind: 'text', destination: 'iphone-clipboard', title: result.text.trim(), size: null });
-        land(item, null, 'down');
-        return;
-      }
+        const files = await stageAll(photos, asPassboardFile);
+        await upload(client, signal, files, 'passboard', 'image');
+        const item = record({
+          pcKey,
+          direction: 'sent',
+          kind: files.length > 1 ? 'files' : 'image',
+          destination: 'passboard',
+          title: files.length > 1 ? format(t.transfer.photosCount, { count: files.length }) : files[0].name,
+          size: totalSize(files),
+        });
+        land(item, 'passboard', 'up');
+      },
+      { probe: true },
+    );
 
-      if (result.kind === 'image') {
-        const file = finalizePulled(result.fileUri, 'png');
-        await copyImageFile(file.uri);
-        const item = record({ pcKey, direction: 'received', kind: 'image', destination: 'iphone-clipboard', title: t.transfer.imageFromPc, size: file.size });
+  const sendFiles = (picked: UploadFile[]) =>
+    run(
+      async (client, pcKey, signal) => {
+        if (picked.length === 0) return;
+        const files = await stageAll(picked, asUploadFile);
+        await upload(client, signal, files, 'passboard', 'file');
+        const item = record({
+          pcKey,
+          direction: 'sent',
+          kind: files.length > 1 ? 'files' : 'file',
+          destination: 'passboard',
+          title: files.length > 1 ? format(t.transfer.filesCount, { count: files.length }) : files[0].name,
+          size: totalSize(files),
+        });
+        land(item, 'passboard', 'up');
+      },
+      { probe: true },
+    );
+
+  const pull = () =>
+    run(
+      async (client, pcKey, signal) => {
+        setActive({
+          direction: 'down',
+          kind: 'text',
+          destination: 'iphone-clipboard',
+          title: t.transfer.receiving,
+          index: 0,
+          count: 1,
+          sent: 0,
+          total: 0,
+        });
+        const result = await client.pull(signal);
+
+        if (result.kind === 'text') {
+          if (result.text.length === 0) {
+            haptic.warning();
+            notify(t.transfer.pcClipboardEmpty);
+            return;
+          }
+          await copyText(result.text);
+          const item = record({ pcKey, direction: 'received', kind: 'text', destination: 'iphone-clipboard', title: result.text.trim(), size: null });
+          land(item, null, 'down');
+          return;
+        }
+
+        if (result.kind === 'image') {
+          const file = await finalizePulled(result.fileUri, 'png');
+          await copyImageFile(file.uri);
+          const item = record({ pcKey, direction: 'received', kind: 'image', destination: 'iphone-clipboard', title: t.transfer.imageFromPc, size: file.size });
+          haptic.success();
+          setOutcome({ kind: 'pulled-image', key: nextKey(), direction: 'down', fileUri: file.uri, item });
+          if (pc) announce(format(t.transfer.receivedFrom, { name: pc.name }));
+          return;
+        }
+
+        const file = await finalizePulled(result.fileUri, 'zip');
+        const item = record({ pcKey, direction: 'received', kind: 'files', destination: 'files', title: file.name, size: file.size });
         haptic.success();
-        setOutcome({ kind: 'pulled-image', key: nextKey(), direction: 'down', fileUri: file.uri, item });
-        return;
-      }
-
-      const file = finalizePulled(result.fileUri, 'zip');
-      const item = record({ pcKey, direction: 'received', kind: 'files', destination: 'files', title: file.name, size: file.size });
-      haptic.success();
-      setOutcome({ kind: 'pulled-files', key: nextKey(), direction: 'down', fileUri: file.uri, item });
-      await shareFile(file.uri, { mimeType: 'application/zip', uti: 'public.zip-archive' });
-    });
+        setOutcome({ kind: 'pulled-files', key: nextKey(), direction: 'down', fileUri: file.uri, item });
+        if (pc) announce(format(t.transfer.receivedFrom, { name: pc.name }));
+        try {
+          await shareFile(file.uri, { mimeType: 'application/zip', uti: 'public.zip-archive' });
+        } catch {
+          // The files arrived; if the share sheet can't open, the Share button stays on the home screen.
+        }
+      },
+      { probe: true },
+    );
 
   const saveImage = async (fileUri: string) => {
-    if (await saveImageToPhotos(fileUri)) {
-      haptic.success();
-      setOutcome({ kind: 'notice', key: nextKey(), message: t.transfer.savedToPhotos });
+    try {
+      if (await saveImageToPhotos(fileUri)) {
+        haptic.success();
+        notify(t.transfer.savedToPhotos);
+      }
+    } catch {
+      fail('protocol', t.transfer.failed);
     }
   };
 
-  const shareFiles = (fileUri: string) => shareFile(fileUri, { mimeType: 'application/zip', uti: 'public.zip-archive' });
+  const shareFiles = async (fileUri: string) => {
+    try {
+      await shareFile(fileUri, { mimeType: 'application/zip', uti: 'public.zip-archive' });
+    } catch {
+      fail('protocol', t.transfer.failed);
+    }
+  };
 
   const cancel = () => running.current?.abort();
 

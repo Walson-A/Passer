@@ -99,7 +99,7 @@ export function TransferCapsule({ transfer, onCancel }: { transfer: ActiveTransf
           {counter + detail}
         </AppText>
       </View>
-      {transfer.direction === 'up' ? <SmallIconButton icon={XIcon} label={t.transfer.cancel} onPress={onCancel} /> : null}
+      <SmallIconButton icon={XIcon} label={t.transfer.cancel} onPress={onCancel} />
     </Animated.View>
   );
 }
@@ -372,5 +372,5 @@ const styles = StyleSheet.create({
     gap: 7,
     paddingHorizontal: 10,
   },
-  link: { alignSelf: 'center', minHeight: 32, justifyContent: 'center' },
+  link: { alignSelf: 'center', minHeight: 44, justifyContent: 'center', paddingHorizontal: 8 },
 });

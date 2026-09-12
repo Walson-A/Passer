@@ -30,18 +30,19 @@ export default function Destination() {
   const { pendingPhotos, setPendingPhotos, sendPhotos } = useTransfers();
   const { updateSettings } = useSettings();
   const [remember, setRemember] = useState(false);
+  // A local copy keeps the sheet's content stable while it animates closed.
+  const [photos] = useState(pendingPhotos);
 
-  if (!pc || pendingPhotos.length === 0) return null;
+  if (!pc || photos.length === 0) return null;
 
-  const count = pendingPhotos.length;
+  const count = photos.length;
   const extra = count - THUMBNAILS;
 
   const choose = (destination: PhotoDestination) => {
     haptic.select();
     if (remember) updateSettings({ photoDestination: destination });
-    const photos = pendingPhotos;
-    router.back();
     setPendingPhotos([]);
+    router.back();
     void sendPhotos(photos, destination);
   };
 
@@ -52,7 +53,7 @@ export default function Destination() {
       </AppText>
 
       <View style={styles.thumbnails} accessibilityElementsHidden>
-        {pendingPhotos.slice(0, THUMBNAILS).map((photo) => (
+        {photos.slice(0, THUMBNAILS).map((photo) => (
           <Image key={photo.uri} source={{ uri: photo.uri }} style={[styles.thumbnail, { backgroundColor: colors.surface.well }]} contentFit="cover" />
         ))}
         {extra > 0 ? (

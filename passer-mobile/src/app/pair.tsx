@@ -23,12 +23,14 @@ import { PasserError } from '@/core/errors';
 import { parsePairingLink, type PairingParseError } from '@/core/pairing';
 import type { PairedPc } from '@/core/types';
 import { format, t } from '@/i18n';
+import { announce } from '@/platform/accessibility';
 import { haptic } from '@/platform/haptics';
 import { usePairings } from '@/state/pairings';
+import { takePendingLink } from '@/state/pending-link';
 import { useTheme } from '@/theme/theme';
 import { motion, radius } from '@/theme/tokens';
 
-type Params = Partial<Record<'link' | 'v' | 'name' | 'host' | 'ip' | 'port' | 'token' | 'id', string>>;
+type Params = Partial<Record<'v' | 'name' | 'host' | 'ip' | 'port' | 'token' | 'id', string>>;
 
 type FailureReason = 'link' | 'network' | 'identity';
 
@@ -41,9 +43,9 @@ type Phase =
 const PAIRED_HOLD_MS = 1_800;
 const LINE_HEIGHT = 112;
 
-/** Rebuilds the link when the app was opened by a `passer://pair?…` URL rather than the scanner. */
-function linkFrom(params: Params): string {
-  if (params.link) return params.link;
+/** A `passer://pair?…` URL opened from outside the app (the Camera app, for one) arrives as route params. */
+function linkFromParams(params: Params): string | null {
+  if (!params.token) return null;
   const query = (['v', 'name', 'host', 'ip', 'port', 'token', 'id'] as const)
     .filter((key) => typeof params[key] === 'string')
     .map((key) => `${key}=${encodeURIComponent(params[key] as string)}`)
@@ -74,11 +76,13 @@ function connectionFailure(error: unknown, name: string): Phase {
  * is also what triggers the iOS Local Network prompt primed on the welcome screen.
  */
 export default function Pair() {
-  const link = linkFrom(useLocalSearchParams() as Params);
+  const params = useLocalSearchParams() as Params;
+  // Read once. The in-app scanner hands the link over in memory, never through the route.
+  const [link] = useState(() => linkFromParams(params) ?? takePendingLink() ?? '');
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
-  const { savePairing } = usePairings();
+  const { ready, savePairing } = usePairings();
   const [attempt, setAttempt] = useState(0);
   const [phase, setPhase] = useState<Phase>(() => {
     const parsed = parsePairingLink(link);
@@ -86,6 +90,8 @@ export default function Pair() {
   });
 
   useEffect(() => {
+    // Stored pairings must be loaded first, or loading them would overwrite this one.
+    if (!ready) return;
     const parsed = parsePairingLink(link);
     if (!parsed.ok) {
       setPhase(linkFailure(parsed.error));
@@ -121,15 +127,19 @@ export default function Pair() {
       });
 
     return () => controller.abort();
-  }, [link, attempt]);
+  }, [link, attempt, ready]);
 
-  const goHome = () => router.dismissTo('/');
+  /** The first pairing leaves the onboarding screens underneath: clear them so Home stands alone. */
+  const goHome = () => {
+    if (router.canDismiss()) router.dismissAll();
+    router.replace('/');
+  };
 
   useEffect(() => {
     if (phase.step !== 'paired') return;
-    const timer = setTimeout(() => router.dismissTo('/'), PAIRED_HOLD_MS);
+    const timer = setTimeout(goHome, PAIRED_HOLD_MS);
     return () => clearTimeout(timer);
-  }, [phase.step, router]);
+  }, [phase.step]);
 
   const title =
     phase.step === 'connecting'
@@ -139,6 +149,10 @@ export default function Pair() {
         : phase.title;
   const body =
     phase.step === 'connecting' ? t.pair.connectingBody : phase.step === 'paired' ? t.pair.pairedBody : phase.body;
+
+  useEffect(() => {
+    if (phase.step !== 'connecting') announce(`${title}. ${body}`);
+  }, [phase.step, title, body]);
 
   return (
     <View
@@ -150,7 +164,7 @@ export default function Pair() {
       <View style={styles.stage}>
         {phase.step === 'failed' ? <FailureMark reason={phase.reason} /> : <PairingConduit step={phase.step} />}
         <Animated.View key={phase.step} entering={FadeIn.duration(motion.duration.reveal)} style={styles.copy}>
-          <AppText variant="pcName" accessibilityRole="header" accessibilityLiveRegion="polite" style={styles.center}>
+          <AppText variant="pcName" accessibilityRole="header" style={styles.center}>
             {title}
           </AppText>
           <AppText variant="body" tone="secondary" style={styles.center}>
@@ -175,7 +189,11 @@ export default function Pair() {
           </PressableScale>
         ) : null}
         {phase.step === 'connecting' ? (
-          <PressableScale accessibilityRole="button" onPress={() => router.back()} style={styles.quiet}>
+          <PressableScale
+            accessibilityRole="button"
+            onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+            style={styles.quiet}
+          >
             <AppText variant="body" tone="tertiary">
               {t.common.cancel}
             </AppText>

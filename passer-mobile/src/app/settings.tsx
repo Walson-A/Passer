@@ -275,7 +275,7 @@ const styles = StyleSheet.create({
   row: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14 },
   choice: { padding: 14, gap: 10 },
   segmented: { flexDirection: 'row', borderRadius: 14, borderWidth: 1, padding: 4, gap: 4 },
-  segment: { flex: 1, minHeight: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 },
+  segment: { flex: 1, minHeight: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 },
   footer: { alignItems: 'center', gap: 6, paddingTop: 4 },
   privacy: { flexDirection: 'row', alignItems: 'center', gap: 6 },
 });

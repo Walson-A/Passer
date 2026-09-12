@@ -8,6 +8,7 @@ import { AppText } from '@/components/ui/app-text';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { parsePairingLink, type PairingParseError } from '@/core/pairing';
 import { t } from '@/i18n';
+import { setPendingLink } from '@/state/pending-link';
 import { useTheme } from '@/theme/theme';
 import { radius, type as typeScale } from '@/theme/tokens';
 
@@ -30,7 +31,9 @@ export default function Manual() {
   const problem = parsed && !parsed.ok ? PROBLEM[parsed.error] : null;
 
   const connect = () => {
-    if (parsed?.ok) router.replace({ pathname: '/pair', params: { link: trimmed } });
+    if (!parsed?.ok) return;
+    setPendingLink(trimmed);
+    router.replace('/pair');
   };
 
   return (
@@ -77,7 +80,8 @@ export default function Manual() {
         {Clipboard.isPasteButtonAvailable ? (
           <Clipboard.ClipboardPasteButton
             acceptedContentTypes={['plain-text', 'url']}
-            displayMode="iconAndLabel"
+            // Icon only: a fixed-width label could clip at large text sizes, and iOS disables a clipped control.
+            displayMode="iconOnly"
             cornerStyle="capsule"
             backgroundColor={colors.surface.sheet}
             foregroundColor={colors.paste.background}
@@ -105,6 +109,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   actions: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 6 },
-  paste: { width: 132, height: 44 },
+  paste: { width: 56, height: 52 },
   connect: { flex: 1 },
 });

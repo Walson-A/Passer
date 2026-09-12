@@ -99,7 +99,7 @@ export function ConnectionProvider({ children }: { children: ReactNode }) {
         lastSeen.current = Date.now();
         if (endpoint.address !== pc.preferredAddress) remember.current(pc.key, endpoint.address);
         setConnection((current) =>
-          current.status === 'online' && current.endpoint.baseUrl === endpoint.baseUrl
+          current.status === 'online' && current.endpoint.baseUrl === endpoint.baseUrl && current.token === token
             ? current
             : { status: 'online', endpoint, token },
         );

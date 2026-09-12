@@ -50,7 +50,7 @@ passer-mobile/
 
 ## Talking to the PC
 
-- **Pairing.** `core/pairing.ts` parses `passer://pair?v=1&name=&host=&ip=&port=&token=&id=`. It ignores unknown parameters, and rejects newer versions with an "update the app" message. The link opens the `pair` route whether it comes from the in-app scanner, the manual field or the iOS Camera app, through the `passer` URL scheme.
+- **Pairing.** `core/pairing.ts` parses `passer://pair?v=1&name=&host=&ip=&port=&token=&id=`. It ignores unknown parameters, and rejects newer versions with an "update the app" message. The link opens the `pair` route whether it comes from the in-app scanner, the manual field or the iOS Camera app, through the `passer` URL scheme. The scanner and the manual field hand it over in memory, so the token never sits in navigation state. The pairing screen waits for stored pairings to load before saving, and clears the onboarding screens underneath once paired.
 - **Identity before secrets.** `core/endpoint.ts` tries the preferred address first and starts the other one 350 ms later. It accepts the first `/ping` whose `id` matches the pairing, or whose `name` matches for older desktops without an id. The token is never sent to a PC that fails this check, which matters on networks with several Passer PCs.
 - **Errors.** `core/http.ts` maps 400, 401 and 5xx to typed errors, and still recognises the HTTP 200 error bodies of older desktops. A `/push/file` response with `clipboard_error` counts as a success.
 - **Status.** `state/connection.tsx`:
@@ -59,9 +59,12 @@ passer-mobile/
   - pauses in the background;
   - stops retrying after a 401 until the PC is paired again.
 - **Transfers.**
+  - One transfer runs at a time. A tap during a transfer is refused with a warning haptic and a VoiceOver announcement; the running capsule keeps its cancel button.
+  - Uploads and pulls start with a 2.5 s `/ping`, so a PC that fell asleep fails in seconds rather than after a network timeout.
   - Text goes through `fetch`.
-  - Uploads use `expo-file-system` upload tasks, the only API with progress and cancellation. The staged file is named after what the PC should show.
-  - `/pull` streams to disk with the legacy download, because it reports the Content-Type that tells text, PNG and ZIP apart.
+  - Uploads use `expo-file-system` upload tasks, the only API with progress and cancellation. Each file is staged, in its own cache folder, under the name the PC should show; the staged copies are deleted when the transfer ends.
+  - `/pull` streams to disk with the legacy resumable download, because it reports the Content-Type that tells text, PNG and ZIP apart. It runs in a foreground session, since the default background session never gives up. iOS abandons it after 60 s without an answer, which leaves the PC time to zip a large Passboard; once data flows, a watchdog cancels a pull that stalls for 15 s.
+  - Outcomes (sent, received, failed, notices) are announced to VoiceOver.
 
 ## iOS constraints designed around
 

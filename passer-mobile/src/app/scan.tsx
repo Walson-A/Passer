@@ -12,6 +12,7 @@ import { AppText } from '@/components/ui/app-text';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { parsePairingLink } from '@/core/pairing';
 import { t } from '@/i18n';
+import { setPendingLink } from '@/state/pending-link';
 
 /** The scanner always reads as a viewfinder: dark scrim and white marks, whatever the theme. */
 const INK = {
@@ -64,7 +65,8 @@ export default function Scan() {
     // Anything that looks like a Passer link goes to the pairing screen, which explains its problems.
     handled.current = true;
     setFocused(false);
-    router.replace({ pathname: '/pair', params: { link: data } });
+    setPendingLink(data);
+    router.replace('/pair');
   };
 
   if (!permission) {

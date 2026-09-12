@@ -19,6 +19,8 @@ export type PadMode = 'ready' | 'searching' | 'paused';
 
 type LaunchPadProps = {
   mode: PadMode;
+  /** A transfer is running: the other actions wait for it. */
+  busy: boolean;
   pcName: string;
   bottomInset: number;
   onPasteText: (text: string) => void;
@@ -35,6 +37,7 @@ type LaunchPadProps = {
  */
 export function LaunchPad({
   mode,
+  busy,
   pcName,
   bottomInset,
   onPasteText,
@@ -83,13 +86,13 @@ export function LaunchPad({
 
       <View style={styles.actions}>
         <View style={styles.action}>
-          <ActionButton icon={ImageIcon} label={t.home.photo} onPress={onPhoto} disabled={!ready} />
+          <ActionButton icon={ImageIcon} label={t.home.photo} onPress={onPhoto} disabled={!ready || busy} />
         </View>
         <View style={styles.action}>
-          <ActionButton icon={ArrowDownToLineIcon} label={t.home.fromPc} onPress={onFromPc} disabled={!ready} emphasis />
+          <ActionButton icon={ArrowDownToLineIcon} label={t.home.fromPc} onPress={onFromPc} disabled={!ready || busy} emphasis />
         </View>
         <View style={styles.action}>
-          <ActionButton icon={FileIcon} label={t.home.file} onPress={onFile} disabled={!ready} />
+          <ActionButton icon={FileIcon} label={t.home.file} onPress={onFile} disabled={!ready || busy} />
         </View>
       </View>
     </View>

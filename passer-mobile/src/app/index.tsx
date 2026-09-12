@@ -157,9 +157,12 @@ function Home({ pc }: { pc: PairedPc }) {
         if (nextArmed) haptic.select();
       }
     })
-    .onEnd(() => {
+    .onEnd((_event, success) => {
+      // A gesture cancelled by the system must not fetch anything.
+      if (success && armedRef.current) void transfers.pull();
+    })
+    .onFinalize(() => {
       pullOffset.set(withSpring(0, { damping: 16, stiffness: 220 }));
-      if (armedRef.current) void transfers.pull();
       armedRef.current = false;
       setArmed(false);
     });
@@ -252,6 +255,7 @@ function Home({ pc }: { pc: PairedPc }) {
 
       <LaunchPad
         mode={padMode}
+        busy={active !== null}
         pcName={pc.name}
         bottomInset={insets.bottom}
         onPasteText={(text) => void transfers.sendText(text)}

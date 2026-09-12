@@ -1,8 +1,16 @@
 import { File, Paths, UploadType } from 'expo-file-system';
-import { downloadAsync, readAsStringAsync } from 'expo-file-system/legacy';
+import {
+  createDownloadResumable,
+  deleteAsync,
+  FileSystemSessionType,
+  readAsStringAsync,
+} from 'expo-file-system/legacy';
 
 import type { FileTransport } from '@/core/client';
 import { PasserError } from '@/core/errors';
+
+/** A pull whose data stops arriving for this long is treated as a lost connection. */
+const STALL_TIMEOUT_MS = 15_000;
 
 function networkFailure(error: unknown, signal?: AbortSignal): PasserError {
   if (signal?.aborted) return new PasserError('cancelled', 'Cancelled');
@@ -15,27 +23,67 @@ function header(headers: Record<string, string>, name: string): string | undefin
 }
 
 /**
- * Streams `/pull` to disk and uploads files with progress. The legacy download
- * is used because it is the one that reports the status and Content-Type the
- * client needs to tell text, image and ZIP apart. The modern upload task is
- * the one that reports progress and honours an AbortSignal.
+ * Streams `/pull` to disk and uploads files with progress.
+ *
+ * The legacy resumable download is used because it reports the status and
+ * Content-Type that tell text, image and ZIP apart. It runs in a foreground
+ * session: the default background session waits for the network indefinitely,
+ * which would leave a pull hanging when the PC falls asleep. The foreground
+ * session gives up after 60 s without an answer, which leaves the PC time to
+ * zip a large Passboard; once data flows, a watchdog cancels a stalled pull.
  */
 export const fileTransport: FileTransport = {
   async download({ url, headers, signal }) {
     if (signal?.aborted) throw new PasserError('cancelled', 'Cancelled');
+
     const destination = new File(Paths.cache, `pull-${Date.now()}`);
+    let stalled = false;
+    let watchdog: ReturnType<typeof setTimeout> | undefined;
+
+    const task = createDownloadResumable(
+      url,
+      destination.uri,
+      { headers, sessionType: FileSystemSessionType.FOREGROUND },
+      () => armWatchdog(),
+    );
+
+    function armWatchdog() {
+      if (watchdog) clearTimeout(watchdog);
+      watchdog = setTimeout(() => {
+        stalled = true;
+        void task.cancelAsync();
+      }, STALL_TIMEOUT_MS);
+    }
+
+    const cancel = () => void task.cancelAsync();
+    signal?.addEventListener('abort', cancel);
+
     try {
-      const result = await downloadAsync(url, destination.uri, { headers });
+      const result = await task.downloadAsync();
       if (signal?.aborted) throw new PasserError('cancelled', 'Cancelled');
+      if (!result) {
+        throw stalled
+          ? new PasserError('unreachable', 'The PC stopped sending')
+          : new PasserError('cancelled', 'Cancelled');
+      }
       return {
         status: result.status,
         contentType: header(result.headers, 'content-type') ?? result.mimeType ?? '',
         fileUri: result.uri,
-        readText: () => readAsStringAsync(result.uri),
+        readText: async () => {
+          // Text answers are read once and never needed as a file.
+          const text = await readAsStringAsync(result.uri);
+          void deleteAsync(result.uri, { idempotent: true });
+          return text;
+        },
       };
     } catch (error) {
       if (error instanceof PasserError) throw error;
+      if (stalled) throw new PasserError('unreachable', 'The PC stopped sending');
       throw networkFailure(error, signal);
+    } finally {
+      if (watchdog) clearTimeout(watchdog);
+      signal?.removeEventListener('abort', cancel);
     }
   },
 

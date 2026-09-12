@@ -18,12 +18,6 @@ function timestamp(date = new Date()): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}.${pad(date.getMinutes())}.${pad(date.getSeconds())}`;
 }
 
-function directory(name: string): Directory {
-  const folder = new Directory(Paths.cache, name);
-  if (!folder.exists) folder.create({ intermediates: true });
-  return folder;
-}
-
 /** Characters Windows refuses in file names, plus control characters. */
 const UNSAFE_FILE_NAME = /[\\/:*?"<>|\x00-\x1f]/g;
 
@@ -38,17 +32,40 @@ function withExtension(name: string, extension: string): string {
   return `${stem}.${extension}`;
 }
 
+/** `File.size` is 0 for a missing file; the UI shows an unknown size instead. */
+function sizeOf(file: File): number | null {
+  return file.exists ? file.size : null;
+}
+
+const OUTGOING = 'outgoing';
+
+/** Each staged file gets its own folder, so two picks with the same name never overwrite each other. */
+function stagingFolder(): Directory {
+  const folder = new Directory(Paths.cache, OUTGOING, `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`);
+  folder.create({ intermediates: true });
+  return folder;
+}
+
 /**
  * Multipart uploads name the part after the file on disk, so outgoing files are
- * staged in the cache under the exact name the PC should show.
+ * staged under the exact name the PC should show.
  */
-function stage(uri: string, name: string, mimeType: string): UploadFile {
+async function stage(uri: string, name: string, mimeType: string): Promise<UploadFile> {
   const source = new File(uri);
-  if (source.name === name) return { uri, name, mimeType, size: source.size ?? null };
-  const target = new File(directory('outgoing'), name);
-  if (target.exists) target.delete();
-  source.copy(target);
-  return { uri: target.uri, name, mimeType, size: target.size ?? null };
+  if (source.name === name) return { uri, name, mimeType, size: sizeOf(source) };
+  const target = new File(stagingFolder(), name);
+  await source.copy(target);
+  return { uri: target.uri, name, mimeType, size: sizeOf(target) };
+}
+
+/** Removes staged copies once a transfer is over. */
+export function clearOutgoing(): void {
+  const folder = new Directory(Paths.cache, OUTGOING);
+  try {
+    if (folder.exists) folder.delete();
+  } catch {
+    // A leftover copy in the cache is harmless; iOS reclaims the cache on its own.
+  }
 }
 
 export async function pickPhotos(): Promise<PickedPhoto[]> {
@@ -84,12 +101,12 @@ export async function pickFiles(): Promise<UploadFile[]> {
 }
 
 /** A photo as it should land in the Passboard folder: the original file, under its own name. */
-export function asPassboardFile(photo: UploadFile): UploadFile {
+export function asPassboardFile(photo: UploadFile): Promise<UploadFile> {
   return stage(photo.uri, photo.name, photo.mimeType);
 }
 
 /** Any other file, staged under its own name. */
-export function asUploadFile(file: UploadFile): UploadFile {
+export function asUploadFile(file: UploadFile): Promise<UploadFile> {
   return stage(file.uri, file.name, file.mimeType);
 }
 
@@ -112,19 +129,23 @@ export function stagePastedImage(dataUri: string): UploadFile {
   const prefix = /^data:(image\/[\w.+-]+);base64,/i.exec(dataUri);
   const isJpeg = prefix?.[1].toLowerCase() === 'image/jpeg';
   const name = `Passer ${timestamp()}.${isJpeg ? 'jpg' : 'png'}`;
-  const file = new File(directory('outgoing'), name);
-  if (file.exists) file.delete();
+  const file = new File(stagingFolder(), name);
   file.write(prefix ? dataUri.slice(prefix[0].length) : dataUri, { encoding: 'base64' });
-  return { uri: file.uri, name, mimeType: isJpeg ? 'image/jpeg' : 'image/png', size: file.size ?? null };
+  return { uri: file.uri, name, mimeType: isJpeg ? 'image/jpeg' : 'image/png', size: sizeOf(file) };
 }
 
 /** `/pull` sets no file name, so received content is named after the moment it arrived. */
-export function finalizePulled(fileUri: string, extension: 'png' | 'zip'): { uri: string; name: string; size: number | null } {
+export async function finalizePulled(
+  fileUri: string,
+  extension: 'png' | 'zip',
+): Promise<{ uri: string; name: string; size: number | null }> {
   const name = `Passer ${timestamp()}.${extension}`;
-  const target = new File(directory('received'), name);
+  const folder = new Directory(Paths.cache, 'received');
+  if (!folder.exists) folder.create({ intermediates: true });
+  const target = new File(folder, name);
   if (target.exists) target.delete();
-  new File(fileUri).move(target);
-  return { uri: target.uri, name, size: target.size ?? null };
+  await new File(fileUri).move(target);
+  return { uri: target.uri, name, size: sizeOf(target) };
 }
 
 /** Saves with add-only access: Passer never asks to read the photo library. */
