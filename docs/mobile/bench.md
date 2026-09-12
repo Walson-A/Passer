@@ -87,6 +87,13 @@ Both views accept the controls as URL parameters, for example `?bench=phone&regi
 
 `&motion=off` makes every animation jump to its end state. Use it for screenshots when the Browser pane is hidden: a hidden pane renders about two frames a second, so an entrance animation caught on its first frame looks like a faded screen. Network timeouts still run in real time, so give a regime such as "PC endormi" a few seconds before judging it.
 
+A hidden pane also marks the page as hidden, and React Native reads that as the app being in the background. The app then never looks for the PC, and Home stays on "Recherche de…" forever. Show the pane before judging a connected state or a transfer. If it has to stay hidden, make the page report itself visible first:
+
+```js
+Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' });
+document.dispatchEvent(new Event('visibilitychange'));
+```
+
 ### Sheets
 
 With `EXPO_UNSTABLE_WEB_MODAL`, expo-router draws sheets with vaul. `bench/phone.tsx` corrects what vaul doesn't know about iOS:
