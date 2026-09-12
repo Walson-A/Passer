@@ -13,8 +13,12 @@ use crate::types::{LastTransfer, ServerState, TransferEvent};
 pub const HUD_LABEL: &str = "hud";
 pub const MAIN_LABEL: &str = "main";
 
-/// Gap kept from the edges of the usable screen.
-const MARGIN: i32 = 16;
+/// Gap kept between the HUD *window* and the edges of the usable screen.
+///
+/// Zero on purpose: the card already sits 32px inside this window so its shadow
+/// has room to fall off, and adding a window inset on top would push the visible
+/// card ~48px off the corner, which reads as detached rather than docked.
+const MARGIN: i32 = 0;
 
 /// Places the HUD at the bottom-right of the *work area*.
 ///

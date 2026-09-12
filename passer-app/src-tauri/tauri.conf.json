@@ -25,8 +25,8 @@
       {
         "label": "hud",
         "title": "",
-        "width": 372,
-        "height": 148,
+        "width": 396,
+        "height": 172,
         "resizable": false,
         "decorations": false,
         "transparent": true,

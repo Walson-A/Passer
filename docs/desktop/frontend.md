@@ -43,5 +43,15 @@ The corner notification, rendered into its own always-on-top window (see `backen
 
 > ⚠️ **It polls; it is not pushed to.** Events emitted from Rust never arrive in this window's webview. That was verified three times — a broadcast `emit`, a `WebviewWindow::emit` immediately after `show()`, and the same 250 ms later; the last two reported success and neither was ever received, while `invoke` *from* that webview worked throughout. So the HUD asks `get_last_transfer` every 400 ms and compares a sequence number, which needs nothing delivered inwards. Do not "simplify" this back into a listener.
 
+## 🔬 Benches
+
+Two instruments, for two different questions.
+
+**`/banc.html` — the look.** `npm run dev`, then open it. Every variant of the HUD replays **at the same time, on a loop**: entry curves side by side, shadows side by side, and each payload shape. Nothing to click — you watch and compare, because a motion judged alone always looks about right, and only a neighbour reveals which is mushy and which is abrupt. The frames reproduce the real window (396×172) with its 32px inset so a shadow gets exactly the room it will really have, and the background switches between a dark desktop, a light one and a busy photo — a shadow that behaves on black can be a smear on white.
+
+It renders the real `HudCard`, not a copy: a bench showing a lookalike stops being evidence the moment the two drift. It is deliberately **absent from `vite.config.ts`**, so it is dev-only and weighs nothing in the packaged app. It has already earned itself — it caught that every received image was labelled "File", which was invisible until the cases sat side by side.
+
+**`scripts/hud-bench.ps1` — the behaviour.** Hides the main window, fires real transfers through the REST API, and asserts that the HUD appears, lands where it should, and retires itself. `-Hold` keeps it on screen by re-firing, `-Kind text|image|file` picks the path, `-KeepMainVisible` checks it correctly declines. It reads the window size from `tauri.conf.json` and `MARGIN` from `hud.rs`, so changing either cannot leave the bench asserting against stale numbers.
+
 ## ♻️ State Management (`useHistory.ts`)
 A custom hook that coordinates adding, deleting, and updating history objects locally. It listens for the backend's structured **`transfer`** events (typed `{ kind, direction, target, name, path, size }` payloads) rather than parsing human-readable log strings, so the feed stays robust as log wording changes.
