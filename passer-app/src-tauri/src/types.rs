@@ -20,6 +20,22 @@ pub struct ServerState {
     /// Whether the HTTP listener is bound *right now*. The UI used to assume it
     /// was, so a failed bind (port already taken) still showed as running.
     pub listening: Arc<std::sync::atomic::AtomicBool>,
+    /// The most recent transfer, kept so the HUD can *fetch* what to display.
+    pub last_transfer: Arc<std::sync::Mutex<Option<LastTransfer>>>,
+}
+
+/// A transfer plus a sequence number.
+///
+/// The HUD polls this instead of listening: events emitted from Rust never
+/// arrive in that window's webview - verified twice, once immediately after
+/// `show()` and once 250ms later, both reporting success and both unreceived -
+/// while `invoke` in the opposite direction works. The sequence number is what
+/// lets the HUD tell a new transfer from the one it is already showing, since
+/// two identical transfers must still count as two.
+#[derive(Serialize, Clone)]
+pub struct LastTransfer {
+    pub seq: u64,
+    pub transfer: TransferEvent,
 }
 
 impl ServerState {
@@ -29,6 +45,7 @@ impl ServerState {
             webdav_creds: Arc::new(std::sync::Mutex::new(None)),
             pairing_token: Arc::new(std::sync::Mutex::new(crate::auth::load_or_create_token())),
             listening: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            last_transfer: Arc::new(std::sync::Mutex::new(None)),
         })
     }
 }

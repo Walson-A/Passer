@@ -12,6 +12,7 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "Passer",
         "width": 390,
         "height": 520,
@@ -20,6 +21,22 @@
         "shadow": false,
         "minWidth": 390,
         "minHeight": 520
+      },
+      {
+        "label": "hud",
+        "title": "",
+        "width": 372,
+        "height": 148,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "shadow": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "dragDropEnabled": false,
+        "focus": false,
+        "focusable": false,
+        "visible": false
       }
     ],
     "security": {

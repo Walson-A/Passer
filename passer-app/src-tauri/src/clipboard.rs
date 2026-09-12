@@ -170,14 +170,16 @@ pub async fn push_clipboard(
     match result {
         Ok(Ok(_)) => {
             if !payload.text.trim().is_empty() {
-                let _ = state.app_handle.emit("transfer", TransferEvent {
+                let ev = TransferEvent {
                     kind: "text".to_string(),
                     direction: "incoming".to_string(),
                     target: "clipboard".to_string(),
                     name: Some(payload.text),
                     path: None,
                     size: None,
-                });
+                };
+                let _ = state.app_handle.emit("transfer", ev.clone());
+                crate::hud::notify(&state.app_handle, &state, &ev);
             }
             (StatusCode::OK, Json(serde_json::json!({ "status": "success" })))
         },
@@ -254,14 +256,16 @@ pub async fn push_image(
 
     match processed {
         Ok(Ok(_)) => {
-            let _ = state.app_handle.emit("transfer", TransferEvent {
+            let ev = TransferEvent {
                 kind: "image".to_string(),
                 direction: "incoming".to_string(),
                 target: "clipboard".to_string(),
                 name: None,
                 path: Some(cache_path.to_string_lossy().to_string()),
                 size: Some(image_len),
-            });
+            };
+            let _ = state.app_handle.emit("transfer", ev.clone());
+            crate::hud::notify(&state.app_handle, &state, &ev);
             (StatusCode::OK, Json(serde_json::json!({ "status": "success" })))
         },
         Ok(Err(e)) => {

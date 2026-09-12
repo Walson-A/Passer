@@ -26,6 +26,14 @@ The IPC (Inter-Process Communication) gateway between the React frontend and Rus
 - **`set_window_on_top`**: Toggles the always-on-top ("pin") window flag.
 - **`delete_cache_file`**: Deletes a cached preview image, validated to stay inside the `.cache` directory.
 
+## 🔔 Transfer HUD (`hud.rs`)
+A second window, declared in `tauri.conf.json` as `hud` (320×96, transparent, undecorated, always on top, off the taskbar, `focus` and `focusable` both false). It loads the same `index.html` as the main window and is told apart by its label in `main.tsx`, so there is one frontend bundle rather than two.
+
+- **`notify`** is called from each transfer site in `clipboard.rs` and `files.rs`. It records the transfer with an incrementing sequence number, and shows the window — but only when the main window is hidden, since the HUD exists to report what happens while Passer is out of sight.
+- Positioning uses `monitor.work_area()`, not `monitor.size()`: the work area already excludes the taskbar, so nothing has to guess its height or cope with it being moved, hidden or scaled.
+- **Rust drives the window; the frontend only draws.** The HUD cannot show itself, because while hidden its webview receives nothing — see the warning in `frontend.md`.
+- Commands: `get_last_transfer` (what to draw), `hide_hud` (the frontend's dismiss), `focus_main_window` (clicking the HUD).
+
 ## ✂️ Core Utilities
 - **`clipboard.rs`**: Safe reading and writing to the system clipboard (Text, HTML, Image, file lists) for iOS push/pull integrations.
 - **`paths.rs`**: Resolves core application directories under `Desktop/Passer/` (`Passboard/` for Push/Pull, `Passer Space/` for the shared folder, `.cache/` for previews) and guarantees collision-free filenames.

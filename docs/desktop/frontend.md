@@ -38,5 +38,10 @@ A graceful full-screen absolute layover that captures dragging events. Highly op
 ### `Settings.tsx`
 A glass modal opened from the footer gear. Reads and writes real preferences over IPC: a **Launch on startup** toggle (`get_autostart` / `set_autostart`), a copyable server address, and the app version (`get_app_version`).
 
+### `Hud.tsx`
+The corner notification, rendered into its own always-on-top window (see `backend.md`). It reports a transfer while the main window is out of sight, then retires after four seconds. Clicking it brings Passer back.
+
+> ⚠️ **It polls; it is not pushed to.** Events emitted from Rust never arrive in this window's webview. That was verified three times — a broadcast `emit`, a `WebviewWindow::emit` immediately after `show()`, and the same 250 ms later; the last two reported success and neither was ever received, while `invoke` *from* that webview worked throughout. So the HUD asks `get_last_transfer` every 400 ms and compares a sequence number, which needs nothing delivered inwards. Do not "simplify" this back into a listener.
+
 ## ♻️ State Management (`useHistory.ts`)
 A custom hook that coordinates adding, deleting, and updating history objects locally. It listens for the backend's structured **`transfer`** events (typed `{ kind, direction, target, name, path, size }` payloads) rather than parsing human-readable log strings, so the feed stays robust as log wording changes.

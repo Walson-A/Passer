@@ -98,11 +98,61 @@
     visibility 0s;
 }
 
+/* --- Transfer HUD -------------------------------------------------------
+   Slides in from the right edge it sits against, and leaves the same way.
+   The travel is only 8px because the card is inset 8px inside its window -
+   anything further would clip against the window bounds rather than sliding
+   in from off-screen.                                                        */
+
+/* Keyframes, not a class toggle. Rust shows the window before the frontend has
+   anything to draw, so the card is inserted late - and a toggle that lands in
+   the same frame as the insertion never transitions. An animation runs on
+   insertion, which needs no state change to fire.
+   It rises rather than slides sideways: this sits in the bottom-right corner,
+   so coming up from the edge it is anchored to is the honest direction. */
+
+@keyframes hud-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes hud-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+}
+
+.hud-card {
+  animation: hud-in 260ms var(--ease-out-expo) both;
+}
+
+.hud-card--out {
+  animation: hud-out 200ms var(--ease-out-expo) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
 
   /* Keep the cross-fade (it aids comprehension), drop the movement. */
   .view-layer,
   .view-layer[data-active="true"] {
+    transform: none;
+  }
+
+  .hud-card,
+  .hud-card--in {
     transform: none;
   }
 

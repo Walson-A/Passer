@@ -52,15 +52,18 @@ pub async fn push_file(
                                message: log_message,
                                kind: "info".to_string(),
                            });
-                            // Structured event for the history feed.
-                            let _ = state.app_handle.emit("transfer", TransferEvent {
+                            // Structured event for the history feed, plus the
+                            // corner HUD when the main window is out of sight.
+                            let ev = TransferEvent {
                                 kind: "file".to_string(),
                                 direction: "incoming".to_string(),
                                 target: "folder".to_string(),
                                 name: Some(filename.clone()),
                                 path: Some(target_path.to_string_lossy().to_string()),
                                 size: Some(bytes.len() as u64),
-                            });
+                            };
+                            let _ = state.app_handle.emit("transfer", ev.clone());
+                            crate::hud::notify(&state.app_handle, &state, &ev);
                             saved_files.push(target_path.to_string_lossy().to_string());
                             count += 1;
                         },
