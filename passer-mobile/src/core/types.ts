@@ -14,8 +14,11 @@ export type PairingPayload = {
   id: string | null;
 };
 
-/** Which of the two advertised addresses answered. */
-export type AddressKind = 'host' | 'ip';
+/**
+ * How the PC was reached: its `.local` host, its IP on the local network, or its
+ * bare machine name, which Tailscale's MagicDNS resolves away from home.
+ */
+export type AddressKind = 'host' | 'ip' | 'name';
 
 /** A paired PC as persisted on the phone. Its token lives in secure storage, never here. */
 export type PairedPc = {

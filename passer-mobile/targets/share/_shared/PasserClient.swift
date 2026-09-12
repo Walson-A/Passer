@@ -66,11 +66,22 @@ struct PasserClient: Sendable {
 
   // MARK: Finding the PC
 
-  /// The preferred address first, the other one 350 ms later; the first verified answer wins.
+  /// The preferred address first, the others 350 ms apart; the first verified answer wins.
   static func locate(_ pc: PasserShared.PairedPC) async throws -> URL {
     let host = pc.host.map { (address: $0, timeout: 2.5) }
     let ip = pc.ip.map { (address: $0, timeout: 1.5) }
-    let candidates = (pc.preferredAddress == "ip" ? [ip, host] : [host, ip]).compactMap { $0 }
+    // The bare machine name: away from home, Tailscale's MagicDNS resolves it (see `machineName` in src/core/endpoint.ts).
+    let name = pc.host.flatMap { host -> (address: String, timeout: Double)? in
+      guard host.lowercased().hasSuffix(".local") else { return nil }
+      return (address: String(host.dropLast(".local".count)), timeout: 3.0)
+    }
+    let ordered: [(address: String, timeout: Double)?]
+    switch pc.preferredAddress {
+    case "ip": ordered = [ip, host, name]
+    case "name": ordered = [name, host, ip]
+    default: ordered = [host, ip, name]
+    }
+    let candidates = ordered.compactMap { $0 }
     guard !candidates.isEmpty else { throw PasserFailure.unreachable }
 
     return try await withThrowingTaskGroup(of: URL.self) { group in

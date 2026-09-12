@@ -62,6 +62,7 @@ A fake that invents a field or a status makes a correct screen look broken, or a
 | PC endormi (asleep) | Nothing answers; requests end when the app gives up |
 | Lent (slow) | 0.9 s pings, 1.5 s requests, 450 KB/s: loading states and progress |
 | Sans .local (no mDNS) | Only the IP address answers |
+| À distance (remote) | Away from home over Tailscale: only the machine name answers, through a relay |
 | Jeton refusé (refused) | The PC expects another token: every transfer gets a 401 |
 | Autre PC (other PC) | Another Passer PC answers at the IP address |
 

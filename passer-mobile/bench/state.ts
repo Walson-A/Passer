@@ -2,7 +2,7 @@ import type { EdgeInsets } from 'react-native-safe-area-context';
 
 import { BENCH_STORAGE_KEY } from '@/platform/web-bench';
 
-export type RegimeName = 'paired' | 'first-launch' | 'asleep' | 'slow' | 'no-mdns' | 'refused' | 'other-pc';
+export type RegimeName = 'paired' | 'first-launch' | 'asleep' | 'slow' | 'no-mdns' | 'remote' | 'refused' | 'other-pc';
 export type DeviceName = 'iphone-16' | 'iphone-16-pro-max' | 'iphone-se';
 export type SchemeChoice = 'dark' | 'light' | 'system';
 export type LanguageChoice = 'fr' | 'en';
@@ -29,6 +29,7 @@ export const REGIMES: Choice<RegimeName>[] = [
   { value: 'asleep', label: 'PC endormi', help: 'plus aucune réponse' },
   { value: 'slow', label: 'Lent', help: 'réponses lentes, progression visible' },
   { value: 'no-mdns', label: 'Sans .local', help: 'seule l’adresse IP répond' },
+  { value: 'remote', label: 'À distance', help: 'via Tailscale, seul le nom du PC répond' },
   { value: 'refused', label: 'Jeton refusé', help: 'le PC a changé de jeton' },
   { value: 'other-pc', label: 'Autre PC', help: 'un autre PC a pris son adresse' },
 ];

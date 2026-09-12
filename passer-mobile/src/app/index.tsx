@@ -21,6 +21,7 @@ import { PcNode, type NodeStatus } from '@/components/conduit/pc-node';
 import { Sockets, type SocketContent, type SocketName } from '@/components/conduit/sockets';
 import { SlidersIcon } from '@/components/icons';
 import { PressableScale } from '@/components/ui/pressable-scale';
+import { machineName } from '@/core/endpoint';
 import type { PairedPc } from '@/core/types';
 import { format, t } from '@/i18n';
 import { haptic } from '@/platform/haptics';
@@ -71,8 +72,9 @@ function Home({ pc }: { pc: PairedPc }) {
 
   let statusText: string;
   if (connection.status === 'online') {
-    const address = connection.endpoint.address === 'host' ? pc.host : pc.ip;
-    statusText = format(t.home.connected, { address: address ?? '' });
+    const { address } = connection.endpoint;
+    const shown = address === 'host' ? pc.host : address === 'ip' ? pc.ip : machineName(pc);
+    statusText = format(t.home.connected, { address: shown ?? '' });
   } else if (connection.status === 'offline') {
     statusText = connection.lastSeen
       ? format(t.home.lastSeen, { time: formatRelative(connection.lastSeen) })

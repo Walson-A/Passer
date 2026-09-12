@@ -19,25 +19,36 @@ type Behaviour = {
 };
 
 const QUICK = { pingLatencyMs: 35, latencyMs: 110, bytesPerSecond: 11_000_000 };
-const BOTH = { host: true, ip: true };
+/** At home the bare machine name usually doesn't resolve: that takes Tailscale's MagicDNS or an obliging router. */
+const HOME = { host: true, ip: true, name: false };
+const SILENT = { host: false, ip: false, name: false };
 
 const BEHAVIOUR: Record<RegimeName, Behaviour> = {
-  paired: { answers: BOTH, ...QUICK, identity: 'paired', tokenAccepted: true },
-  'first-launch': { answers: BOTH, ...QUICK, identity: 'paired', tokenAccepted: true },
-  asleep: { answers: { host: false, ip: false }, ...QUICK, identity: 'paired', tokenAccepted: true },
+  paired: { answers: HOME, ...QUICK, identity: 'paired', tokenAccepted: true },
+  'first-launch': { answers: HOME, ...QUICK, identity: 'paired', tokenAccepted: true },
+  asleep: { answers: SILENT, ...QUICK, identity: 'paired', tokenAccepted: true },
   // Pings stay under the app's 2.5 s timeout: any slower and the PC reads as asleep, not slow.
   slow: {
-    answers: BOTH,
+    answers: HOME,
     pingLatencyMs: 900,
     latencyMs: 1_500,
     bytesPerSecond: 450_000,
     identity: 'paired',
     tokenAccepted: true,
   },
-  'no-mdns': { answers: { host: false, ip: true }, ...QUICK, identity: 'paired', tokenAccepted: true },
-  refused: { answers: BOTH, ...QUICK, identity: 'paired', tokenAccepted: false },
+  'no-mdns': { answers: { host: false, ip: true, name: false }, ...QUICK, identity: 'paired', tokenAccepted: true },
+  // Away from home over Tailscale: only the machine name resolves, through a relay.
+  remote: {
+    answers: { host: false, ip: false, name: true },
+    pingLatencyMs: 180,
+    latencyMs: 260,
+    bytesPerSecond: 1_500_000,
+    identity: 'paired',
+    tokenAccepted: true,
+  },
+  refused: { answers: HOME, ...QUICK, identity: 'paired', tokenAccepted: false },
   // The paired PC is off, and another Passer PC was given its IP address.
-  'other-pc': { answers: { host: false, ip: true }, ...QUICK, identity: 'other', tokenAccepted: true },
+  'other-pc': { answers: { host: false, ip: true, name: false }, ...QUICK, identity: 'other', tokenAccepted: true },
 };
 
 const TICK_MS = 100;
@@ -123,6 +134,7 @@ export function createFakeNetwork({ regime, pcClipboard, log }: FakeNetworkOptio
     if (url.port !== String(PC.port)) return null;
     if (url.hostname === PC.host) return 'host';
     if (url.hostname === PC.ip) return 'ip';
+    if (url.hostname === PC.host.replace(/\.local$/, '')) return 'name';
     return null;
   };
 

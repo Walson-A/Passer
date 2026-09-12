@@ -2,8 +2,25 @@ import { PasserError, type PasserErrorKind } from './errors';
 import { fetchWithTimeout } from './http';
 import type { AddressKind, Endpoint, PairedPc, PingInfo } from './types';
 
-/** `.local` names can take a moment to resolve over Bonjour; raw IPs answer fast or not at all. */
-const PING_TIMEOUT_MS: Record<AddressKind, number> = { host: 2500, ip: 1500 };
+/**
+ * `.local` names can take a moment to resolve over Bonjour; raw IPs answer fast or
+ * not at all; a machine name may go through a VPN tunnel that is still waking up.
+ */
+const PING_TIMEOUT_MS: Record<AddressKind, number> = { host: 2500, ip: 1500, name: 3000 };
+
+/**
+ * The PC's bare machine name, taken from its `.local` host. Tailscale names a
+ * machine after its OS hostname the way the desktop derives its mDNS label, so
+ * away from home MagicDNS resolves this name to the PC's tailnet address.
+ */
+export function machineName(pc: Pick<PairedPc, 'host'>): string | null {
+  const label = pc.host?.replace(/\.local\.?$/i, '');
+  return label && label !== pc.host ? label : null;
+}
+
+function addressOf(pc: PairedPc, kind: AddressKind): string | null {
+  return kind === 'name' ? machineName(pc) : pc[kind];
+}
 
 /** Head start given to the preferred address before the other one is tried too. */
 const FALLBACK_DELAY_MS = 350;
@@ -65,13 +82,14 @@ function mostSpecific(errors: unknown[]): unknown {
 
 /**
  * Finds a verified way to reach a paired PC. The preferred address is tried
- * first and the other one joins shortly after, so a stale IP or a network
- * without working `.local` resolution costs a fraction of a second rather than
- * a full timeout. The token is never sent to a PC whose identity doesn't match.
+ * first and the others join shortly after, so a stale IP, a network without
+ * working `.local` resolution or a phone away from home costs a fraction of a
+ * second rather than a full timeout. The token is never sent to a PC whose
+ * identity doesn't match.
  */
 export async function locate(pc: PairedPc, signal?: AbortSignal): Promise<Endpoint> {
-  const order: AddressKind[] = pc.preferredAddress === 'ip' ? ['ip', 'host'] : ['host', 'ip'];
-  const candidates = order.filter((kind) => pc[kind]);
+  const others = (['host', 'ip', 'name'] as const).filter((kind) => kind !== pc.preferredAddress);
+  const candidates = [pc.preferredAddress, ...others].filter((kind) => addressOf(pc, kind) !== null);
   if (candidates.length === 0) {
     throw new PasserError('unreachable', 'This pairing has no address');
   }
@@ -82,7 +100,7 @@ export async function locate(pc: PairedPc, signal?: AbortSignal): Promise<Endpoi
 
   const attempts = candidates.map(async (address, index): Promise<Endpoint> => {
     if (index > 0) await wait(FALLBACK_DELAY_MS * index, race.signal);
-    const url = baseUrl(pc[address] as string, pc.port);
+    const url = baseUrl(addressOf(pc, address) as string, pc.port);
     const info = await ping(url, PING_TIMEOUT_MS[address], race.signal);
     if (!isSamePc(pc, info)) {
       throw new PasserError('wrong-pc', `The ${address} address answered as another PC`);
