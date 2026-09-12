@@ -146,7 +146,8 @@ struct SendFilesToPCIntent: AppIntent {
     "Sends photos or files to your PC: one image to its clipboard, anything else to the Passboard folder."
   )
 
-  @Parameter(title: "Files", supportedContentTypes: [.item], inputConnectionBehavior: .connectToPreviousIntentResult)
+  // Restricting content types or connecting to the previous result needs iOS 18; the app runs from 16.4.
+  @Parameter(title: "Files")
   var files: [IntentFile]
 
   @Parameter(title: "Destination", default: .automatic)

@@ -260,7 +260,7 @@ private struct ContentCard: View {
     case .text: return nil
     case .link(let url): return url.absoluteString
     case .images(let files), .files(let files):
-      return ShareModel.totalSize(files).map { ByteCountFormatter.string(fromByteCount: $0, countStyle: .file) }
+      return PasserFiles.totalSize(files).map { ByteCountFormatter.string(fromByteCount: $0, countStyle: .file) }
     }
   }
 }
