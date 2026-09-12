@@ -17,6 +17,9 @@ pub struct ServerState {
     /// Secret required on every REST request. Shared between the HTTP server
     /// and the Tauri commands so the UI always shows the token actually in use.
     pub pairing_token: Arc<std::sync::Mutex<String>>,
+    /// Whether the HTTP listener is bound *right now*. The UI used to assume it
+    /// was, so a failed bind (port already taken) still showed as running.
+    pub listening: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl ServerState {
@@ -25,6 +28,7 @@ impl ServerState {
             app_handle,
             webdav_creds: Arc::new(std::sync::Mutex::new(None)),
             pairing_token: Arc::new(std::sync::Mutex::new(crate::auth::load_or_create_token())),
+            listening: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         })
     }
 }

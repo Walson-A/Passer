@@ -4,6 +4,7 @@ use axum::{
 };
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 use tauri::{AppHandle, Emitter};
 
 use crate::types::{ServerState, LogEvent, SERVER_PORT};
@@ -49,7 +50,9 @@ pub async fn start_server(
         .route("/ping", get(ping))
         .merge(protected)
         .layer(axum::extract::DefaultBodyLimit::disable())
-        .with_state(state);
+        // Cloned so `state` survives the router: the bind branches below still
+        // need it to publish whether the listener actually came up.
+        .with_state(state.clone());
 
     let addr = SocketAddr::from(([0, 0, 0, 0], SERVER_PORT));
     
@@ -62,6 +65,10 @@ pub async fn start_server(
     match tokio::net::TcpListener::bind(addr).await {
         Ok(listener) => {
             println!(" [SERVER] Listening on http://0.0.0.0:8000");
+            // Emitted here rather than optimistically by the caller: this is the
+            // only point where the socket is known to be bound.
+            state.listening.store(true, Ordering::SeqCst);
+            let _ = app_handle.emit("server-started", ());
             let _ = app_handle.emit("log", LogEvent {
                 message: "Server listening successfully!".to_string(),
                 kind: "success".to_string(),
@@ -78,6 +85,7 @@ pub async fn start_server(
                 eprintln!(" [SERVER] Error serving: {}", e);
             }
             
+            state.listening.store(false, Ordering::SeqCst);
             let _ = app_handle.emit("server-stopped", ());
             let _ = app_handle.emit("log", LogEvent {
                 message: "Server stopped.".to_string(),
@@ -99,6 +107,10 @@ pub async fn start_server(
             };
             
             eprintln!(" [SERVER] FATAL ERROR: {}", err_msg);
+            // Without this the UI kept showing "receiving" while nothing was
+            // bound - the one state it must never get wrong.
+            state.listening.store(false, Ordering::SeqCst);
+            let _ = app_handle.emit("server-stopped", ());
             let _ = app_handle.emit("log", LogEvent {
                 message: err_msg.clone(),
                 kind: "error".to_string(),

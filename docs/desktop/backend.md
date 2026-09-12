@@ -5,7 +5,8 @@ The backend powers the desktop application by providing an interface with the OS
 ## 🚀 Application Lifecycle (`lib.rs`)
 - Extends the core Tauri builder.
 - Manages plugins:
-  - `tauri-plugin-autostart`: Allows the application to launch silently on boot.
+  - `tauri-plugin-single-instance`: **Registered first**, as the plugin requires. A second launch no longer starts a rival process that silently fails to bind port 8000 — it shows, unminimises and focuses the window already running.
+  - `tauri-plugin-autostart`: Allows the application to launch silently on boot. Enabled on first run only (via a `.initialized` marker), so a user who later turns it off is not overridden at every launch.
   - `tauri-plugin-opener`: Safe handling of external URLs or files.
 - Positions the window dynamically at the bottom right corner of the primary monitor using `monitor.work_area()` and `window.outer_size()`.
 
@@ -16,6 +17,11 @@ The IPC (Inter-Process Communication) gateway between the React frontend and Rus
 - **`open_webdav`**: Opens the `Passer Space` shared folder in the native file explorer.
 - **`get_webdav_creds`**: Returns the WebDAV credentials held in state (used only once the WebDAV server is enabled — see `api.md`).
 - **`toggle_server`**: Starts or stops the local Axum HTTP server (port 8000) safely from the UI.
+- **`get_server_status`**: Whether the listener is bound *right now*, read from a `listening` flag on `ServerState`. The UI seeds itself from this on mount and then follows the `server-started` / `server-stopped` events, which `server.rs` emits only once the socket has really come up or gone down. Previously the UI assumed the server was running, so a failed bind — port already taken — still displayed as receiving.
+- **`get_device_info`**: Machine name plus its mDNS address, IP and port, for any surface that shows or copies an address. Carries no secret, unlike `get_pairing_info`.
+- **`get_pairing_info`**: Everything a device needs to pair, including the token and the stable device id (see `api.md`).
+- **`get_autostart` / `set_autostart`**: Read and write the launch-on-login preference.
+- **`get_pairing_token` / `regenerate_pairing_token`**: Read the pairing secret, or rotate it and invalidate every paired device.
 - **`handle_file_drop`**: Copies files dragged onto the window into the `Passer Space` folder, renaming to avoid collisions.
 - **`set_window_on_top`**: Toggles the always-on-top ("pin") window flag.
 - **`delete_cache_file`**: Deletes a cached preview image, validated to stay inside the `.cache` directory.

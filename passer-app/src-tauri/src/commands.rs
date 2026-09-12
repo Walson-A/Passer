@@ -117,6 +117,13 @@ pub fn get_pairing_info(state: tauri::State<'_, Arc<ServerState>>) -> Result<Pai
     })
 }
 
+/// Whether the HTTP listener is bound right now. Read on mount, because the
+/// server may have started before the webview attached its event listeners.
+#[tauri::command]
+pub fn get_server_status(state: tauri::State<'_, Arc<ServerState>>) -> bool {
+    state.listening.load(std::sync::atomic::Ordering::SeqCst)
+}
+
 /// Addresses for display in the UI. Unlike `get_pairing_info` this carries no
 /// secret, so any surface that merely shows or copies an address can use it.
 #[tauri::command]
@@ -172,8 +179,8 @@ pub async fn toggle_server(
             server::start_server(app_handle, rx, srv_state).await;
         });
         
-        // Emit events
-        let _ = state.app_handle.emit("server-started", ());
+        // `server-started` is deliberately not emitted here: the bind can still
+        // fail, and server.rs emits it only once the socket is really listening.
         let _ = state.app_handle.emit("log", LogEvent {
             message: "Server resumed by user.".to_string(),
             kind: "info".to_string(),

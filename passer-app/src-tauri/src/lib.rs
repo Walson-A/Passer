@@ -22,6 +22,16 @@ use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 
 pub fn run() {
     tauri::Builder::default()
+        // Must be registered first. A second launch no longer starts a rival
+        // instance that fails to bind port 8000 in silence - it surfaces the
+        // window that is already running.
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec![]))) 
         .invoke_handler(tauri::generate_handler![
@@ -39,7 +49,8 @@ pub fn run() {
             commands::get_pairing_token,
             commands::regenerate_pairing_token,
             commands::get_pairing_info,
-            commands::get_device_info
+            commands::get_device_info,
+            commands::get_server_status
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {

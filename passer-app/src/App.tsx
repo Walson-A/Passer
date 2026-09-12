@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
+import { invoke } from "@tauri-apps/api/core";
 import { Layout } from "./components/Layout";
 import { ServerStatusBar } from "./components/ServerStatusBar";
 import { TabBar, type View } from "./components/TabBar";
@@ -17,7 +18,9 @@ interface LogEntry {
 
 function App() {
   const [status, setStatus] = useState<"idle" | "pushing" | "pulling" | "success" | "sync-success">("idle");
-  const [isServerOn, setIsServerOn] = useState(true);
+  // Seeded from the backend on mount, never assumed. This used to start as
+  // `true`, so a failed bind - port already taken - still showed as receiving.
+  const [isServerOn, setIsServerOn] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
 
   const [view, setView] = useState<View>("passboard");
@@ -34,12 +37,11 @@ function App() {
     if (isTransitioning) return;
     setIsTransitioning(true);
     try {
-      const { invoke } = await import("@tauri-apps/api/core");
-      const newState = await invoke<string>("toggle_server");
-      setTimeout(() => {
-        setIsServerOn(newState === "on");
-        setIsTransitioning(false);
-      }, 500);
+      // The real answer arrives as server-started / server-stopped: starting
+      // can still fail to bind, and the UI must not claim otherwise.
+      await invoke<string>("toggle_server");
+      // Safety net, in case no event ever lands.
+      setTimeout(() => setIsTransitioning(false), 3000);
     } catch (e) {
       console.error("Toggle failed", e);
       setIsTransitioning(false);
@@ -50,6 +52,36 @@ function App() {
     setStatus("sync-success");
     setTimeout(() => setStatus("idle"), 400);
   };
+
+  // Track whether the listener is actually bound. Seeded by a command because
+  // the server can bind before the webview attaches these listeners, then kept
+  // current by the events the backend emits when it really starts or stops.
+  useEffect(() => {
+    let unStarted: (() => void) | undefined;
+    let unStopped: (() => void) | undefined;
+
+    (async () => {
+      try {
+        setIsServerOn(await invoke<boolean>("get_server_status"));
+      } catch (e) {
+        console.error("Failed to read server status", e);
+      }
+
+      unStarted = await listen("server-started", () => {
+        setIsServerOn(true);
+        setIsTransitioning(false);
+      });
+      unStopped = await listen("server-stopped", () => {
+        setIsServerOn(false);
+        setIsTransitioning(false);
+      });
+    })();
+
+    return () => {
+      unStarted?.();
+      unStopped?.();
+    };
+  }, []);
 
   // Listen for backend logs
   useEffect(() => {
