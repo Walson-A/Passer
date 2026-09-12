@@ -23,7 +23,10 @@ export function ServerStatusBar({ status, isReady, onClick, isTransitioning }: S
     };
 
     return (
-        <div className="relative w-[85%] mx-auto mt-0.5 h-8.5 flex items-center justify-center overflow-visible shrink-0 rounded-full border border-white/[0.03] bg-white/[0.005] backdrop-blur-[2px] transition-all duration-100">
+        // No backdrop-blur here on purpose - see frontend.md. Inside a
+        // transparent window a backdrop filter composites dark, which rendered
+        // this pill as a near-black bar despite a 0.5% white fill.
+        <div className="relative w-[85%] mx-auto mt-0.5 h-8.5 flex items-center justify-center overflow-visible shrink-0 rounded-full border border-white/[0.03] bg-white/[0.005] transition-all duration-100">
             {/* Background */}
             {/* Success Pulse (Emerald) - Make it faster and tighter */}
             <div className={`
