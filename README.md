@@ -80,6 +80,7 @@ npm run tauri dev
 - **Backend**: Rust + Tauri v2.
 - **File Services**: Axum + Dav-server (WebDAV).
 - **Integration**: iOS Shortcuts + REST API.
+- **Mobile (in development)**: Expo + React Native, in `passer-mobile/`. A native iPhone app that replaces the Shortcuts; see `docs/mobile/`.
 
 ---
 

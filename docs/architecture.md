@@ -4,7 +4,7 @@ Passer is a seamless bridge between iPhone and PC, built with Tauri (v2) and Rea
 
 ## 🏗️ Project Structure
 
-The project is divided into two main parts:
+The project is divided into three main parts:
 
 ### 1. `passer-app/` (The Desktop Application)
 - **`src-tauri/`**: Rust backend (Tauri). Handles system-level operations, the local HTTP file/clipboard server, and iOS Shortcut integration via REST API.
@@ -25,6 +25,13 @@ The project is divided into two main parts:
     - All content resides in `src/locales/`.
 - **Styling**: TailwindCSS 4 + Framer Motion.
 
+### 3. `passer-mobile/` (The iPhone App)
+- **Expo SDK 57 + expo-router**: React Native with strict TypeScript. Built on EAS, so no Mac is required.
+- **`src/core/`**: The desktop contract (pairing link, responses, connection strategy, API client). No React Native imports, unit-tested with Jest.
+- **`src/platform/`**: Thin wrappers over native modules (Keychain, file transfers, pickers, clipboard, haptics), so Android can swap implementations without touching logic.
+- **`src/state/`**, **`src/components/`**, **`src/app/`**: Providers, the "Conduit" home screen pieces, and routes.
+- **Details**: `docs/mobile/README.md` (architecture and decisions) and `docs/mobile/SPEC.md` (the brief).
+
 ## 🛠️ Development Standards
 
 ### 1. Unified Design Language
@@ -35,9 +42,9 @@ The project is divided into two main parts:
 - Every new feature or architectural change MUST be documented in `docs/`.
 - Ensure the `README.md` at the root remains the single source of truth for installation and quick start.
 
-### 3. iOS Integration (Shortcuts)
-- The app exposes a local REST API that iOS Shortcuts communicate with.
-- Any changes to this API must be carefully tested for backward compatibility with existing Shortcuts.
+### 3. iOS Integration (Mobile App and Shortcuts)
+- The desktop exposes a local REST API that the mobile app and the iOS Shortcuts both talk to. Its contract lives in `docs/desktop/api.md`.
+- Any change to this API must stay compatible with the mobile app's parser (unknown pairing parameters are ignored; a new major `v` asks users to update) and be tested against existing Shortcuts.
 
 ### 4. Privacy & Performance
 - Everything runs locally. No cloud dependencies.

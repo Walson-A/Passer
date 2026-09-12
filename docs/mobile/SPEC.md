@@ -1,6 +1,6 @@
 # Passer Mobile — Specification & Handoff Brief
 
-> **Status:** Not started. This document is the complete brief for building the Passer mobile app.
+> **Status:** Phase 1 is implemented in `passer-mobile/` and awaits its first device build. See [README.md](README.md) for what was built and the decisions taken. This document remains the brief.
 > **Primary target:** iOS. **Android must stay buildable and unblocked** (see §9).
 > **Author's directive:** *design and ergonomics are the priority — that is what sells this product.* Read §2 before writing any code.
 

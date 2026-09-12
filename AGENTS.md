@@ -23,9 +23,10 @@ When using skills that reference legacy tools, use these Antigravity equivalents
 ## 🏗️ Technical Stack Constraints
 
 - **App**: Tauri v2 (Rust) + React.
+- **Mobile**: Expo SDK 57 (React Native) + expo-router, strict TypeScript, in `passer-mobile/`. See `docs/mobile/`.
 - **Website**: Vite + React + TailwindCSS 4.
 - **Style**: Vanilla CSS or TailwindCSS with premium glassmorphism tokens.
-- **Integration**: iOS Shortcuts REST API.
+- **Integration**: the Passer REST API, used by the mobile app and the iOS Shortcuts.
 
 ---
 
