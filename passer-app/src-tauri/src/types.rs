@@ -14,6 +14,9 @@ pub struct WebDavCreds {
 pub struct ServerState {
     pub app_handle: AppHandle,
     pub webdav_creds: Arc<std::sync::Mutex<Option<WebDavCreds>>>,
+    /// Secret required on every REST request. Shared between the HTTP server
+    /// and the Tauri commands so the UI always shows the token actually in use.
+    pub pairing_token: Arc<std::sync::Mutex<String>>,
 }
 
 impl ServerState {
@@ -21,6 +24,7 @@ impl ServerState {
         Arc::new(Self {
             app_handle,
             webdav_creds: Arc::new(std::sync::Mutex::new(None)),
+            pairing_token: Arc::new(std::sync::Mutex::new(crate::auth::load_or_create_token())),
         })
     }
 }

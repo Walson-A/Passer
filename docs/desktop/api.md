@@ -9,11 +9,21 @@ Running on port `8000`, this standard HTTP server built with the Rust `axum` fra
 - **`POST /push`**: Overwrites the PC clipboard with plaintext (JSON body `{ "text": "..." }`).
 - **`POST /push/image`**: Reads a multipart image and sets it as the PC clipboard image. A copy is cached under `Passer/.cache/` so it can be previewed in the history feed.
 - **`POST /push/file`**: Uploads arbitrary files. Each file is written to `Desktop/Passer/Passboard/<category>/` (Images, Videos, Audio, Documents, Misc), and the saved paths are injected into the Windows clipboard as a native file list so they can be pasted directly.
+- **`GET /ping`**: Unauthenticated liveness probe returning `{ app, version, host }`. Lets a device confirm it is talking to a Passer host (and which machine) before pairing. It exposes no user data.
 
-### Security notes
+## Pairing token
+Every route except `/ping` requires a **pairing token**. Without it the server replies `401 Unauthorized`.
+
+- Send it as the `X-Passer-Token` header, or as a `?token=...` query parameter when custom headers are inconvenient.
+- The token is 32 random alphanumeric characters, generated on first run and persisted to `%APPDATA%\Passer\pairing.token` so it survives restarts — a token that rotated every launch would force the Shortcuts to be re-edited constantly.
+- It is stored outside the user-visible `Passer` folder so it is never exposed alongside shared files.
+- Copy it from **Passer → Settings**, and paste it into each Shortcut's headers. Regenerating it from Settings immediately invalidates every previously paired device.
+- Comparison is constant-time, and the HTTP server and the UI read the same in-memory token, so a regeneration takes effect without restarting the server.
+
+### Other security notes
 - Uploaded filenames are reduced to their base name before being written, so a crafted name cannot use `..` or an absolute path to escape the target directory.
 - The server does **not** enable CORS, so a web page in a browser cannot read `/pull` or drive the push endpoints; only non-browser clients (the iOS Shortcuts) can reach the API.
-- Access is otherwise scoped to the local network (LAN); no external endpoints are exposed. A shared secret / pairing token is **not** yet implemented — see the roadmap.
+- Traffic stays on the local network (LAN); no external endpoints are exposed.
 
 ## 2. Passer Space (Shared Folder)
 "Passer Space" is a local folder (`Desktop/Passer/Passer Space/`) meant to act as a drop zone shared with the iPhone. Files dragged onto the app window, or added from the UI, land here. The app surfaces an `smb://passer.local` address so the folder can be reached from the iOS **Files** app once the folder is shared at the OS level.

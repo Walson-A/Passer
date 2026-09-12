@@ -31,6 +31,16 @@ Passer leverages **iOS Shortcuts** to provide a deeply integrated experience on 
 - [x] [**Pull Shortcut**](https://www.icloud.com/shortcuts/4293d6e1253249efa1b6401f4648641e)
 - [x] [**Pass Shortcut**](https://www.icloud.com/shortcuts/6a6fa41ddc2a452cb19b9f245b1709e6)
 
+### 🔑 Pair your device
+Passer only accepts requests from devices that know your **pairing token**, so nobody else on the network can read your clipboard or drop files on your PC.
+
+1. Open **Passer → Settings** (the gear, bottom-left) and copy the pairing token.
+2. In each Shortcut, open the *Get Contents of URL* action → **Headers**, and add:
+   - Key: `X-Passer-Token`
+   - Value: *the token you copied*
+
+The token is generated once and kept across restarts. If you ever need to revoke access, hit **Regenerate** in Settings — every device will then need the new token.
+
 ---
 
 ## ✨ Key Features

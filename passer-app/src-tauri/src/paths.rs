@@ -25,6 +25,21 @@ pub fn get_webdav_dir() -> PathBuf {
     path
 }
 
+/// Private application data, kept out of the user-visible (and potentially
+/// shared) Passer folder so secrets are not exposed alongside transferred files.
+pub fn get_config_dir() -> PathBuf {
+    let path = match std::env::var("APPDATA") {
+        Ok(appdata) => PathBuf::from(appdata).join("Passer"),
+        Err(_) => get_passer_base_dir(),
+    };
+    let _ = fs::create_dir_all(&path);
+    path
+}
+
+pub fn get_token_path() -> PathBuf {
+    get_config_dir().join("pairing.token")
+}
+
 // --- Helper: Sort into Subfolders (Legacy) ---
 // Now we just dump into Passboard flat or keep logic? User said "Passboard pour les fichiers Push/Pull".
 // Let's keep subfolders inside Passboard for organization if desired, or flatten. 

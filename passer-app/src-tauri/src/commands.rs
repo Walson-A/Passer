@@ -87,9 +87,38 @@ pub async fn handle_file_drop(paths: Vec<String>) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn toggle_server(state: tauri::State<'_, ServerControl>) -> Result<String, String> {
+pub fn get_pairing_token(state: tauri::State<'_, Arc<ServerState>>) -> Result<String, String> {
+    state
+        .pairing_token
+        .lock()
+        .map(|t| t.clone())
+        .map_err(|_| "Failed to lock pairing token".to_string())
+}
+
+/// Rotates the pairing token, immediately invalidating every paired device.
+#[tauri::command]
+pub fn regenerate_pairing_token(state: tauri::State<'_, Arc<ServerState>>) -> Result<String, String> {
+    let new_token = crate::auth::generate_token();
+
+    {
+        let mut lock = state
+            .pairing_token
+            .lock()
+            .map_err(|_| "Failed to lock pairing token".to_string())?;
+        *lock = new_token.clone();
+    }
+
+    crate::auth::save_token(&new_token).map_err(|e| e.to_string())?;
+    Ok(new_token)
+}
+
+#[tauri::command]
+pub async fn toggle_server(
+    state: tauri::State<'_, ServerControl>,
+    server_state: tauri::State<'_, Arc<ServerState>>,
+) -> Result<String, String> {
     let mut tx_lock = state.tx.lock().map_err(|_| "Failed to lock server control".to_string())?;
-    
+
     if let Some(tx) = tx_lock.as_ref() {
         // Server is running -> Stop it
         let _ = tx.send(());
@@ -104,8 +133,9 @@ pub async fn toggle_server(state: tauri::State<'_, ServerControl>) -> Result<Str
         *tx_lock = Some(tx);
         
         let app_handle = state.app_handle.clone();
+        let srv_state = (*server_state).clone();
         tauri::async_runtime::spawn(async move {
-            server::start_server(app_handle, rx).await;
+            server::start_server(app_handle, rx, srv_state).await;
         });
         
         // Emit events

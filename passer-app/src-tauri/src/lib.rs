@@ -1,6 +1,7 @@
 
 mod types;
 mod paths;
+mod auth;
 mod clipboard;
 mod files;
 mod server;
@@ -33,7 +34,9 @@ pub fn run() {
             commands::delete_cache_file,
             commands::get_autostart,
             commands::set_autostart,
-            commands::get_app_version
+            commands::get_app_version,
+            commands::get_pairing_token,
+            commands::regenerate_pairing_token
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
@@ -59,18 +62,21 @@ pub fn run() {
             *title_control.tx.lock().unwrap() = Some(tx);
             app.manage(title_control);
 
+            // A single shared state: the HTTP server and the Tauri commands must
+            // agree on the pairing token, so the UI always shows the token that
+            // is actually being enforced.
+            let state = ServerState::new(app.handle().clone());
+            app.manage(state.clone());
+
             // Start HTTP Server
             let handle = app.handle().clone();
+            let server_state = state.clone();
             tauri::async_runtime::spawn(async move {
-               server::start_server(handle, rx).await;
+               server::start_server(handle, rx, server_state).await;
             });
-            
+
             // Setup System Tray
             tray::setup_tray(app)?;
-            
-            // Init and manage state for Tauri commands
-            let state = ServerState::new(app.handle().clone());
-            app.manage(state);
 
             // Position Window at Bottom Right (Smart + Margin)
             let window = app.get_webview_window("main").unwrap();

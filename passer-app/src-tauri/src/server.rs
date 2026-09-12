@@ -3,20 +3,43 @@ use axum::{
     Router,
 };
 use std::net::SocketAddr;
+use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
 
 use crate::types::{ServerState, LogEvent};
+use crate::auth;
 use crate::clipboard;
 use crate::files;
 
-pub async fn start_server(app_handle: AppHandle, mut rx: tokio::sync::broadcast::Receiver<()>) {
-    let state = ServerState::new(app_handle.clone());
+/// Unauthenticated liveness probe. Lets a device confirm it is talking to a
+/// Passer host (and which one) before pairing, without exposing any data.
+async fn ping() -> axum::Json<serde_json::Value> {
+    axum::Json(serde_json::json!({
+        "app": "passer",
+        "version": env!("CARGO_PKG_VERSION"),
+        "host": std::env::var("COMPUTERNAME").unwrap_or_else(|_| "unknown".to_string()),
+    }))
+}
 
-    let app = Router::new()
+pub async fn start_server(
+    app_handle: AppHandle,
+    mut rx: tokio::sync::broadcast::Receiver<()>,
+    state: Arc<ServerState>,
+) {
+    // Every data route sits behind the pairing token.
+    let protected = Router::new()
         .route("/pull", get(clipboard::pull_clipboard))
         .route("/push", post(clipboard::push_clipboard))
         .route("/push/image", post(clipboard::push_image))
         .route("/push/file", post(files::push_file))
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            auth::require_token,
+        ));
+
+    let app = Router::new()
+        .route("/ping", get(ping))
+        .merge(protected)
         .layer(axum::extract::DefaultBodyLimit::disable())
         .with_state(state);
 
