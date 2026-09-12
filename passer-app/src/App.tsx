@@ -88,20 +88,21 @@ function App() {
     <Layout>
       <div className="flex-1 flex flex-col min-h-0">
 
-        {/* Server status stays global: knowing the server is alive should never
-            depend on which view you happen to be standing in. */}
-        <div className="shrink-0 px-4 pt-3">
-          <ServerStatusBar
-            status={isServerOn ? status : "idle"}
-            isReady={isServerOn}
-            onClick={toggleServer}
-            isTransitioning={isTransitioning}
-          />
-        </div>
-
         {/* The body. Layers stay mounted so scroll and state survive a switch. */}
         <div className="relative flex-1 min-h-0">
           <div className="view-layer" data-active={view === "passboard"}>
+            {/* The server only powers /pull and /push, which is the Passboard
+                flow - Space is a local folder and Settings needs nothing. So
+                this is the Passboard's state, not the app's, and it belongs
+                here rather than above every view. */}
+            <div className="shrink-0 px-4 pt-3">
+              <ServerStatusBar
+                status={isServerOn ? status : "idle"}
+                isReady={isServerOn}
+                onClick={toggleServer}
+                isTransitioning={isTransitioning}
+              />
+            </div>
             <Passboard />
           </div>
 

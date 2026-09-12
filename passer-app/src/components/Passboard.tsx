@@ -20,7 +20,7 @@ export function Passboard() {
     const incomingHistory = history.filter(item => item.direction === 'incoming');
 
     return (
-        <div className="w-full flex-1 flex flex-col min-h-0 px-4 pt-6 pb-2 relative">
+        <div className="w-full flex-1 flex flex-col min-h-0 px-4 pt-4 pb-2 relative">
             {/* Header / Section Divider */}
             <div className="flex items-center justify-between px-0 mb-4 opacity-0 animate-fade-in" style={{ animationDelay: '0.2s' }}>
                 <div className="flex items-center gap-2.5 flex-1">

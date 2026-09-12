@@ -98,10 +98,6 @@
     visibility 0s;
 }
 
-.tab-indicator {
-  transition: transform 220ms var(--ease-spring);
-}
-
 @media (prefers-reduced-motion: reduce) {
 
   /* Keep the cross-fade (it aids comprehension), drop the movement. */
@@ -124,10 +120,6 @@
     transition:
       opacity 150ms linear,
       visibility 0s;
-  }
-
-  .tab-indicator {
-    transition: none;
   }
 }
 

@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+import { motion, useSpring, useVelocity, useTransform, useReducedMotion } from "framer-motion";
 import { Inbox, Layers, Settings as SettingsIcon } from "lucide-react";
 
 export type View = "passboard" | "space" | "settings";
@@ -21,6 +23,30 @@ interface Props {
  */
 export function TabBar({ view, onChange }: Props) {
     const index = Math.max(0, TABS.findIndex(t => t.id === view));
+    const reduce = useReducedMotion();
+
+    // Position in percent of the indicator's own width, so one tab = 100%.
+    // A spring rather than an overshoot curve: the previous --ease-spring
+    // (1.275) sent the dot past its target and back, which at 4px reads as
+    // missing the mark rather than as life.
+    const pos = useSpring(index * 100, reduce
+        ? { stiffness: 1000, damping: 100 }
+        : { stiffness: 420, damping: 34, mass: 0.7 });
+
+    useEffect(() => {
+        pos.set(index * 100);
+    }, [index, pos]);
+
+    // Stretch with speed: the dot elongates into a pill while travelling and
+    // settles back into a circle on arrival. Transitions cannot do this - the
+    // value has to rise and fall within a single move.
+    const velocity = useVelocity(pos);
+    const stretch = useTransform(velocity, [-500, 0, 500], [2.4, 1, 2.4], { clamp: true });
+
+    const transform = useTransform(
+        [pos, stretch],
+        ([p, s]: number[]) => `translateX(${p}%) scaleX(${reduce ? 1 : s})`
+    );
 
     return (
         <nav className="shrink-0 px-6 pt-2 pb-5 relative z-50">
@@ -48,18 +74,13 @@ export function TabBar({ view, onChange }: Props) {
                     );
                 })}
 
-                {/* Sliding dot. Equal-width tabs, so the offset is its own width
-                    times the active index. */}
-                <div
+                <motion.div
                     aria-hidden
-                    className="tab-indicator absolute -bottom-2 left-0 flex justify-center"
-                    style={{
-                        width: `${100 / TABS.length}%`,
-                        transform: `translateX(calc(${index} * 100%))`,
-                    }}
+                    className="absolute -bottom-2 left-0 flex justify-center"
+                    style={{ width: `${100 / TABS.length}%`, transform }}
                 >
                     <span className="w-1 h-1 rounded-full bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.9)]" />
-                </div>
+                </motion.div>
             </div>
         </nav>
     );
