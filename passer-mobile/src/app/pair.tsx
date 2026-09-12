@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState, type ComponentType } from 'react';
-import { Linking, StyleSheet, View } from 'react-native';
+import { AppState, Linking, StyleSheet, View } from 'react-native';
 import Animated, {
   cancelAnimation,
   Easing,
@@ -42,6 +42,13 @@ type Phase =
 /** How long the paired state stays on screen before the home screen takes over. */
 const PAIRED_HOLD_MS = 1_800;
 const LINE_HEIGHT = 112;
+/**
+ * The first local connection triggers the iOS Local Network alert, and requests
+ * fail until it is answered. The first try keeps going this long before it
+ * reports the PC as unreachable.
+ */
+const RETRY_WINDOW_MS = 15_000;
+const RETRY_DELAY_MS = 1_000;
 
 /** A `passer://pair?…` URL opened from outside the app (the Camera app, for one) arrives as route params. */
 function linkFromParams(params: Params): string | null {
@@ -100,6 +107,9 @@ export default function Pair() {
     }
     const { payload } = parsed;
     const controller = new AbortController();
+    // "Try again" answers at once; only the first try waits out the alert.
+    const deadline = Date.now() + (attempt === 0 ? RETRY_WINDOW_MS : 0);
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
     setPhase({ step: 'connecting', name: payload.name });
 
     const candidate: PairedPc = {
@@ -113,20 +123,41 @@ export default function Pair() {
       preferredAddress: 'host',
     };
 
-    locate(candidate, controller.signal)
-      .then(async (endpoint) => {
-        await savePairing(payload, endpoint);
-        if (controller.signal.aborted) return;
-        haptic.success();
-        setPhase({ step: 'paired', name: endpoint.ping.name ?? endpoint.ping.host });
-      })
-      .catch((error: unknown) => {
-        if (controller.signal.aborted) return;
-        haptic.error();
-        setPhase(connectionFailure(error, payload.name));
-      });
+    const connect = () => {
+      retryTimer = undefined;
+      locate(candidate, controller.signal)
+        .then(async (endpoint) => {
+          await savePairing(payload, endpoint);
+          if (controller.signal.aborted) return;
+          haptic.success();
+          setPhase({ step: 'paired', name: endpoint.ping.name ?? endpoint.ping.host });
+        })
+        .catch((error: unknown) => {
+          if (controller.signal.aborted) return;
+          const unreachable = error instanceof PasserError && error.kind === 'unreachable';
+          if (unreachable && Date.now() < deadline) {
+            retryTimer = setTimeout(connect, RETRY_DELAY_MS);
+            return;
+          }
+          haptic.error();
+          setPhase(connectionFailure(error, payload.name));
+        });
+    };
 
-    return () => controller.abort();
+    // Answering the alert brings the app back to the foreground: retry now rather than after the delay.
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state !== 'active' || !retryTimer) return;
+      clearTimeout(retryTimer);
+      connect();
+    });
+
+    connect();
+
+    return () => {
+      controller.abort();
+      if (retryTimer) clearTimeout(retryTimer);
+      subscription.remove();
+    };
   }, [link, attempt, ready]);
 
   /** The first pairing leaves the onboarding screens underneath: clear them so Home stands alone. */

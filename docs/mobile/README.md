@@ -72,7 +72,7 @@ passer-mobile/
 |---|---|
 | Reading the clipboard shows an alert | The send button is Apple's `UIPasteControl` (`ClipboardPasteButton`). Its label and icon are Apple's; only its colours, shape and size are ours. The kind of content on the clipboard is detected without reading it. |
 | No background receive | Pulling is explicit: the From PC button, or pulling the conduit down. |
-| Local Network permission | Explained on the welcome screen before the first connection triggers the prompt. Unreachable states link to Settings. |
+| Local Network permission | Explained on the welcome screen before the first connection triggers the prompt. Requests fail until the alert is answered, so the first pairing try keeps retrying for 15 s, and at once when the app returns to the foreground. Unreachable states link to Settings. |
 | Cleartext HTTP | `NSAllowsLocalNetworking` only; App Transport Security stays on everywhere else. Android enables cleartext through `expo-build-properties`. |
 | HEIC | The PC cannot decode it, so photos sent to its clipboard are re-encoded as JPEG. Passboard sends keep the original file. |
 | Haptics stop while the camera runs | The pairing success haptic fires on the pairing screen, after the scanner has closed. |
