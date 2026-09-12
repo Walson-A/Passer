@@ -26,9 +26,16 @@ if (Object.keys(overrides).length > 0) saveState(sanitizeState({ ...loadState(),
 /** A modal route to present once the app is mounted: its stack needs Home underneath. */
 export const openOnMount = params.get('open');
 
+/**
+ * `motion=off` makes every animation jump to its end, for screenshots. A hidden
+ * browser pane renders almost no frames, and an entrance animation caught on
+ * its first frame looks like a faded screen.
+ */
+export const stillMotion = params.get('motion') === 'off';
+
 if (benchMode === 'phone') {
   // The router reads the URL: it must only see the app's own route and parameters.
-  for (const key of [...OVERRIDABLE, 'bench', 'open']) params.delete(key);
+  for (const key of [...OVERRIDABLE, 'bench', 'open', 'motion']) params.delete(key);
   const query = params.toString();
   window.history.replaceState(null, '', `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`);
 }

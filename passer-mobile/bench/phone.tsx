@@ -1,15 +1,17 @@
 import { router, type Href } from 'expo-router';
 import { App } from 'expo-router/build/qualified-entry';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { ReducedMotionConfig, ReduceMotion } from 'react-native-reanimated';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
 import { seedToken } from '@/platform/secrets.web';
 import { DEFAULT_SETTINGS, storage } from '@/platform/storage';
 import { installBenchHost, subscribeBenchPreferences, type IphoneClipboard } from '@/platform/web-bench';
 import { useSystemScheme } from '@/theme/system-scheme.web';
+import { palettes } from '@/theme/tokens';
 
-import { openOnMount } from './boot';
+import { openOnMount, stillMotion } from './boot';
 import { FILES, history, iphoneClipboard, pairedPc, PC, pcClipboard, PHOTOS } from './fixtures';
 import { postLog } from './log';
 import { createFakeNetwork } from './network';
@@ -78,6 +80,12 @@ function start(state: BenchState) {
 export function Phone() {
   const [phone] = useState(() => start(loadState()));
   const [ready, setReady] = useState(false);
+  const wrapper = useRef<View>(null);
+
+  useEffect(() => {
+    // vaul scales this element back behind an open sheet, as iOS does with the screen underneath.
+    (wrapper.current as unknown as HTMLElement | null)?.setAttribute('data-vaul-drawer-wrapper', '');
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -112,10 +120,50 @@ export function Phone() {
 
   return (
     <View style={styles.screen}>
-      {ready ? <App /> : null}
+      {stillMotion ? <ReducedMotionConfig mode={ReduceMotion.Always} /> : null}
+      <SheetStyle device={phone.device} />
+      <View ref={wrapper} style={styles.app}>
+        {ready ? <App /> : null}
+      </View>
       <DeviceChrome device={phone.device} />
     </View>
   );
+}
+
+/**
+ * With `EXPO_UNSTABLE_WEB_MODAL`, expo-router draws sheets with vaul, which knows
+ * nothing of iOS. This paints them in the app's sheet colour instead of the
+ * navigation theme's grey, keeps a large sheet below the status bar, and draws
+ * the grabber the app asks for.
+ */
+function SheetStyle({ device }: { device: Device }) {
+  const sheet = palettes[useSystemScheme() === 'light' ? 'light' : 'dark'].surface.sheet;
+  const top = device.insets.top + 10;
+  const css = [
+    `[data-presentation="formSheet"] { background-color: ${sheet} !important; }`,
+    // The sheet body is a row flexbox: without this, a screen is as wide as its longest line instead of the sheet.
+    '[data-presentation="formSheet"] > div:last-child > * { flex: 1 1 auto !important; min-width: 0 !important; }',
+    '[data-presentation="formSheet"]::before { content: ""; position: absolute; z-index: 5; top: 5px; left: 50%; width: 36px; height: 5px; margin-left: -18px; border-radius: 3px; background: rgba(128, 128, 128, 0.45); }',
+    `[data-vaul-drawer] { top: auto !important; height: calc(100% - ${top}px) !important; }`,
+    `[data-vaul-drawer][style*="height: auto"] { height: auto !important; max-height: calc(100% - ${top}px) !important; }`,
+    // expo-router doesn't mark full-screen modals on the web; it gives them its default 24 px
+    // corner radius, while every sheet in the app sets 32 px. That is what tells them apart.
+    '[data-vaul-drawer]:has(> [style*="border-top-left-radius: 24px"]) { height: 100% !important; }',
+    '[data-presentation][style*="border-top-left-radius: 24px"] { border-radius: 0 !important; }',
+    '[data-presentation][style*="border-top-left-radius: 24px"]::before { display: none; }',
+    stillMotion
+      ? '[data-vaul-drawer], [data-vaul-overlay], [data-vaul-drawer-wrapper] { transition: none !important; animation: none !important; }'
+      : '',
+  ].join('\n');
+
+  useEffect(() => {
+    const element = document.createElement('style');
+    element.textContent = css;
+    document.head.appendChild(element);
+    return () => element.remove();
+  }, [css]);
+
+  return null;
 }
 
 /** The status bar and home indicator iOS draws over the app, so collisions with them show. */
@@ -165,7 +213,9 @@ function StatusGlyphs({ color }: { color: string }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#000000' },
-  chrome: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 1000 },
+  app: { flex: 1 },
+  // Above vaul's sheets too, which are portaled after the app in the document.
+  chrome: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 2147483647 },
   islandBar: { position: 'absolute', top: 11, left: 0, right: 0, height: 37, flexDirection: 'row', alignItems: 'center' },
   side: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   island: { width: 126, height: 37, borderRadius: 19, backgroundColor: '#000000' },

@@ -1,9 +1,11 @@
 # The bench: see the screens without a phone
 
 > ```bash
-> npx expo start --web --port 8090
+> EXPO_UNSTABLE_WEB_MODAL=1 npx expo start --web --port 8090
 > ```
-> Run it in `passer-mobile/`, then open <http://localhost:8090>. In the desktop app's Browser pane, the `bench` configuration in `passer-mobile/.claude/launch.json` starts the same server.
+> Run it in `passer-mobile/`, then open <http://localhost:8090>. In PowerShell, set the variable first: `$env:EXPO_UNSTABLE_WEB_MODAL = '1'`. In the desktop app's Browser pane, the `bench` configuration in `passer-mobile/.claude/launch.json` starts the same server.
+>
+> `EXPO_UNSTABLE_WEB_MODAL` makes expo-router draw sheets as sheets on the web, with detents, rounded corners and the screen behind them scaled back. Without it, every sheet opens full screen under the status bar, which is not what the phone shows.
 
 The bench renders the app's real screens in a browser, inside an iPhone frame, facing a fake Passer PC. The code lives in `bench/` and `index.web.ts`, plus the `*.web.ts(x)` stand-ins in `src/`.
 
@@ -79,6 +81,18 @@ Changing the regime, device or language relaunches the app, as iOS would. Appear
 - **Phone** (`?bench=phone`, or a window as narrow as a phone). The phone alone, at 1:1. Agents screenshot this view, with the viewport set to the device size (393 × 852 for the iPhone 16).
 
 Both views accept the controls as URL parameters, for example `?bench=phone&regime=slow&scheme=light&language=en&device=iphone-se`. `&open=/settings` opens a modal route over Home.
+
+`&motion=off` makes every animation jump to its end state. Use it for screenshots when the Browser pane is hidden: a hidden pane renders about two frames a second, so an entrance animation caught on its first frame looks like a faded screen. Network timeouts still run in real time, so give a regime such as "PC endormi" a few seconds before judging it.
+
+### Sheets
+
+With `EXPO_UNSTABLE_WEB_MODAL`, expo-router draws sheets with vaul. `bench/phone.tsx` corrects what vaul doesn't know about iOS:
+- it paints sheets in the app's sheet colour, not the navigation theme's grey;
+- it keeps a large sheet below the status bar and draws the grabber;
+- it lets a sheet's content take the sheet's width;
+- it scales the screen behind, as iOS does.
+
+expo-router doesn't mark full-screen modals on the web, so the bench recognises them by vaul's default 24 px corner radius. Every sheet in the app sets 32 px; keep it that way, or update the selector. Detents are approximate: a 0.6 detent is 60 % of the window.
 
 ## Limits
 

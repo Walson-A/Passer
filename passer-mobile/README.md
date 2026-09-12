@@ -33,7 +33,7 @@ A new iPhone needs `eas device:create` and a new build, because internal builds 
 
 ## See the screens: the bench
 
-Run `npx expo start --web --port 8090`, then open <http://localhost:8090>. You get the real screens in an iPhone frame, a fake PC, and switches for regime, appearance, language and device. Look at every screen you change there before building. Details and rules: [docs/mobile/bench.md](../docs/mobile/bench.md).
+Run `npx expo start --web --port 8090` with `EXPO_UNSTABLE_WEB_MODAL=1` set, so sheets render as sheets. Then open <http://localhost:8090>. You get the real screens in an iPhone frame, a fake PC, and switches for regime, appearance, language and device. Look at every screen you change there before building. Details and rules: [docs/mobile/bench.md](../docs/mobile/bench.md).
 
 ## Bundle id
 

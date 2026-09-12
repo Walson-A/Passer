@@ -5,6 +5,7 @@
       "name": "bench",
       "runtimeExecutable": "npx",
       "runtimeArgs": ["expo", "start", "--web", "--port", "8090"],
+      "env": { "EXPO_UNSTABLE_WEB_MODAL": "1" },
       "port": 8090
     }
   ]
