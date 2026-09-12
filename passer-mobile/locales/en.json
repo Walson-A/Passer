@@ -2,5 +2,6 @@
   "CFBundleDisplayName": "Passer",
   "NSLocalNetworkUsageDescription": "Passer connects to your PC over Wi-Fi to send and receive your clipboard, photos and files. Nothing leaves your local network.",
   "NSCameraUsageDescription": "Passer uses the camera to scan the pairing code shown on your PC.",
-  "NSPhotoLibraryAddUsageDescription": "Passer saves the images you receive from your PC to your photo library."
+  "NSPhotoLibraryAddUsageDescription": "Passer saves the images you receive from your PC to your photo library.",
+  "NSPhotoLibraryUsageDescription": "Passer reads your latest screenshots and photos when you run one of its Shortcuts actions, to send them to your PC."
 }

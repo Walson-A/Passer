@@ -18,6 +18,7 @@
     }
   },
   "dependencies": {
+    "@bacons/apple-targets": "^5.0.0",
     "@expo/ui": "~57.0.18",
     "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "~57.0.22",
@@ -60,6 +61,11 @@
     "react-native-svg": "15.15.4",
     "react-native-web": "~0.21.0",
     "react-native-worklets": "0.10.1"
+  },
+  "overrides": {
+    "@bacons/apple-targets": {
+      "@expo/require-utils": "57.0.5"
+    }
   },
   "devDependencies": {
     "@types/jest": "29.5.14",

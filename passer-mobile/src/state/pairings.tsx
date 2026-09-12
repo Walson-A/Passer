@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 
 import type { AddressKind, Endpoint, PairedPc, PairingPayload } from '@/core/types';
 import { deleteToken, saveToken } from '@/platform/secrets';
+import { shareWithExtensions } from '@/platform/shared-state';
 import { storage } from '@/platform/storage';
 
 type PairingsValue = {
@@ -40,7 +41,9 @@ export function PairingsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (ready) void storage.savePcs(pcs);
+    if (!ready) return;
+    void storage.savePcs(pcs);
+    shareWithExtensions({ pcs });
   }, [pcs, ready]);
 
   const savePairing = async (payload: PairingPayload, endpoint: Endpoint): Promise<PairedPc> => {

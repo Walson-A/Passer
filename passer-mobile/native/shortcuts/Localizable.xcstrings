@@ -1,0 +1,87 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "Automatic" : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Automatique" } } }
+    },
+    "Checks that your paired PC answers on this network, for example to run an automation only at home." : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Vérifie que votre PC associé répond sur ce réseau, par exemple pour ne lancer une automatisation qu'à la maison." } } }
+    },
+    "Copies your PC's clipboard to this iPhone, ready to paste." : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Copie le presse-papiers du PC sur cet iPhone, prêt à coller." } } }
+    },
+    "Copy PC Clipboard" : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Copier le presse-papiers du PC" } } }
+    },
+    "Destination" : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Destination" } } }
+    },
+    "Files" : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Fichiers" } } }
+    },
+    "Get Files from PC" : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Obtenir les fichiers du PC" } } }
+    },
+    "Get Text from PC" : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Obtenir le texte du PC" } } }
+    },
+    "Is PC Reachable" : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "PC joignable" } } }
+    },
+    "Number of Photos" : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Nombre de photos" } } }
+    },
+    "Passboard" : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Passboard" } } }
+    },
+    "PC Clipboard" : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Presse-papiers du PC" } } }
+    },
+    "Puts text on your PC's clipboard, ready to paste." : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Met du texte dans le presse-papiers du PC, prêt à coller." } } }
+    },
+    "Reads the image or the files copied on your PC, for the next action." : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Récupère l'image ou les fichiers copiés sur le PC, pour l'action suivante." } } }
+    },
+    "Reads the text on your PC's clipboard, for the next action." : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Lit le texte du presse-papiers du PC, pour l'action suivante." } } }
+    },
+    "Send and Delete Latest Screenshot" : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Envoyer puis supprimer la dernière capture" } } }
+    },
+    "Send Clipboard to PC" : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Envoyer le presse-papiers au PC" } } }
+    },
+    "Send Files to PC" : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Envoyer des fichiers au PC" } } }
+    },
+    "Send Latest Photos to PC" : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Envoyer les dernières photos au PC" } } }
+    },
+    "Send Latest Screenshot to PC" : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Envoyer la dernière capture au PC" } } }
+    },
+    "Send Text to PC" : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Envoyer du texte au PC" } } }
+    },
+    "Sends photos or files to your PC: one image to its clipboard, anything else to the Passboard folder." : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Envoie des photos ou des fichiers au PC : une image dans son presse-papiers, le reste dans le dossier Passboard." } } }
+    },
+    "Sends what you copied on this iPhone to your PC's clipboard. iOS may ask you to allow pasting." : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Envoie ce que vous avez copié sur cet iPhone dans le presse-papiers du PC. iOS peut vous demander d'autoriser le collage." } } }
+    },
+    "Sends your latest screenshot to your PC, by default to its clipboard, ready to paste." : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Envoie votre dernière capture d'écran au PC, par défaut dans son presse-papiers, prête à coller." } } }
+    },
+    "Sends your latest screenshot to your PC, then deletes it from the photo library. iOS asks you to confirm the deletion." : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Envoie votre dernière capture d'écran au PC, puis la supprime de la photothèque. iOS demande de confirmer la suppression." } } }
+    },
+    "Sends your most recent photos to your PC: one to its clipboard, several to the Passboard folder." : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Envoie vos photos les plus récentes au PC : une dans son presse-papiers, plusieurs dans le dossier Passboard." } } }
+    },
+    "Text" : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Texte" } } }
+    }
+  },
+  "version" : "1.0"
+}

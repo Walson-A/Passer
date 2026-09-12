@@ -108,5 +108,6 @@ Known gap, noted by the owner: the middle of the conduit feels empty when idle.
 ## Not done yet
 
 - **Real-device checks:** the Local Network prompt, `.local` resolution on iOS, paste button sizing in French, upload progress.
-- **Later phases:** the share extension ("Pass"), multiple PCs in the UI, mDNS discovery (phases 2 and 3).
+- **Share extension and Shortcuts actions:** written, but not yet signed and tried on a phone. See [extensions.md](extensions.md).
+- **Later phases:** multiple PCs in the UI, and mDNS discovery (phases 2 and 3).
 - **Device passes:** VoiceOver on a real iPhone, and 60 fps on the transfer animation.

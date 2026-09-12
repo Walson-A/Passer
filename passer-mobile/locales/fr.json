@@ -2,5 +2,6 @@
   "CFBundleDisplayName": "Passer",
   "NSLocalNetworkUsageDescription": "Passer se connecte à votre PC par le Wi-Fi pour envoyer et recevoir votre presse-papiers, vos photos et vos fichiers. Rien ne quitte votre réseau local.",
   "NSCameraUsageDescription": "Passer utilise l'appareil photo pour scanner le code d'appairage affiché sur votre PC.",
-  "NSPhotoLibraryAddUsageDescription": "Passer enregistre dans votre photothèque les images reçues de votre PC."
+  "NSPhotoLibraryAddUsageDescription": "Passer enregistre dans votre photothèque les images reçues de votre PC.",
+  "NSPhotoLibraryUsageDescription": "Passer lit vos dernières captures d'écran et photos quand vous lancez l'une de ses actions Raccourcis, pour les envoyer à votre PC."
 }

@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 
 import { setHapticsEnabled } from '@/platform/haptics';
+import { shareWithExtensions } from '@/platform/shared-state';
 import { DEFAULT_SETTINGS, storage, type Settings } from '@/platform/storage';
 
 type SettingsValue = {
@@ -28,7 +29,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setHapticsEnabled(settings.haptics);
-    if (loaded.current) void storage.saveSettings(settings);
+    if (!loaded.current) return;
+    void storage.saveSettings(settings);
+    shareWithExtensions({ photoDestination: settings.photoDestination });
   }, [settings]);
 
   const updateSettings = (patch: Partial<Settings>) =>

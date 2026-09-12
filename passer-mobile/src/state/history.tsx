@@ -1,5 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { AppState } from 'react-native';
 
+import { takeOutbox } from '@/platform/shared-state';
 import { storage } from '@/platform/storage';
 
 export type Direction = 'sent' | 'received';
@@ -51,6 +53,32 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (ready) void storage.saveHistory(items);
   }, [items, ready]);
+
+  // Transfers made from the share sheet or a Shortcut join the history when the app comes to the front.
+  useEffect(() => {
+    if (!ready) return;
+    const merge = () => {
+      const entries = takeOutbox();
+      if (entries.length === 0) return;
+      setItems((current) =>
+        [
+          ...entries.map((entry) => ({
+            ...entry,
+            title: entry.title.slice(0, PREVIEW_LENGTH),
+            id: `${entry.at.toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+          })),
+          ...current,
+        ]
+          .sort((a, b) => b.at - a.at)
+          .slice(0, MAX_ITEMS),
+      );
+    };
+    merge();
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') merge();
+    });
+    return () => subscription.remove();
+  }, [ready]);
 
   const record = (entry: Omit<HistoryItem, 'id' | 'at'>): HistoryItem => {
     const at = Date.now();

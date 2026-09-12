@@ -1,0 +1,41 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "Copy PC clipboard with ${applicationName}" : {
+      "localizations" : {
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Copier le presse-papiers du PC avec ${applicationName}" } }
+      }
+    },
+    "Is my PC reachable with ${applicationName}" : {
+      "localizations" : {
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Mon PC est-il joignable avec ${applicationName}" } }
+      }
+    },
+    "Paste from my PC with ${applicationName}" : {
+      "localizations" : {
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Coller depuis mon PC avec ${applicationName}" } }
+      }
+    },
+    "Send and delete latest screenshot with ${applicationName}" : {
+      "localizations" : {
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Envoyer et supprimer la dernière capture avec ${applicationName}" } }
+      }
+    },
+    "Send clipboard with ${applicationName}" : {
+      "localizations" : {
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Envoyer le presse-papiers avec ${applicationName}" } }
+      }
+    },
+    "Send latest screenshot with ${applicationName}" : {
+      "localizations" : {
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Envoyer la dernière capture avec ${applicationName}" } }
+      }
+    },
+    "Send my clipboard to my PC with ${applicationName}" : {
+      "localizations" : {
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Envoyer mon presse-papiers au PC avec ${applicationName}" } }
+      }
+    }
+  },
+  "version" : "1.0"
+}

@@ -1,12 +1,14 @@
 import * as Application from 'expo-application';
 import { useRouter } from 'expo-router';
 import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
-import { Linking, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { AppState, Linking, Platform, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   ChevronRightIcon,
+  ImageIcon,
   LaptopIcon,
+  LayersIcon,
   ScanIcon,
   ShieldIcon,
   TrashIcon,
@@ -18,6 +20,7 @@ import { AppText } from '@/components/ui/app-text';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { format, language, t } from '@/i18n';
 import { haptic } from '@/platform/haptics';
+import { readPhotoAccess, requestPhotoAccess, type PhotoAccess } from '@/platform/photo-access';
 import type { PhotoDestination } from '@/platform/storage';
 import { useHistory } from '@/state/history';
 import { usePairings } from '@/state/pairings';
@@ -38,12 +41,45 @@ export default function Settings() {
   const { settings, updateSettings } = useSettings();
   const { clear } = useHistory();
   const [armed, setArmed] = useState(false);
+  const [photoAccess, setPhotoAccess] = useState<PhotoAccess | null>(null);
 
   useEffect(() => {
     if (!armed) return;
     const timer = setTimeout(() => setArmed(false), DISARM_MS);
     return () => clearTimeout(timer);
   }, [armed]);
+
+  // Coming back from iOS Settings may have changed the photo access.
+  useEffect(() => {
+    const refresh = () => {
+      readPhotoAccess()
+        .then(setPhotoAccess)
+        .catch(() => setPhotoAccess(null));
+    };
+    refresh();
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refresh();
+    });
+    return () => subscription.remove();
+  }, []);
+
+  const askPhotoAccess = async () => {
+    if (photoAccess !== 'undetermined') {
+      void Linking.openSettings();
+      return;
+    }
+    haptic.select();
+    setPhotoAccess(await requestPhotoAccess());
+  };
+
+  const photoAccessLabel =
+    photoAccess === 'all'
+      ? t.settings.photoAccessAll
+      : photoAccess === 'limited'
+        ? t.settings.photoAccessLimited
+        : photoAccess === 'denied'
+          ? t.settings.photoAccessDenied
+          : t.settings.photoAccessAsk;
 
   const forgetPc = async () => {
     if (!pc) return;
@@ -124,6 +160,14 @@ export default function Settings() {
         </View>
       </Section>
 
+      {Platform.OS !== 'android' ? (
+        <Section label={t.settings.shortcutsSection} footer={t.settings.shortcutsHint}>
+          <Row icon={LayersIcon} label={t.settings.shortcutsApp} onPress={() => void Linking.openURL('shortcuts://')} chevron />
+          <Divider />
+          <Row icon={ImageIcon} label={t.settings.photoAccess} value={photoAccessLabel} onPress={() => void askPhotoAccess()} chevron />
+        </Section>
+      ) : null}
+
       <Section>
         <Row
           icon={WifiIcon}
@@ -160,7 +204,7 @@ export default function Settings() {
   );
 }
 
-function Section({ label, children }: { label?: string; children: ReactNode }) {
+function Section({ label, footer, children }: { label?: string; footer?: string; children: ReactNode }) {
   const { colors } = useTheme();
   return (
     <View style={styles.section}>
@@ -172,6 +216,11 @@ function Section({ label, children }: { label?: string; children: ReactNode }) {
       <View style={[styles.card, { backgroundColor: colors.surface.card, borderColor: colors.border.subtle }]}>
         {children}
       </View>
+      {footer ? (
+        <AppText variant="caption" tone="tertiary" style={styles.sectionFooter}>
+          {footer}
+        </AppText>
+      ) : null}
     </View>
   );
 }
@@ -266,6 +315,7 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: 20, paddingTop: 28, gap: 20 },
   section: { gap: 8 },
   sectionLabel: { paddingHorizontal: 4 },
+  sectionFooter: { paddingHorizontal: 4 },
   card: { borderRadius: radius.card, borderWidth: 1, overflow: 'hidden' },
   pc: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
   tile: { width: 44, height: 44, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },

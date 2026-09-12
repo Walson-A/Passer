@@ -6,6 +6,9 @@ import type { ConfigContext, ExpoConfig } from 'expo/config';
  */
 const BUNDLE_ID = 'direct.passer.app';
 
+/** Also in `src/platform/app-group.ts` and `targets/share/_shared/PasserShared.swift`. */
+const APP_GROUP = 'group.direct.passer.app';
+
 /** EAS project `@walsondev/passer`, created with `eas init`. */
 const EAS_PROJECT_ID = '24bd9306-2019-4dbf-808d-bd058478c748';
 
@@ -13,6 +16,8 @@ const LOCAL_NETWORK_REASON =
   'Passer connects to your PC over Wi-Fi to send and receive your clipboard, photos and files. Nothing leaves your local network.';
 const CAMERA_REASON = 'Passer uses the camera to scan the pairing code shown on your PC.';
 const SAVE_PHOTOS_REASON = 'Passer saves the images you receive from your PC to your photo library.';
+const PHOTOS_REASON =
+  'Passer reads your latest screenshots and photos when you run one of its Shortcuts actions, to send them to your PC.';
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
@@ -20,7 +25,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   slug: 'passer',
   owner: 'walsondev',
   scheme: 'passer',
-  version: '1.0.0',
+  // 1.1 adds the App Group. Its JavaScript stores tokens in the group's keychain,
+  // which a 1.0 build can't open; the runtime version follows this number, so
+  // updates for 1.1 never reach a 1.0 build.
+  version: '1.1.0',
   orientation: 'portrait',
   icon: './assets/images/icon.png',
   userInterfaceStyle: 'automatic',
@@ -39,6 +47,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     supportsTablet: false,
     icon: './assets/images/icon.png',
     config: { usesNonExemptEncryption: false },
+    // Shared with the share extension and the Shortcuts actions: the paired PCs,
+    // and the keychain group holding the tokens (docs/mobile/extensions.md).
+    entitlements: { 'com.apple.security.application-groups': [APP_GROUP] },
     infoPlist: {
       NSLocalNetworkUsageDescription: LOCAL_NETWORK_REASON,
       // Declared now for the "find PCs on this network" discovery planned in phase 3.
@@ -80,13 +91,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ],
     [
       'expo-image-picker',
-      // The system photo picker needs no library permission. The camera string
-      // repeats expo-camera's, because `false` here would delete it.
-      { photosPermission: false, cameraPermission: CAMERA_REASON, microphonePermission: false },
+      // The system photo picker needs no library permission, but the Shortcuts
+      // screenshot actions do, and `false` here would delete that string and the
+      // camera one. Both repeat what the other plugins set.
+      { photosPermission: PHOTOS_REASON, cameraPermission: CAMERA_REASON, microphonePermission: false },
     ],
     [
       'expo-media-library',
-      { photosPermission: false, savePhotosPermission: SAVE_PHOTOS_REASON, isAccessMediaLocationEnabled: false },
+      { photosPermission: PHOTOS_REASON, savePhotosPermission: SAVE_PHOTOS_REASON, isAccessMediaLocationEnabled: false },
     ],
     // Tokens are stored without biometrics, so no Face ID permission string.
     ['expo-secure-store', { faceIDPermission: false }],
@@ -94,6 +106,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-sharing',
     // Android blocks cleartext HTTP by default; the PC API is plain HTTP on the LAN.
     ['expo-build-properties', { android: { usesCleartextTraffic: true } }],
+    // The share extension, from targets/share.
+    '@bacons/apple-targets',
+    // The Shortcuts actions, from native/shortcuts, compiled into the app.
+    './plugins/with-shortcuts',
   ],
   experiments: {
     typedRoutes: true,

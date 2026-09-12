@@ -35,6 +35,10 @@ A new iPhone needs `eas device:create` and a new build, because internal builds 
 
 Run `npx expo start --web --port 8090` with `EXPO_UNSTABLE_WEB_MODAL=1` set, so sheets render as sheets. Then open <http://localhost:8090>. You get the real screens in an iPhone frame, a fake PC, and switches for regime, appearance, language and device. Look at every screen you change there before building. Details and rules: [docs/mobile/bench.md](../docs/mobile/bench.md).
 
+## Share extension and Shortcuts actions
+
+Both are Swift: the extension is in `targets/share`, and the actions are in `native/shortcuts`. Neither compiles on Windows, so check a change with `eas build --platform ios --profile simulator` before a device build. The first device build with them must run with your Apple ID login, so EAS can put the App Group on the extension. Details and the signing fix: [docs/mobile/extensions.md](../docs/mobile/extensions.md).
+
 ## Bundle id
 
 `BUNDLE_ID` in `app.config.ts` is `direct.passer.app`, the reverse of the product domain `passer.direct`. Don't change it: App Store Connect ties the app record to it, and a new id installs as a different app that has to be paired again.
