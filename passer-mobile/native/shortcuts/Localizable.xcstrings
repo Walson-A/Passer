@@ -4,6 +4,9 @@
     "Automatic" : {
       "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Automatique" } } }
     },
+    "Check PC" : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Vérifier le PC" } } }
+    },
     "Checks that your paired PC answers on this network, for example to run an automation only at home." : {
       "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Vérifie que votre PC associé répond sur ce réseau, par exemple pour ne lancer une automatisation qu'à la maison." } } }
     },
@@ -46,8 +49,14 @@
     "Reads the text on your PC's clipboard, for the next action." : {
       "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Lit le texte du presse-papiers du PC, pour l'action suivante." } } }
     },
+    "Send and Delete Screenshot" : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Envoyer et supprimer la capture" } } }
+    },
     "Send and Delete Latest Screenshot" : {
       "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Envoyer puis supprimer la dernière capture" } } }
+    },
+    "Send Clipboard" : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Envoyer le presse-papiers" } } }
     },
     "Send Clipboard to PC" : {
       "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Envoyer le presse-papiers au PC" } } }
@@ -57,6 +66,9 @@
     },
     "Send Latest Photos to PC" : {
       "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Envoyer les dernières photos au PC" } } }
+    },
+    "Send Screenshot" : {
+      "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Envoyer la capture" } } }
     },
     "Send Latest Screenshot to PC" : {
       "localizations" : { "fr" : { "stringUnit" : { "state" : "translated", "value" : "Envoyer la dernière capture au PC" } } }
