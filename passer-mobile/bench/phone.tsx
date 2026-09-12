@@ -11,7 +11,7 @@ import { installBenchHost, subscribeBenchPreferences, type IphoneClipboard } fro
 import { useSystemScheme } from '@/theme/system-scheme.web';
 import { palettes } from '@/theme/tokens';
 
-import { openOnMount, stillMotion } from './boot';
+import { openOnMount, restartedOntoUpdate, stillMotion } from './boot';
 import { FILES, history, iphoneClipboard, pairedPc, PC, pcClipboard, PHOTOS } from './fixtures';
 import { postLog } from './log';
 import { createFakeNetwork } from './network';
@@ -61,6 +61,12 @@ function start(state: BenchState) {
     pickPhotos: async () => PHOTOS,
     pickFiles: async () => FILES,
     insets: DEVICES[state.device].insets,
+    updates: {
+      // Once restarted onto the update, the server has nothing newer.
+      scenario: restartedOntoUpdate ? 'none' : state.update,
+      applied: restartedOntoUpdate,
+      restart: () => window.location.assign(`/?bench=phone&updated=1${stillMotion ? '&motion=off' : ''}`),
+    },
   });
 
   // The desk changes the clipboards live, as copying something on the iPhone or the PC would.

@@ -15,6 +15,7 @@ import {
   REGIMES,
   saveState,
   SCHEMES,
+  UPDATES,
   type BenchState,
   type Choice,
 } from './state';
@@ -53,6 +54,7 @@ const LOG_LABELS: Record<BenchLogKind, string> = {
   pc: 'PC',
   photos: 'Photos',
   share: 'Partage',
+  updates: 'Mises à jour',
 };
 
 const RAIL_WIDTH = 252;
@@ -212,6 +214,9 @@ export function Desk() {
         </Section>
         <Section title="Presse-papiers du PC">
           <Choices choices={PC_CLIPBOARDS} value={state.pcClipboard} onChange={(pcClipboard) => update({ pcClipboard })} />
+        </Section>
+        <Section title="Serveur de mises à jour">
+          <Choices choices={UPDATES} value={state.update} onChange={(value) => update({ update: value })} />
         </Section>
         <Section title="Journal">
           {log.length === 0 ? (

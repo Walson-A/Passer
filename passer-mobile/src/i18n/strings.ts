@@ -173,8 +173,18 @@ export const en = {
     photoAccessAsk: 'Allow',
     shortcutsHint:
       'Send your latest screenshot, your clipboard or files from Siri, Spotlight or the Action Button. Screenshot actions need access to your photos.',
+    updatesSection: 'Updates',
+    checkForUpdate: 'Check for updates',
+    checkingForUpdate: 'Checking for updates',
+    downloadingUpdate: 'Downloading the update',
+    downloadProgress: '{percent}%',
+    restartToUpdate: 'Restart to update',
+    restartHint: 'Passer restarts in a second and keeps your PC and your history.',
+    upToDate: 'Passer is up to date',
+    updateFailed: "The update server isn't answering. Check your internet connection, then try again.",
     privacy: 'Everything stays on your local network.',
     version: 'Version {version}',
+    runningUpdate: 'Update from {date}',
   },
 } as const;
 
@@ -350,7 +360,17 @@ export const fr: Translation<typeof en> = {
     photoAccessAsk: 'Autoriser',
     shortcutsHint:
       "Envoyez votre dernière capture, votre presse-papiers ou des fichiers depuis Siri, Spotlight ou le bouton Action. Les actions de capture ont besoin d'accéder à vos photos.",
+    updatesSection: 'Mises à jour',
+    checkForUpdate: 'Rechercher une mise à jour',
+    checkingForUpdate: "Recherche d'une mise à jour",
+    downloadingUpdate: 'Téléchargement de la mise à jour',
+    downloadProgress: '{percent} %',
+    restartToUpdate: 'Redémarrer pour mettre à jour',
+    restartHint: 'Passer redémarre en une seconde, sans oublier votre PC ni votre historique.',
+    upToDate: 'Passer est à jour',
+    updateFailed: 'Le serveur de mises à jour ne répond pas. Vérifiez votre connexion Internet, puis réessayez.',
     privacy: 'Tout reste sur votre réseau local.',
     version: 'Version {version}',
+    runningUpdate: 'Mise à jour du {date}',
   },
 };

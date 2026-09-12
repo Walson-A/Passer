@@ -40,6 +40,7 @@ Only fake what a browser cannot have, never a piece of the app. Each stand-in si
 | Haptics, VoiceOver | `src/platform/haptics.web.ts`, `src/platform/accessibility.web.ts` | They are written to the log, where they can be checked |
 | Safe areas | `src/platform/safe-area-provider.web.tsx` | The web provider measures zero insets, which would hide a title under the Dynamic Island |
 | Appearance and language | `src/theme/system-scheme.web.ts`, `src/i18n/device-language.web.ts` | They are switched from the bench |
+| EAS Update | `src/platform/updates.web.ts` | Only a release build can reach the update server. The bench chooses what the server holds; checks and downloads take a phone's time, and restarting relaunches the phone onto the update |
 
 ### The fake PC answers exactly like the desktop
 
@@ -70,18 +71,19 @@ The right rail also sets:
 - the device (iPhone 16, 16 Pro Max, SE);
 - the appearance;
 - the iPhone's language;
-- what the iPhone and PC clipboards hold.
+- what the iPhone and PC clipboards hold;
+- what the update server holds, for Settings › Updates: nothing newer, a published update, one the launch check already downloaded, or no answer.
 
-Below it, the log lists haptics, VoiceOver announcements, what the PC received and every HTTP error.
+Below it, the log lists haptics, VoiceOver announcements, what the PC received, update checks and every HTTP error.
 
-Changing the regime, device or language relaunches the app, as iOS would. Appearance and clipboards change live.
+Changing the regime, device, language or update server relaunches the app, as iOS would. Appearance and clipboards change live.
 
 ## Two ways to look
 
 - **Desk** (a wide window). The screens are on the left, the phone in the middle, and the controls and log on the right. The phone is an iframe the size of the device, so its window, sheets and safe areas are the phone's.
 - **Phone** (`?bench=phone`, or a window as narrow as a phone). The phone alone, at 1:1. Agents screenshot this view, with the viewport set to the device size (393 × 852 for the iPhone 16).
 
-Both views accept the controls as URL parameters, for example `?bench=phone&regime=slow&scheme=light&language=en&device=iphone-se`. `&open=/settings` opens a modal route over Home.
+Both views accept the controls as URL parameters, for example `?bench=phone&regime=slow&scheme=light&language=en&device=iphone-se&update=available`. `&open=/settings` opens a modal route over Home.
 
 `&motion=off` makes every animation jump to its end state. Use it for screenshots when the Browser pane is hidden: a hidden pane renders about two frames a second, so an entrance animation caught on its first frame looks like a faded screen. Network timeouts still run in real time, so give a regime such as "PC endormi" a few seconds before judging it.
 

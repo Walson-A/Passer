@@ -26,7 +26,7 @@ The owner widened Phase 1 beyond the spec's original scope. It includes:
 | Languages | English and French, following the device language |
 | Distribution | TestFlight first, public App Store listing from Phase 2 |
 | Testing | EAS preview builds (internal distribution) plus EAS Update |
-| OTA updates | Kept in the App Store build, checked automatically at launch on the `production` channel. An app that can't be updated quickly is a dead app. |
+| OTA updates | Kept in the App Store build, checked automatically at launch on the `production` channel. An app that can't be updated quickly is a dead app. iOS keeps an app suspended for days, so an update downloaded at launch can wait long for the next cold start: Settings › Updates checks on demand, downloads the update and offers a restart onto it (`src/platform/updates.ts`). |
 
 ## Layout
 
@@ -83,7 +83,7 @@ passer-mobile/
 - **History:** text previews of up to 160 characters and file names, stored on the device only. It can be cleared from Settings.
 - **Photo library:** access is add-only, and requested only when saving an image pulled from the PC.
 - **Other permissions:** no microphone or Face ID permission is declared.
-- **EAS Update:** the app contacts Expo's servers at launch. Each request carries:
+- **EAS Update:** the app contacts Expo's servers at launch, and when someone checks from Settings › Updates. Each request carries:
   - a random installation id (`EAS-Client-ID`);
   - the runtime version and channel;
   - after a crash, the previous fatal JavaScript error message.

@@ -1,8 +1,9 @@
 import type { EdgeInsets } from 'react-native-safe-area-context';
 
-import { BENCH_STORAGE_KEY } from '@/platform/web-bench';
+import { BENCH_STORAGE_KEY, type BenchUpdateScenario } from '@/platform/web-bench';
 
 export type RegimeName = 'paired' | 'first-launch' | 'asleep' | 'slow' | 'no-mdns' | 'remote' | 'refused' | 'other-pc';
+export type UpdateChoice = BenchUpdateScenario;
 export type DeviceName = 'iphone-16' | 'iphone-16-pro-max' | 'iphone-se';
 export type SchemeChoice = 'dark' | 'light' | 'system';
 export type LanguageChoice = 'fr' | 'en';
@@ -17,6 +18,8 @@ export type BenchState = {
   language: LanguageChoice;
   iphoneClipboard: IphoneClipboardChoice;
   pcClipboard: PcClipboardChoice;
+  /** What the update server holds, for Settings › Updates. */
+  update: UpdateChoice;
   /** The route the phone opens on. */
   route: string;
 };
@@ -101,6 +104,13 @@ export const PC_CLIPBOARDS: Choice<PcClipboardChoice>[] = [
   { value: 'empty', label: 'Vide' },
 ];
 
+export const UPDATES: Choice<UpdateChoice>[] = [
+  { value: 'none', label: 'Rien de neuf' },
+  { value: 'available', label: 'Publiée' },
+  { value: 'downloaded', label: 'Déjà téléchargée' },
+  { value: 'offline', label: 'Serveur muet' },
+];
+
 export const DEFAULT_STATE: BenchState = {
   regime: 'paired',
   device: 'iphone-16',
@@ -108,6 +118,7 @@ export const DEFAULT_STATE: BenchState = {
   language: 'fr',
   iphoneClipboard: 'link',
   pcClipboard: 'text',
+  update: 'none',
   route: '/',
 };
 
@@ -123,6 +134,7 @@ export function sanitizeState(raw: Partial<Record<keyof BenchState, unknown>>): 
     language: pick(LANGUAGES, raw.language, DEFAULT_STATE.language),
     iphoneClipboard: pick(IPHONE_CLIPBOARDS, raw.iphoneClipboard, DEFAULT_STATE.iphoneClipboard),
     pcClipboard: pick(PC_CLIPBOARDS, raw.pcClipboard, DEFAULT_STATE.pcClipboard),
+    update: pick(UPDATES, raw.update, DEFAULT_STATE.update),
     route: typeof raw.route === 'string' && raw.route.startsWith('/') ? raw.route : DEFAULT_STATE.route,
   };
 }

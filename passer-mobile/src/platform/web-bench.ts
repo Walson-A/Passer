@@ -14,7 +14,10 @@ import type { PickedPhoto } from './media-types';
 
 export const BENCH_STORAGE_KEY = 'passer.bench.v1';
 
-export type BenchLogKind = 'haptic' | 'voiceover' | 'clipboard' | 'pc' | 'photos' | 'share';
+export type BenchLogKind = 'haptic' | 'voiceover' | 'clipboard' | 'pc' | 'photos' | 'share' | 'updates';
+
+/** What the update server holds: nothing newer, a published update, one the launch check already downloaded, or no answer. */
+export type BenchUpdateScenario = 'none' | 'available' | 'downloaded' | 'offline';
 
 export type IphoneClipboard =
   | { kind: 'empty' }
@@ -32,6 +35,13 @@ export type BenchHost = {
   pickPhotos: () => Promise<PickedPhoto[]>;
   pickFiles: () => Promise<UploadFile[]>;
   insets: EdgeInsets;
+  updates: {
+    scenario: BenchUpdateScenario;
+    /** The phone has just restarted onto the downloaded update. */
+    applied: boolean;
+    /** Relaunches the phone, as `Updates.reloadAsync` restarts the app. */
+    restart: () => void;
+  };
 };
 
 let host: BenchHost | null = null;
