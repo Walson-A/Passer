@@ -20,6 +20,24 @@ Every route except `/ping` requires a **pairing token**. Without it the server r
 - Copy it from **Passer → Settings**, and paste it into each Shortcut's headers. Regenerating it from Settings immediately invalidates every previously paired device.
 - Comparison is constant-time, and the HTTP server and the UI read the same in-memory token, so a regeneration takes effect without restarting the server.
 
+### Pairing payload (QR code)
+**Passer → Settings → Pair a device** renders a QR code encoding a single URL. This is the contract the mobile app parses:
+
+```
+passer://pair?v=1&name=<device name>&host=passer.local&ip=<LAN IP>&port=8000&token=<token>
+```
+
+| Field  | Meaning |
+| ------ | ------- |
+| `v`    | Payload version, so the app can handle future format changes. |
+| `name` | Human-readable machine name (`COMPUTERNAME`), for a device picker. |
+| `host` | Preferred address — the mDNS name, which survives IP changes. |
+| `ip`   | Current LAN IP, a fallback for networks where `.local` resolution fails. |
+| `port` | REST API port (`SERVER_PORT`, shared with the server so the payload can never advertise an unbound port). |
+| `token`| The pairing token to send as `X-Passer-Token`. |
+
+A client should try `host` first and fall back to `ip`. Because the payload carries the secret, the pairing screen warns against sharing or screenshotting the code.
+
 ### Other security notes
 - Uploaded filenames are reduced to their base name before being written, so a crafted name cannot use `..` or an absolute path to escape the target directory.
 - The server does **not** enable CORS, so a web page in a browser cannot read `/pull` or drive the push endpoints; only non-browser clients (the iOS Shortcuts) can reach the API.

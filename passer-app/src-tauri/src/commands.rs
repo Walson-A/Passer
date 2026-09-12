@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use tauri::AppHandle;
 
-use crate::types::{ServerState, WebDavCreds, ServerControl, LogEvent};
+use crate::types::{ServerState, WebDavCreds, ServerControl, LogEvent, PairingInfo, SERVER_PORT};
 use crate::paths::{get_downloads_dir, get_webdav_dir, get_unique_file_path};
 use crate::server;
 use tauri::Emitter;
@@ -93,6 +93,26 @@ pub fn get_pairing_token(state: tauri::State<'_, Arc<ServerState>>) -> Result<St
         .lock()
         .map(|t| t.clone())
         .map_err(|_| "Failed to lock pairing token".to_string())
+}
+
+/// Everything needed to pair a device, for the QR code / pairing screen.
+#[tauri::command]
+pub fn get_pairing_info(state: tauri::State<'_, Arc<ServerState>>) -> Result<PairingInfo, String> {
+    let token = state
+        .pairing_token
+        .lock()
+        .map(|t| t.clone())
+        .map_err(|_| "Failed to lock pairing token".to_string())?;
+
+    Ok(PairingInfo {
+        name: std::env::var("COMPUTERNAME").unwrap_or_else(|_| "PC".to_string()),
+        // mDNS name first (survives IP changes), raw IP kept as a fallback for
+        // networks where .local resolution fails.
+        host: "passer.local".to_string(),
+        ip: get_ip(),
+        port: SERVER_PORT,
+        token,
+    })
 }
 
 /// Rotates the pairing token, immediately invalidating every paired device.

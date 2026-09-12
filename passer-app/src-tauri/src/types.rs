@@ -29,9 +29,24 @@ impl ServerState {
     }
 }
 
+/// Port the REST API listens on. Shared so the pairing payload can never
+/// advertise a port the server is not actually bound to.
+pub const SERVER_PORT: u16 = 8000;
+
 #[derive(Serialize, Deserialize)]
 pub struct ClipboardContent {
     pub text: String,
+}
+
+/// Everything a device needs to pair, delivered in one call so the UI never
+/// assembles a half-populated QR code.
+#[derive(Serialize, Clone)]
+pub struct PairingInfo {
+    pub name: String,
+    pub host: String,
+    pub ip: String,
+    pub port: u16,
+    pub token: String,
 }
 
 #[derive(Serialize, Clone)]

@@ -6,7 +6,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
 
-use crate::types::{ServerState, LogEvent};
+use crate::types::{ServerState, LogEvent, SERVER_PORT};
 use crate::auth;
 use crate::clipboard;
 use crate::files;
@@ -43,7 +43,7 @@ pub async fn start_server(
         .layer(axum::extract::DefaultBodyLimit::disable())
         .with_state(state);
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], 8000));
+    let addr = SocketAddr::from(([0, 0, 0, 0], SERVER_PORT));
     
     println!(" [SERVER] Attempting to bind to http://0.0.0.0:8000"); 
     let _ = app_handle.emit("log", LogEvent {

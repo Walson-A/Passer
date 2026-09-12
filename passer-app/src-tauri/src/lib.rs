@@ -36,7 +36,8 @@ pub fn run() {
             commands::set_autostart,
             commands::get_app_version,
             commands::get_pairing_token,
-            commands::regenerate_pairing_token
+            commands::regenerate_pairing_token,
+            commands::get_pairing_info
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {

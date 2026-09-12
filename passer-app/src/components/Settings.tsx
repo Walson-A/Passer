@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { X, Power, Link2, Check, Rocket, Info, KeyRound, Eye, EyeOff, Copy, RefreshCw } from "lucide-react";
+import { X, Power, Link2, Check, Rocket, Info, KeyRound, Eye, EyeOff, Copy, RefreshCw, QrCode } from "lucide-react";
+import { PairDevice } from "./PairDevice";
 
 interface Props {
     open: boolean;
@@ -20,6 +21,7 @@ export function Settings({ open, onClose }: Props) {
     const [tokenCopied, setTokenCopied] = useState(false);
     const [regenConfirm, setRegenConfirm] = useState(false);
     const [regenBusy, setRegenBusy] = useState(false);
+    const [pairOpen, setPairOpen] = useState(false);
 
     // Load current settings when the panel opens.
     useEffect(() => {
@@ -200,6 +202,20 @@ export function Settings({ open, onClose }: Props) {
                         </button>
                     </div>
 
+                    {/* Pair a device */}
+                    <button
+                        onClick={() => setPairOpen(true)}
+                        className="flex items-center gap-3 p-3 rounded-2xl bg-blue-500/10 border border-blue-400/25 hover:bg-blue-500/20 hover:border-blue-400/40 transition-all duration-200 active:scale-[0.99] text-left group"
+                    >
+                        <div className="shrink-0 w-8 h-8 rounded-xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center">
+                            <QrCode className="w-4 h-4 text-blue-300" strokeWidth={2} />
+                        </div>
+                        <div className="min-w-0">
+                            <p className="text-[11px] font-bold text-white/90 leading-tight">Pair a device</p>
+                            <p className="text-[9px] text-white/45 leading-tight mt-0.5">Show the QR code to connect a phone</p>
+                        </div>
+                    </button>
+
                     {/* Server address */}
                     <button
                         onClick={copyAddress}
@@ -231,6 +247,8 @@ export function Settings({ open, onClose }: Props) {
                     </div>
                 </div>
             </div>
+
+            <PairDevice open={pairOpen} onClose={() => setPairOpen(false)} />
         </div>
     );
 }
