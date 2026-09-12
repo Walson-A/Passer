@@ -71,9 +71,12 @@ export function ServerStatusBar({ status, isReady, onClick, isTransitioning }: S
                                         : 'text-red-500/70 group-hover/status:text-red-400'
                         }
                     `}>
+                        {/* "Passboard" now names a destination, so this describes
+                            the activity instead: what the PC is doing, not where
+                            you are. */}
                         {isTransitioning
                             ? (isReady ? "Stopping..." : "Starting...")
-                            : (status === 'pushing' ? "Pulling..." : status === 'pulling' ? "Pushing..." : (status === 'success' || status === 'sync-success' ? "Done!" : (isReady ? "Passboard On" : "Passboard Off")))
+                            : (status === 'pushing' ? "Pulling..." : status === 'pulling' ? "Pushing..." : (status === 'success' || status === 'sync-success' ? "Done!" : (isReady ? "Receiving" : "Paused")))
                         }
                     </span>
                 </div>

@@ -13,23 +13,18 @@ interface Props {
     onChange: (view: View) => void;
 }
 
+/**
+ * Destination picker. Deliberately chrome-less: the rest of the app lives in
+ * barely-there surfaces, so a bordered container with a filled pill made this
+ * the heaviest element on screen. The active state is carried by brightness
+ * and the app's existing glow vocabulary instead.
+ */
 export function TabBar({ view, onChange }: Props) {
     const index = Math.max(0, TABS.findIndex(t => t.id === view));
 
     return (
-        <nav className="shrink-0 px-4 pb-4 pt-1 relative z-50">
-            <div className="relative flex items-center p-1 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
-                {/* Sliding indicator. The tabs are equal width, so the offset is
-                    simply its own width times the active index. */}
-                <div
-                    aria-hidden
-                    className="tab-indicator absolute top-1 bottom-1 left-1 rounded-xl bg-white/[0.07] border border-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
-                    style={{
-                        width: `calc((100% - 0.5rem) / ${TABS.length})`,
-                        transform: `translateX(calc(${index} * 100%))`,
-                    }}
-                />
-
+        <nav className="shrink-0 px-6 pt-2 pb-5 relative z-50">
+            <div className="relative flex items-center">
                 {TABS.map(({ id, label, Icon }) => {
                     const active = id === view;
                     return (
@@ -37,17 +32,34 @@ export function TabBar({ view, onChange }: Props) {
                             key={id}
                             onClick={() => onChange(id)}
                             aria-current={active ? "page" : undefined}
-                            className={`relative z-10 flex-1 flex flex-col items-center gap-1 py-2 rounded-xl cursor-pointer
-                                transition-colors duration-200 active:scale-[0.97]
-                                ${active ? "text-white" : "text-white/40 hover:text-white/75"}`}
+                            className={`relative flex-1 flex flex-col items-center gap-1.5 py-1.5 rounded-xl cursor-pointer
+                                transition-colors duration-200 active:scale-[0.96]
+                                ${active ? "text-white" : "text-white/35 hover:text-white/70"}`}
                         >
-                            <Icon className="w-[18px] h-[18px]" strokeWidth={2} />
-                            <span className="text-[8.5px] font-black uppercase tracking-[0.12em] leading-none">
+                            <Icon
+                                className={`w-[18px] h-[18px] transition-all duration-200
+                                    ${active ? "drop-shadow-[0_0_8px_rgba(96,165,250,0.55)]" : ""}`}
+                                strokeWidth={1.75}
+                            />
+                            <span className="text-[8px] font-black uppercase tracking-[0.15em] leading-none">
                                 {label}
                             </span>
                         </button>
                     );
                 })}
+
+                {/* Sliding dot. Equal-width tabs, so the offset is its own width
+                    times the active index. */}
+                <div
+                    aria-hidden
+                    className="tab-indicator absolute -bottom-2 left-0 flex justify-center"
+                    style={{
+                        width: `${100 / TABS.length}%`,
+                        transform: `translateX(calc(${index} * 100%))`,
+                    }}
+                >
+                    <span className="w-1 h-1 rounded-full bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.9)]" />
+                </div>
             </div>
         </nav>
     );
