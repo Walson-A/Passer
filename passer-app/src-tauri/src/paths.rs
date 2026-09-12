@@ -40,6 +40,10 @@ pub fn get_token_path() -> PathBuf {
     get_config_dir().join("pairing.token")
 }
 
+pub fn get_device_id_path() -> PathBuf {
+    get_config_dir().join("device.id")
+}
+
 // --- Helper: Sort into Subfolders (Legacy) ---
 // Now we just dump into Passboard flat or keep logic? User said "Passboard pour les fichiers Push/Pull".
 // Let's keep subfolders inside Passboard for organization if desired, or flatten. 

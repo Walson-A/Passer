@@ -1,14 +1,13 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Power, Link2, Check, Rocket, Info, KeyRound, Eye, EyeOff, Copy, RefreshCw, QrCode, ChevronRight } from "lucide-react";
+import { useDeviceInfo } from "../hooks/useDeviceInfo";
 
 interface Props {
     /** True while this is the visible view - drives loading and state resets. */
     active: boolean;
     onOpenPair: () => void;
 }
-
-const SERVER_ADDRESS = "http://passer.local:8000";
 
 export function Settings({ active, onOpenPair }: Props) {
     const [autostart, setAutostart] = useState<boolean | null>(null);
@@ -21,6 +20,9 @@ export function Settings({ active, onOpenPair }: Props) {
     const [tokenCopied, setTokenCopied] = useState(false);
     const [regenConfirm, setRegenConfirm] = useState(false);
     const [regenBusy, setRegenBusy] = useState(false);
+
+    const device = useDeviceInfo();
+    const serverAddress = device ? `http://${device.host}:${device.port}` : "…";
 
     // Load when this becomes the visible view.
     useEffect(() => {
@@ -69,7 +71,8 @@ export function Settings({ active, onOpenPair }: Props) {
     };
 
     const copyAddress = () => {
-        navigator.clipboard.writeText(SERVER_ADDRESS);
+        if (!device) return;
+        navigator.clipboard.writeText(serverAddress);
         setCopied(true);
         setTimeout(() => setCopied(false), 1500);
     };
@@ -195,7 +198,7 @@ export function Settings({ active, onOpenPair }: Props) {
                     </div>
                     <div className="min-w-0">
                         <p className="text-[9px] font-bold uppercase tracking-widest text-white/40 leading-tight">Server address</p>
-                        <p className="text-[11px] font-mono font-bold text-white/85 leading-tight mt-0.5 truncate">{SERVER_ADDRESS}</p>
+                        <p className="text-[11px] font-mono font-bold text-white/85 leading-tight mt-0.5 truncate">{serverAddress}</p>
                     </div>
                 </div>
                 <div className="shrink-0 text-white/40 group-hover:text-blue-400 transition-colors">

@@ -42,9 +42,10 @@ pub fn setup_tray(app: &App) -> Result<(), Box<dyn std::error::Error>> {
                      let _ = std::process::Command::new("open").arg(&path).spawn();
                 }
                 "copy" => {
-                    // Copy smb://passer.local
+                    // Derived per machine, so this never hands out an address
+                    // that points at a different PC on the same network.
                     if let Ok(mut clipboard) = arboard::Clipboard::new() {
-                        let _ = clipboard.set_text("smb://passer.local");
+                        let _ = clipboard.set_text(format!("smb://{}", crate::device::mdns_host()));
                     }
                 }
                 "quit" => {

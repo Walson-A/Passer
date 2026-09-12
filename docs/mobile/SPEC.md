@@ -18,7 +18,7 @@ The **desktop app** is shipped and at v1.0.0:
 | Platform | Windows (clipboard integration is Windows-specific) |
 | Location | `passer-app/` in this repo |
 | Server | Axum HTTP on port **8000**, bound `0.0.0.0` |
-| Discovery | mDNS, advertises `passer.local` |
+| Discovery | mDNS, advertises `<machine>.local` (e.g. `walson-laptop.local`) |
 | Docs | `docs/desktop/` — read `api.md` first |
 
 Today the phone side is **iOS Shortcuts** (Push / Pull / Pass). They work but the UX ceiling is low: no device picker, no history, no real error messages, and pairing means hand-typing a 32-character token into each Shortcut's headers.
@@ -131,7 +131,7 @@ A config plugin will be needed for the Info.plist keys (`NSLocalNetworkUsageDesc
 This is the integration spec. Source of truth: `docs/desktop/api.md` and `passer-app/src-tauri/src/`.
 
 ### Base URL
-`http://<host>:8000` — try `host` (`passer.local`) first, fall back to `ip`. Both come from the pairing payload.
+`http://<host>:8000` — try `host` (the machine's mDNS name, e.g. `walson-laptop.local`) first, fall back to `ip`. Both come from the pairing payload. Each PC advertises its own name, so never assume a fixed hostname.
 
 ### Authentication
 Every route except `/ping` requires the pairing token:
@@ -167,7 +167,7 @@ Notes:
 The desktop screen is **Settings → Pair a device**. The QR encodes exactly:
 
 ```
-passer://pair?v=1&name=<device name>&host=passer.local&ip=<LAN IP>&port=8000&token=<token>
+passer://pair?v=1&name=WALSON-LAPTOP&host=walson-laptop.local&ip=<LAN IP>&port=8000&token=<token>&id=<id>
 ```
 
 | Field | Use |
@@ -182,7 +182,7 @@ passer://pair?v=1&name=<device name>&host=passer.local&ip=<LAN IP>&port=8000&tok
 **Connection strategy:** on each use, race/try `host` then `ip`; persist whichever answered `/ping` last as the fast path. IPs change on DHCP — `host` is what makes pairing durable, so never store only the IP.
 
 ### Discovery (later phases)
-mDNS service type `_passer._tcp.local.`, host `passer.local`, port 8000.
+mDNS service type `_passer._tcp.local.`, instance and host derived per machine (`walson-laptop` / `walson-laptop.local`), port 8000. TXT properties carry `id`, `name` and `version`, so a browse result identifies a specific PC without connecting.
 
 ---
 

@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { Link2, Check } from "lucide-react";
 import { PremiumTooltip } from "./PremiumTooltip";
+import { useDeviceInfo } from "../hooks/useDeviceInfo";
 
 interface ServerStatusBarProps {
     status: "idle" | "pushing" | "pulling" | "success" | "sync-success";
@@ -12,9 +13,11 @@ interface ServerStatusBarProps {
 
 export function ServerStatusBar({ status, isReady, onClick, isTransitioning }: ServerStatusBarProps) {
     const [copied, setCopied] = useState(false);
+    const device = useDeviceInfo();
 
     const handleCopy = () => {
-        navigator.clipboard.writeText(`http://passer.local:8000`);
+        if (!device) return;
+        navigator.clipboard.writeText(`http://${device.host}:${device.port}`);
         setCopied(true);
         setTimeout(() => setCopied(false), 1500);
     };

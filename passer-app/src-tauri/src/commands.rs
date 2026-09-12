@@ -1,8 +1,9 @@
 use std::sync::Arc;
 use tauri::AppHandle;
 
-use crate::types::{ServerState, WebDavCreds, ServerControl, LogEvent, PairingInfo, SERVER_PORT};
+use crate::types::{ServerState, WebDavCreds, ServerControl, LogEvent, PairingInfo, DeviceInfo, SERVER_PORT};
 use crate::paths::{get_downloads_dir, get_webdav_dir, get_unique_file_path};
+use crate::device;
 use crate::server;
 use tauri::Emitter;
 use tauri_plugin_autostart::ManagerExt;
@@ -105,14 +106,27 @@ pub fn get_pairing_info(state: tauri::State<'_, Arc<ServerState>>) -> Result<Pai
         .map_err(|_| "Failed to lock pairing token".to_string())?;
 
     Ok(PairingInfo {
-        name: std::env::var("COMPUTERNAME").unwrap_or_else(|_| "PC".to_string()),
+        name: device::display_name(),
         // mDNS name first (survives IP changes), raw IP kept as a fallback for
         // networks where .local resolution fails.
-        host: "passer.local".to_string(),
+        host: device::mdns_host(),
         ip: get_ip(),
         port: SERVER_PORT,
         token,
+        id: device::load_or_create_device_id(),
     })
+}
+
+/// Addresses for display in the UI. Unlike `get_pairing_info` this carries no
+/// secret, so any surface that merely shows or copies an address can use it.
+#[tauri::command]
+pub fn get_device_info() -> DeviceInfo {
+    DeviceInfo {
+        name: device::display_name(),
+        host: device::mdns_host(),
+        ip: get_ip(),
+        port: SERVER_PORT,
+    }
 }
 
 /// Rotates the pairing token, immediately invalidating every paired device.

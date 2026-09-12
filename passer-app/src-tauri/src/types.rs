@@ -47,6 +47,19 @@ pub struct PairingInfo {
     pub ip: String,
     pub port: u16,
     pub token: String,
+    /// Stable machine identifier, so a paired device can confirm it is talking
+    /// to the PC it paired with even after that PC is renamed.
+    pub id: String,
+}
+
+/// Addresses for display in the UI. Carries no secret, so it can be used by
+/// any surface that just needs to show or copy where this PC lives.
+#[derive(Serialize, Clone)]
+pub struct DeviceInfo {
+    pub name: String,
+    pub host: String,
+    pub ip: String,
+    pub port: u16,
 }
 
 #[derive(Serialize, Clone)]

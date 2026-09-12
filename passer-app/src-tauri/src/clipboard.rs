@@ -1,5 +1,6 @@
 use axum::{
     extract::{State, Json, Multipart},
+    http::StatusCode,
     response::IntoResponse,
 };
 use std::sync::Arc;
@@ -130,15 +131,21 @@ pub async fn pull_clipboard(State(state): State<Arc<ServerState>>) -> impl IntoR
                 kind: "info".to_string(),
             });
 
-            ([(axum::http::header::CONTENT_TYPE, content_type)], body)
+            (StatusCode::OK, [(axum::http::header::CONTENT_TYPE, content_type)], body)
         },
         _ => {
-             // Fallback error response
              let _ = state.app_handle.emit("log", LogEvent {
                 message: "PULL: Failed to read clipboard or internal error".to_string(),
                 kind: "error".to_string(),
             });
-            ([(axum::http::header::CONTENT_TYPE, "application/json")], serde_json::to_vec(&serde_json::json!({"error": "Failed to read clipboard"})).unwrap())
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                [(axum::http::header::CONTENT_TYPE, "application/json")],
+                serde_json::to_vec(&serde_json::json!({
+                    "status": "error",
+                    "message": "Failed to read clipboard"
+                })).unwrap(),
+            )
         }
     }
 }
@@ -146,7 +153,7 @@ pub async fn pull_clipboard(State(state): State<Arc<ServerState>>) -> impl IntoR
 pub async fn push_clipboard(
     State(state): State<Arc<ServerState>>,
     Json(payload): Json<ClipboardContent>,
-) -> Json<serde_json::Value> {
+) -> (StatusCode, Json<serde_json::Value>) {
     let text = payload.text.clone();
 
     let _ = state.app_handle.emit("log", LogEvent {
@@ -172,21 +179,23 @@ pub async fn push_clipboard(
                     size: None,
                 });
             }
-            Json(serde_json::json!({ "status": "success" }))
+            (StatusCode::OK, Json(serde_json::json!({ "status": "success" })))
         },
-        Ok(Err(e)) => {
-            Json(serde_json::json!({ "status": "error", "message": format!("Clipboard error: {}", e) }))
-        },
-        Err(e) => {
-             Json(serde_json::json!({ "status": "error", "message": format!("Task join error: {}", e) }))
-        }
+        Ok(Err(e)) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "status": "error", "message": format!("Clipboard error: {}", e) })),
+        ),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "status": "error", "message": format!("Task join error: {}", e) })),
+        ),
     }
 }
 
 pub async fn push_image(
     State(state): State<Arc<ServerState>>,
     mut multipart: Multipart,
-) -> Json<serde_json::Value> {
+) -> (StatusCode, Json<serde_json::Value>) {
     let mut image_bytes = Vec::new();
 
     while let Some(field) = multipart.next_field().await.unwrap_or(None) {
@@ -210,7 +219,10 @@ pub async fn push_image(
             message: "PUSH (Image) failed: No image data found".to_string(),
             kind: "error".to_string(),
         });
-        return Json(serde_json::json!({ "status": "error", "message": "No image found" }));
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "status": "error", "message": "No image found" })),
+        );
     }
 
     // Save to cache for preview display in history
@@ -250,21 +262,27 @@ pub async fn push_image(
                 path: Some(cache_path.to_string_lossy().to_string()),
                 size: Some(image_len),
             });
-            Json(serde_json::json!({ "status": "success" }))
+            (StatusCode::OK, Json(serde_json::json!({ "status": "success" })))
         },
         Ok(Err(e)) => {
              let _ = state.app_handle.emit("log", LogEvent {
                 message: format!("PUSH (Image) failed: {}", e),
                 kind: "error".to_string(),
             });
-            Json(serde_json::json!({ "status": "error", "message": e }))
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "status": "error", "message": e })),
+            )
         },
         Err(e) => {
              let _ = state.app_handle.emit("log", LogEvent {
                 message: format!("PUSH (Image) fatal: {}", e),
                 kind: "error".to_string(),
             });
-            Json(serde_json::json!({ "status": "error", "message": "Internal Server Error" }))
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "status": "error", "message": "Internal Server Error" })),
+            )
         }
     }
 }

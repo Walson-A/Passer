@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Layers, FolderOpen, Link2, Check, MonitorSmartphone } from "lucide-react";
-
-const CONNECT_ADDRESS = "smb://passer.local";
+import { useDeviceInfo } from "../hooks/useDeviceInfo";
 
 /**
  * Passer Space view - the shared folder half of the app. Files dropped on the
@@ -10,9 +9,12 @@ const CONNECT_ADDRESS = "smb://passer.local";
  */
 export function PasserSpace() {
     const [copied, setCopied] = useState(false);
+    const device = useDeviceInfo();
+    const connectAddress = device ? `smb://${device.host}` : "…";
 
     const copyAddress = () => {
-        navigator.clipboard.writeText(CONNECT_ADDRESS);
+        if (!device) return;
+        navigator.clipboard.writeText(connectAddress);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
     };
@@ -59,7 +61,7 @@ export function PasserSpace() {
                             : "bg-black/40 border-white/10 hover:border-blue-400/40"}`}
                 >
                     <span className={`text-[10px] font-mono font-bold truncate transition-colors ${copied ? "text-emerald-300" : "text-blue-400"}`}>
-                        {copied ? "Copied to clipboard" : CONNECT_ADDRESS}
+                        {copied ? "Copied to clipboard" : connectAddress}
                     </span>
                     <span className="shrink-0 text-white/30 group-hover:text-blue-400 transition-colors">
                         {copied

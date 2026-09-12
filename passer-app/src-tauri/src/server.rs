@@ -9,6 +9,7 @@ use tauri::{AppHandle, Emitter};
 use crate::types::{ServerState, LogEvent, SERVER_PORT};
 use crate::auth;
 use crate::clipboard;
+use crate::device;
 use crate::files;
 
 /// Unauthenticated liveness probe. Lets a device confirm it is talking to a
@@ -17,7 +18,14 @@ async fn ping() -> axum::Json<serde_json::Value> {
     axum::Json(serde_json::json!({
         "app": "passer",
         "version": env!("CARGO_PKG_VERSION"),
-        "host": std::env::var("COMPUTERNAME").unwrap_or_else(|_| "unknown".to_string()),
+        // `host` keeps its original meaning - the display name - so existing
+        // clients are unaffected. `name` is the explicit synonym, and the mDNS
+        // address gets its own field rather than overloading `host`, which in
+        // the pairing payload means something different.
+        "host": device::display_name(),
+        "name": device::display_name(),
+        "mdns": device::mdns_host(),
+        "id": device::load_or_create_device_id(),
     }))
 }
 

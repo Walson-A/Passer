@@ -2,6 +2,7 @@
 mod types;
 mod paths;
 mod auth;
+mod device;
 mod clipboard;
 mod files;
 mod server;
@@ -37,7 +38,8 @@ pub fn run() {
             commands::get_app_version,
             commands::get_pairing_token,
             commands::regenerate_pairing_token,
-            commands::get_pairing_info
+            commands::get_pairing_info,
+            commands::get_device_info
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {

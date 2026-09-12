@@ -1,5 +1,6 @@
 use axum::{
     extract::{State, Multipart},
+    http::StatusCode,
     Json,
 };
 use std::sync::Arc;
@@ -11,7 +12,7 @@ use crate::paths::{get_downloads_dir, get_target_dir, get_unique_file_path};
 pub async fn push_file(
     State(state): State<Arc<ServerState>>,
     mut multipart: Multipart,
-) -> Json<serde_json::Value> {
+) -> (StatusCode, Json<serde_json::Value>) {
     let download_base = get_downloads_dir();
     let mut saved_files: Vec<String> = Vec::new();
     let mut count = 0;
@@ -83,7 +84,10 @@ pub async fn push_file(
     }
 
     if saved_files.is_empty() {
-        return Json(serde_json::json!({ "status": "error", "message": "No files saved" }));
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "status": "error", "message": "No files saved" })),
+        );
     }
 
     let _ = state.app_handle.emit("log", LogEvent {
@@ -121,15 +125,31 @@ pub async fn push_file(
     })
     .await;
 
+    // The files are on disk by this point, which is what the caller asked for.
+    // Clipboard injection is a convenience on top, so its failure is reported
+    // in the body rather than by failing the whole transfer.
     match clipboard_res {
-        Ok(Ok(_)) => Json(serde_json::json!({ "status": "success", "count": count })),
+        Ok(Ok(_)) => (
+            StatusCode::OK,
+            Json(serde_json::json!({ "status": "success", "count": count })),
+        ),
         Ok(Err(e)) => {
              let _ = state.app_handle.emit("log", LogEvent {
                 message: format!("Clipboard injection failed: {}", e),
                 kind: "error".to_string(),
             });
-            Json(serde_json::json!({ "status": "error", "message": e }))
+            (
+                StatusCode::OK,
+                Json(serde_json::json!({ "status": "success", "count": count, "clipboard_error": e })),
+            )
         },
-        Err(e) => Json(serde_json::json!({ "status": "error", "message": format!("Thread Error: {}", e) }))
+        Err(e) => (
+            StatusCode::OK,
+            Json(serde_json::json!({
+                "status": "success",
+                "count": count,
+                "clipboard_error": format!("Thread Error: {}", e)
+            })),
+        ),
     }
 }
