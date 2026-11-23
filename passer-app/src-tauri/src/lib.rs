@@ -11,6 +11,7 @@ mod webdav;
 mod mdns;
 mod commands;
 mod tray;
+mod devices;
 
 pub use types::*;
 pub use paths::*;
@@ -54,7 +55,14 @@ pub fn run() {
             commands::get_server_status,
             hud::hide_hud,
             hud::focus_main_window,
-            hud::get_last_transfer
+            hud::get_last_transfer,
+            devices::devices_status,
+            devices::devices_create_group,
+            devices::devices_join,
+            devices::devices_invite,
+            devices::devices_remove,
+            devices::devices_stop_sessions,
+            devices::devices_answer_approval
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
@@ -85,6 +93,20 @@ pub fn run() {
             // is actually being enforced.
             let state = ServerState::new(app.handle().clone());
             app.manage(state.clone());
+
+            // The device network (passer-core): this PC's key, its group, and what other
+            // devices of the group may ask it. Starts by itself once a group exists.
+            match devices::Devices::init(app.handle().clone(), state.clone()) {
+                Ok(devices) => {
+                    app.manage(devices.clone());
+                    tauri::async_runtime::spawn(async move {
+                        if let Err(e) = devices.start_if_ready().await {
+                            eprintln!(" [devices] could not start: {e}");
+                        }
+                    });
+                }
+                Err(e) => eprintln!(" [devices] unavailable: {e}"),
+            }
 
             // Start HTTP Server
             let handle = app.handle().clone();

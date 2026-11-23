@@ -9,6 +9,8 @@ import { PasserSpace } from "./components/PasserSpace";
 import { Settings } from "./components/Settings";
 import { PairDevice } from "./components/PairDevice";
 import { DropZone } from "./components/DropZone";
+import { Devices } from "./components/Devices";
+import { ApprovalPrompt } from "./components/ApprovalPrompt";
 import "./App.css";
 
 interface LogEntry {
@@ -142,6 +144,10 @@ function App() {
             <PasserSpace />
           </div>
 
+          <div className="view-layer" data-active={view === "devices"}>
+            <Devices active={view === "devices"} />
+          </div>
+
           <div className="view-layer" data-active={view === "settings"}>
             <Settings
               active={view === "settings"}
@@ -159,6 +165,8 @@ function App() {
       </div>
 
       <DropZone onDropSuccess={handleDropSuccess} />
+      {/* Above everything: another device asks for something sensitive. */}
+      <ApprovalPrompt />
     </Layout>
   );
 }

@@ -34,6 +34,25 @@ A second window, declared in `tauri.conf.json` as `hud` (320×96, transparent, u
 - **Rust drives the window; the frontend only draws.** The HUD cannot show itself, because while hidden its webview receives nothing — see the warning in `frontend.md`.
 - Commands: `get_last_transfer` (what to draw), `hide_hud` (the frontend's dismiss), `focus_main_window` (clicking the HUD).
 
+## 🔗 Device network (`devices.rs`)
+The new way devices talk to this PC, built on [passer-core](https://github.com/Walson-A/passer-core) (pinned by commit in `Cargo.toml`). It runs **next to** the legacy HTTP API, which keeps serving the iOS Shortcuts.
+
+- **Identity**: `PasserDevice::open_on_desktop` keeps this PC's key in `%APPDATA%\Passer\devices\device.key`, encrypted with DPAPI. The group's signed device log, the permission rules (`policy.json`) and the call journal live in the same folder.
+- **Start**: at launch if the PC already belongs to a group; otherwise after `devices_create_group` or `devices_join`.
+- **What other devices of the group may ask this PC** (the core checks membership, input schema, rules, approval and journals every call *before* `PcCapabilities::invoke` runs):
+
+  | Capability | Effect | Default | What it does |
+  |---|---|---|---|
+  | `device.info` | read | allowed | name, OS, version |
+  | `clipboard.write` | write | allowed | puts text (≤ 200 000 characters) on the clipboard; history + HUD |
+  | `clipboard.read` | sensitive | **asks** | returns the clipboard text after the user approves |
+  | `file.receive` | write | allowed | saves a file (≤ 700 KB until the core has streams) into the Passboard folder, base name only |
+
+- **Approvals**: `WindowPrompter` brings the main window forward and emits `approval-request`; the frontend answers with `devices_answer_approval`. No answer within 55 s means no (the core's own limit is 60 s). `approval-closed` removes the card.
+- **Joins**: when a device joins through an invitation of this PC, `device-joined` carries its name and the 6-digit code to compare.
+- **Network**: n0's development relays for now (`NetworkKind::N0Dev`), shown as a preview in the UI. Production needs Passer's own relay and coordination server.
+- **Commands**: `devices_status`, `devices_create_group`, `devices_join`, `devices_invite` (one-time link, 10 min, optionally as approver), `devices_remove`, `devices_stop_sessions` (the stop button), `devices_answer_approval`.
+
 ## ✂️ Core Utilities
 - **`clipboard.rs`**: Safe reading and writing to the system clipboard (Text, HTML, Image, file lists) for iOS push/pull integrations.
 - **`paths.rs`**: Resolves core application directories under `Desktop/Passer/` (`Passboard/` for Push/Pull, `Passer Space/` for the shared folder, `.cache/` for previews) and guarantees collision-free filenames.

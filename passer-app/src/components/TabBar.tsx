@@ -1,12 +1,13 @@
 import { useEffect } from "react";
 import { motion, useSpring, useVelocity, useTransform, useReducedMotion } from "framer-motion";
-import { Inbox, Layers, Settings as SettingsIcon } from "lucide-react";
+import { Inbox, Layers, MonitorSmartphone, Settings as SettingsIcon } from "lucide-react";
 
-export type View = "passboard" | "space" | "settings";
+export type View = "passboard" | "space" | "devices" | "settings";
 
 const TABS = [
     { id: "passboard" as const, label: "Passboard", Icon: Inbox },
     { id: "space" as const, label: "Space", Icon: Layers },
+    { id: "devices" as const, label: "Devices", Icon: MonitorSmartphone },
     { id: "settings" as const, label: "Settings", Icon: SettingsIcon },
 ];
 

@@ -43,6 +43,12 @@ The corner notification, rendered into its own always-on-top window (see `backen
 
 > ⚠️ **It polls; it is not pushed to.** Events emitted from Rust never arrive in this window's webview. That was verified three times — a broadcast `emit`, a `WebviewWindow::emit` immediately after `show()`, and the same 250 ms later; the last two reported success and neither was ever received, while `invoke` *from* that webview worked throughout. So the HUD asks `get_last_transfer` every 400 ms and compares a sequence number, which needs nothing delivered inwards. Do not "simplify" this back into a listener.
 
+### `Devices.tsx`
+The **Devices** tab: start a group with this PC or join one with a link; the members with their short id and an approver crown; *Add a device* shows a one-time QR code (with an option to make the new device an approver); *Remove* asks for confirmation; the stop button ends every session other devices have open here. After a join, both sides show the same 6-digit code to compare.
+
+### `ApprovalPrompt.tsx`
+Mounted above everything in `App.tsx`. Listens to `approval-request` and shows one request at a time: who asks (and through which device, for an AI agent), what, on what, for how long, with a countdown. Every string in it comes from another device and is rendered as plain text.
+
 ## 🔬 Benches
 
 Two instruments, for two different questions.
