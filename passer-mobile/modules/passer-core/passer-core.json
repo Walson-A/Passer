@@ -1,8 +1,8 @@
 {
   "repo": "Walson-A/passer-core",
-  "tag": "mobile-v0.1.2",
+  "tag": "mobile-v0.2.0",
   "sha256": {
-    "ios": "187f0ddab69522212ec5412e189c876d3caca4e469fa326a8b854de2ab211dc4",
-    "android": "3f749c3d75b8a7e12779762fcef3d759a8c5113cb1de1448ebf6680fd883ccdd"
+    "ios": "8b0a82d77228df1240092bf7ca2876023be339042ef1e972d579629919d0521c",
+    "android": "c074beba0bc72eb1d659d011ce46a4f70a20972f3c46f8afe0c61a4ba11cfa53"
   }
 }
