@@ -83,6 +83,8 @@ type DevicesValue = {
   offers: Record<string, OfferedCapability[] | undefined>;
   /** This phone's calls with a member (or all), newest first, never their content. */
   journal: (id: string | null, limit?: number) => Promise<JournalEntry[]>;
+  /** This build carries streams (passer-core mobile-v0.3.0); an older one reached over the air doesn't. */
+  canStream: boolean;
   /** Streams the file at `uri` to an upload capability (`file.drop`), reporting bytes as they go. */
   sendFile: (
     device: string,
@@ -391,6 +393,7 @@ export function DevicesProvider({ children }: { children: ReactNode }) {
       },
       call,
       offers,
+      canStream: typeof core?.sendFile === 'function',
       journal: async (id, limit = 30) => (core?.journal ? core.journal(limit, id) : []),
       sendFile: async (device, capability, input, uri, onProgress) => {
         if (!core?.sendFile) throw new Error('unknown_capability: this build has no streams');

@@ -134,9 +134,12 @@ function describe(error: unknown, name: string): string {
 }
 
 export function TransfersProvider({ children }: { children: ReactNode }) {
-  const { target, call, reach, report, offers, sendFile } = useDevices();
+  const { target, call, reach, report, offers, sendFile, canStream } = useDevices();
   /** The destination takes files of any size as a stream (`file.drop`, desktop with passer-core streams). */
-  const streams = target ? (offers[target.id]?.some((offer) => offer.name === 'file.drop') ?? false) : false;
+  // Streams need the PC to offer file.drop and this build to carry them: a build from before
+  // mobile-v0.3.0, reached by an over-the-air update, sends one call per file instead.
+  const streams =
+    canStream && target ? (offers[target.id]?.some((offer) => offer.name === 'file.drop') ?? false) : false;
   const { pc } = usePairings();
   const { connection, reportUnauthorized, retry } = useConnection();
   const { record } = useHistory();
