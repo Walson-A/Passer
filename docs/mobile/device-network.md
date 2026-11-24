@@ -27,6 +27,17 @@ Swift bindings for iOS, `jniLibs` with the Kotlin bindings for Android.
 
 A phone can also start its own group, then other devices join it.
 
+## What the other members are and offer
+
+The Devices sheet shows each member's kind, system and version, as that device last said
+(`members()` in the core). This phone declares its own at open: phone or tablet, the iOS or
+Android version, the app version. The core asks the other members after `start`, and the
+app asks again when it returns to the foreground and when a device joins
+(`refreshMembers`). The core only calls `device.info` where it runs without approval, so a
+refresh never makes another device ask its user anything. `memberCapabilities(id)` lists
+what a member lets this phone ask for, and `journal(limit, id)` the calls made and received
+with it, never their content. All of it is for display; the target device decides every call.
+
 ## Keys and storage
 
 - **iOS:** the device key is in the Keychain, `AfterFirstUnlockThisDeviceOnly` (never synced,

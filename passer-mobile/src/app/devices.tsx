@@ -153,8 +153,9 @@ export default function Devices() {
 
 function MemberRow({ member, armed, onRemove }: { member: Member; armed: boolean; onRemove?: () => void }) {
   const { colors } = useTheme();
-  const Icon = member.thisDevice ? SmartphoneIcon : LaptopIcon;
-  const detail = [member.thisDevice ? t.devices.thisDevice : null, member.approver ? t.devices.approver : null, member.shortId]
+  const Icon = member.kind === 'phone' || member.kind === 'tablet' ? SmartphoneIcon : LaptopIcon;
+  const system = osLabel(member);
+  const detail = [member.thisDevice ? t.devices.thisDevice : null, member.approver ? t.devices.approver : null, system ?? member.shortId]
     .filter(Boolean)
     .join(' · ');
   return (
@@ -186,6 +187,13 @@ function MemberRow({ member, armed, onRemove }: { member: Member; armed: boolean
       ) : null}
     </View>
   );
+}
+
+/** `Windows 10.0.26100`, `iOS 18.2`: what the member said about itself, if anything. */
+function osLabel(member: Member): string | null {
+  if (!member.os) return null;
+  const names: Record<string, string> = { windows: 'Windows', macos: 'macOS', ios: 'iOS', android: 'Android', linux: 'Linux' };
+  return [names[member.os] ?? member.os, member.osVersion].filter(Boolean).join(' ');
 }
 
 function JoinBanner({ joining, onClose }: { joining: Joining; onClose: () => void }) {

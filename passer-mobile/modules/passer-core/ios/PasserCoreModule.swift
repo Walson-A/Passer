@@ -1,6 +1,7 @@
 import ExpoModulesCore
 import Foundation
 import Security
+import UIKit
 
 /// The Passer device network (passer-core) for the iPhone app.
 ///
@@ -59,6 +60,43 @@ public class PasserCoreModule: Module {
       try await self.openDevice().stopAllSessions()
     }
 
+    AsyncFunction("refreshMembers") { () async throws -> Int in
+      Int(try await self.openDevice().refreshMembers())
+    }
+
+    AsyncFunction("memberCapabilities") { (id: String) throws -> [[String: Any?]] in
+      try self.openDevice().memberCapabilities(device: id).map { c in
+        [
+          "name": c.name,
+          "title": c.title,
+          "description": c.description,
+          "effect": Self.effectName(c.effect),
+          "needsApproval": c.needsApproval,
+        ]
+      }
+    }
+
+    AsyncFunction("journal") { (limit: Int, id: String?) async throws -> [[String: Any?]] in
+      try await self.openDevice()
+        .journalRecent(limit: UInt32(max(1, min(limit, 200))), device: id)
+        .map { e in
+          [
+            "seq": Double(e.seq),
+            "at": Double(e.at),
+            "outgoing": e.outgoing,
+            "peerId": e.peerId,
+            "peerShortId": String(e.peerId.prefix(10)),
+            "peerName": e.peerName,
+            "agent": e.agent,
+            "capability": e.capability,
+            "target": e.target,
+            "decision": e.decision,
+            "approved": e.approved,
+            "outcome": e.outcome,
+          ]
+        }
+    }
+
     Function("answerApproval") { (id: Int, allow: Bool) -> Bool in
       self.prompts.answer(id: id, allow: allow)
     }
@@ -71,6 +109,15 @@ public class PasserCoreModule: Module {
       .url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
       .appendingPathComponent("passer-core", isDirectory: true)
     let device = try PasserDevice(home: home.path, vault: KeychainVault())
+    // UIDevice belongs to the main thread; never wait on it from the main thread itself.
+    let (idiom, systemVersion) = Thread.isMainThread
+      ? (UIDevice.current.userInterfaceIdiom, UIDevice.current.systemVersion)
+      : DispatchQueue.main.sync { (UIDevice.current.userInterfaceIdiom, UIDevice.current.systemVersion) }
+    device.setDeviceDetails(
+      kind: idiom == .pad ? .tablet : .phone,
+      osVersion: systemVersion,
+      appVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+    )
     device.setApprovalPrompter(prompter: JsPrompter(module: self, book: prompts))
     device.setAdmissionListener(listener: JoinRelay(module: self))
     self.device = device
@@ -90,9 +137,33 @@ public class PasserCoreModule: Module {
           "name": m.name,
           "approver": m.approver,
           "thisDevice": m.thisDevice,
-        ] as [String: Any]
+          "kind": Self.kindName(m.kind),
+          "os": m.os,
+          "osVersion": m.osVersion,
+          "appVersion": m.appVersion,
+          "coreVersion": m.coreVersion,
+          "answeredAt": m.answeredAt.map { Double($0) },
+        ] as [String: Any?]
       },
     ]
+  }
+
+  private static func kindName(_ kind: DeviceKind) -> String {
+    switch kind {
+    case .phone: return "phone"
+    case .tablet: return "tablet"
+    case .laptop: return "laptop"
+    case .desktop: return "desktop"
+    case .unknown: return "unknown"
+    }
+  }
+
+  private static func effectName(_ effect: EffectKind) -> String {
+    switch effect {
+    case .read: return "read"
+    case .write: return "write"
+    case .sensitive: return "sensitive"
+    }
   }
 
   fileprivate func emit(_ name: String, _ body: [String: Any?]) {

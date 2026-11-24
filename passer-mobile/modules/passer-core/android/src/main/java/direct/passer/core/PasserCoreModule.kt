@@ -12,6 +12,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 import uniffi.passer_ffi.AdmissionListener
 import uniffi.passer_ffi.ApprovalInfo
 import uniffi.passer_ffi.ApprovalPrompter
+import uniffi.passer_ffi.DeviceKind
+import uniffi.passer_ffi.EffectKind
 import uniffi.passer_ffi.KeyVault
 import uniffi.passer_ffi.NetworkKind
 import uniffi.passer_ffi.PasserDevice
@@ -71,6 +73,39 @@ class PasserCoreModule : Module() {
 
     AsyncFunction("stopAllSessions") Coroutine { -> openDevice().stopAllSessions() }
 
+    AsyncFunction("refreshMembers") Coroutine { -> openDevice().refreshMembers().toInt() }
+
+    AsyncFunction("memberCapabilities") { id: String ->
+      openDevice().memberCapabilities(id).map {
+        mapOf(
+          "name" to it.name,
+          "title" to it.title,
+          "description" to it.description,
+          "effect" to effectName(it.effect),
+          "needsApproval" to it.needsApproval,
+        )
+      }
+    }
+
+    AsyncFunction("journal") Coroutine { limit: Int, id: String? ->
+      openDevice().journalRecent(limit.coerceIn(1, 200).toUInt(), id).map {
+        mapOf(
+          "seq" to it.seq.toDouble(),
+          "at" to it.at.toDouble(),
+          "outgoing" to it.outgoing,
+          "peerId" to it.peerId,
+          "peerShortId" to it.peerId.take(10),
+          "peerName" to it.peerName,
+          "agent" to it.agent,
+          "capability" to it.capability,
+          "target" to it.target,
+          "decision" to it.decision,
+          "approved" to it.approved,
+          "outcome" to it.outcome,
+        )
+      }
+    }
+
     Function("answerApproval") { id: Int, allow: Boolean ->
       waiting.remove(id)?.complete(allow) ?: false
     }
@@ -83,6 +118,17 @@ class PasserCoreModule : Module() {
     device?.let { return it }
     val home = File(context.filesDir, "passer-core").apply { mkdirs() }
     val d = PasserDevice(home.absolutePath, KeystoreVault(context))
+    val tablet = context.resources.configuration.smallestScreenWidthDp >= 600
+    val appVersion = try {
+      context.packageManager.getPackageInfo(context.packageName, 0).versionName
+    } catch (e: Exception) {
+      null
+    }
+    d.setDeviceDetails(
+      if (tablet) DeviceKind.TABLET else DeviceKind.PHONE,
+      android.os.Build.VERSION.RELEASE,
+      appVersion,
+    )
     d.setApprovalPrompter(JsPrompter())
     d.setAdmissionListener(JoinRelay())
     device = d
@@ -102,9 +148,21 @@ class PasserCoreModule : Module() {
           "name" to it.name,
           "approver" to it.approver,
           "thisDevice" to it.thisDevice,
+          "kind" to it.kind.name.lowercase(),
+          "os" to it.os,
+          "osVersion" to it.osVersion,
+          "appVersion" to it.appVersion,
+          "coreVersion" to it.coreVersion,
+          "answeredAt" to it.answeredAt?.toDouble(),
         )
       },
     )
+  }
+
+  private fun effectName(effect: EffectKind) = when (effect) {
+    EffectKind.READ -> "read"
+    EffectKind.WRITE -> "write"
+    EffectKind.SENSITIVE -> "sensitive"
   }
 
   /** Asks the user through the app's UI; no answer within 55 s means no. */

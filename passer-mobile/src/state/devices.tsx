@@ -3,7 +3,14 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { AppState } from 'react-native';
 
 import { ApprovalPrompt } from '@/components/approval-prompt';
-import { PasserCore, type ApprovalRequest, type Joined, type Status } from '../../modules/passer-core';
+import {
+  PasserCore,
+  type ApprovalRequest,
+  type JournalEntry,
+  type Joined,
+  type OfferedCapability,
+  type Status,
+} from '../../modules/passer-core';
 
 /**
  * The device network (passer-core) as the app sees it: this phone's group, its members,
@@ -23,6 +30,10 @@ type DevicesValue = {
   createGroup: (groupName: string) => Promise<void>;
   remove: (id: string) => Promise<void>;
   stopAllSessions: () => Promise<void>;
+  /** What a member lets this phone ask for, as it last said. */
+  capabilities: (id: string) => Promise<OfferedCapability[]>;
+  /** This phone's journal, newest first; only one member's lines when `id` is set. */
+  journal: (id: string | null, limit?: number) => Promise<JournalEntry[]>;
 };
 
 const DevicesContext = createContext<DevicesValue | null>(null);
@@ -44,13 +55,23 @@ export function DevicesProvider({ children }: { children: ReactNode }) {
     setStatus(await core.status());
   }, []);
 
-  /** Opens the device and, once it belongs to a group, keeps its node running. */
+  /**
+   * Opens the device and, once it belongs to a group, keeps its node running. Starting
+   * asks the other members what they are; a node already running asks again here, since
+   * the app comes back from the background.
+   */
   const wake = useCallback(async () => {
     if (!core) return;
     let current = await core.open();
     if (current.group && !current.running) {
       await core.start(null);
       current = await core.status();
+    } else if (current.running) {
+      void core
+        .refreshMembers()
+        .then(() => core.status())
+        .then(setStatus)
+        .catch(() => {});
     }
     setStatus(current);
   }, []);
@@ -63,7 +84,11 @@ export function DevicesProvider({ children }: { children: ReactNode }) {
       core.addListener('onApprovalClosed', ({ id }) => setRequests((list) => list.filter((r) => r.id !== id))),
       core.addListener('onDeviceJoined', (device) => {
         setJoined(device);
-        void refresh().catch(() => {});
+        // Learn what the newcomer is and offers.
+        void core
+          .refreshMembers()
+          .then(refresh)
+          .catch(() => {});
       }),
       AppState.addEventListener('change', (state) => {
         if (state === 'active') void wake().catch(() => {});
@@ -97,6 +122,8 @@ export function DevicesProvider({ children }: { children: ReactNode }) {
       stopAllSessions: async () => {
         await core?.stopAllSessions();
       },
+      capabilities: async (id) => (core ? core.memberCapabilities(id) : []),
+      journal: async (id, limit = 50) => (core ? core.journal(limit, id) : []),
     }),
     [status, joined, refresh, wake],
   );

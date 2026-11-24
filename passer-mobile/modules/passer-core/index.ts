@@ -9,12 +9,50 @@ import { requireOptionalNativeModule, type NativeModule } from 'expo';
  * app is needed.
  */
 
+export type DeviceKind = 'phone' | 'tablet' | 'laptop' | 'desktop' | 'unknown';
+
+/**
+ * A member of the group. `id`, `name` and `approver` come from the verified device log;
+ * the rest is what the member last said about itself, for display only.
+ */
 export type Member = {
   id: string;
   shortId: string;
   name: string;
   approver: boolean;
   thisDevice: boolean;
+  kind: DeviceKind;
+  os: string | null;
+  osVersion: string | null;
+  appVersion: string | null;
+  coreVersion: string | null;
+  /** When it last answered this phone, in Unix seconds; null for this phone or never. */
+  answeredAt: number | null;
+};
+
+/** Something another member lets this phone ask for. */
+export type OfferedCapability = {
+  name: string;
+  title: string;
+  description: string;
+  effect: 'read' | 'write' | 'sensitive';
+  needsApproval: boolean;
+};
+
+/** One line of this phone's journal: what was called, never what was sent. */
+export type JournalEntry = {
+  seq: number;
+  at: number;
+  outgoing: boolean;
+  peerId: string;
+  peerShortId: string;
+  peerName: string;
+  agent: string | null;
+  capability: string;
+  target: string | null;
+  decision: string;
+  approved: boolean | null;
+  outcome: string;
 };
 
 export type Status = {
@@ -56,6 +94,10 @@ declare class PasserCoreNative extends NativeModule<Events> {
   call(device: string, capability: string, inputJson: string): Promise<string>;
   removeDevice(id: string): Promise<void>;
   stopAllSessions(): Promise<void>;
+  /** Asks the other members what they are and offer; resolves with how many answered. */
+  refreshMembers(): Promise<number>;
+  memberCapabilities(id: string): Promise<OfferedCapability[]>;
+  journal(limit: number, id: string | null): Promise<JournalEntry[]>;
   answerApproval(id: number, allow: boolean): boolean;
 }
 
