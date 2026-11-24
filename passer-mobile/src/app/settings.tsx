@@ -20,6 +20,7 @@ import {
   ImageIcon,
   LaptopIcon,
   LayersIcon,
+  LinkIcon,
   RotateIcon,
   ScanIcon,
   ShieldIcon,
@@ -182,6 +183,10 @@ export default function Settings() {
           />
         </Section>
       ) : null}
+
+      <Section>
+        <Row icon={LinkIcon} label={t.devices.row} onPress={() => router.push('/devices')} chevron />
+      </Section>
 
       <Section label={t.settings.preferences}>
         <Row

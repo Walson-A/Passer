@@ -5,6 +5,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { SafeAreaProvider } from '@/platform/safe-area-provider';
 import { ConnectionProvider } from '@/state/connection';
+import { DevicesProvider } from '@/state/devices';
 import { HistoryProvider } from '@/state/history';
 import { PairingsProvider } from '@/state/pairings';
 import { SettingsProvider } from '@/state/settings';
@@ -21,7 +22,9 @@ export default function RootLayout() {
               <HistoryProvider>
                 <ConnectionProvider>
                   <TransfersProvider>
-                    <Screens />
+                    <DevicesProvider>
+                      <Screens />
+                    </DevicesProvider>
                   </TransfersProvider>
                 </ConnectionProvider>
               </HistoryProvider>
@@ -57,6 +60,7 @@ function Screens() {
         <Stack.Screen name="destination" options={{ ...sheet, sheetAllowedDetents: 'fitToContents' }} />
         <Stack.Screen name="recent" options={{ ...sheet, sheetAllowedDetents: [0.6, 1] }} />
         <Stack.Screen name="settings" options={{ ...sheet, sheetAllowedDetents: [1] }} />
+        <Stack.Screen name="devices" options={{ ...sheet, sheetAllowedDetents: [0.6, 1] }} />
         {/* A widget's link: gone as soon as it has handed its action to Home. */}
         <Stack.Screen name="action/[name]" options={{ animation: 'none' }} />
       </Stack>

@@ -36,11 +36,12 @@ passer-mobile/
   eas.json          preview (internal) and production profiles
   locales/          Info.plist permission strings, EN and FR
   assets/brand/     vector icon source
+  modules/passer-core/  the device network (Rust passer-core), see device-network.md
   src/
     app/            routes (expo-router)
     core/           the desktop contract; no React Native imports, unit-tested
     platform/       thin wrappers over native modules
-    state/          providers: pairings, connection, history, transfers, settings
+    state/          providers: pairings, connection, history, transfers, settings, devices
     components/     conduit (home screen pieces) and ui primitives
     theme/          tokens from the approved mockups
     i18n/           strings, EN and FR
@@ -107,6 +108,7 @@ Known gap, noted by the owner: the middle of the conduit feels empty when idle.
 
 ## Not done yet
 
+- **Device network:** the passer-core module, the Devices sheet and approval prompts are written and checked in the bench; no native build has compiled them yet. See [device-network.md](device-network.md).
 - **Real-device checks:** the Local Network prompt, `.local` resolution on iOS, paste button sizing in French, upload progress.
 - **Share extension and Shortcuts actions:** built and signed, not yet tried on a phone. See [extensions.md](extensions.md).
 - **Widgets and Control Center controls:** written, not yet built. The first build needs the owner's Apple ID login for the new `direct.passer.app.widgets` identifier.

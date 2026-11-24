@@ -38,6 +38,7 @@ const ROUTE_GROUPS: { title: string; routes: Route[] }[] = [
       { label: 'Accueil', path: '/', modal: false },
       { label: 'Récents', path: '/recent', modal: true },
       { label: 'Réglages', path: '/settings', modal: true },
+      { label: 'Appareils', path: '/devices', modal: true },
     ],
   },
   {

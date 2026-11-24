@@ -14,6 +14,8 @@ import { parsePairingLink } from '@/core/pairing';
 import { t } from '@/i18n';
 import { setPendingLink } from '@/state/pending-link';
 
+import { isCoreInvitation } from '../../modules/passer-core';
+
 /** The scanner always reads as a viewfinder: dark scrim and white marks, whatever the theme. */
 const INK = {
   ground: '#0B0B0B',
@@ -57,6 +59,14 @@ export default function Scan() {
 
   const onScanned = ({ data }: BarcodeScanningResult) => {
     if (handled.current) return;
+    // An invitation to the device network: the Devices sheet joins with it.
+    if (isCoreInvitation(data)) {
+      handled.current = true;
+      setFocused(false);
+      setPendingLink(data);
+      router.replace('/devices');
+      return;
+    }
     const result = parsePairingLink(data);
     if (!result.ok && result.error === 'not-a-pairing-link') {
       setRejected(true);

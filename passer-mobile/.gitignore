@@ -41,3 +41,7 @@ example
 # generated native folders
 /ios
 /android
+
+# passer-core libraries, fetched by scripts/fetch-passer-core.mjs
+/modules/passer-core/ios/vendor/
+/modules/passer-core/android/vendor/

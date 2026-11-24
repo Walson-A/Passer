@@ -110,6 +110,7 @@ expo-router doesn't mark full-screen modals on the web, so the bench recognises 
 - **Shadows and blur** are approximated.
 - **The camera** is unavailable in the desktop app's browser, so the scanner only shows its permission state.
 - **Native-only UI**, such as a SwiftUI share extension, cannot run here.
+- **Approval prompts over a sheet** show but can't be tapped: the web sheet makes the rest of the page inert. Try them from Home. To raise one, see `modules/passer-core/index.web.ts`.
 
 ## Adding a screen, a call or a native module
 

@@ -9,7 +9,8 @@
     "android": "expo start --android",
     "test": "jest",
     "typecheck": "tsc --noEmit",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "postinstall": "node scripts/fetch-passer-core.mjs"
   },
   "jest": {
     "preset": "jest-expo",
