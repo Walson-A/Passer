@@ -79,6 +79,15 @@ const fake = {
   },
   removeDevice: async () => {},
   stopAllSessions: async () => {},
+  sendFile: async (_device: string, _capability: string, inputJson: string, _uri: string, transferId: string) => {
+    const total = 3_000_000;
+    for (const done of [1_000_000, 2_000_000, total]) {
+      await new Promise((r) => setTimeout(r, 150));
+      listeners.get('onTransferProgress')?.forEach((l) => (l as (p: { id: string; done: number; total: number }) => void)({ id: transferId, done, total }));
+    }
+    return JSON.stringify({ saved: true, size: total, name: JSON.parse(inputJson).name });
+  },
+  fetchFile: async () => JSON.stringify({ bytes: 1_000_000 }),
   refreshMembers: async () => (joined ? 1 : 0),
   memberCapabilities: async (id: string) => (joined && id === pc.id ? pcOffers : []),
   journal: async (limit: number, id: string | null) =>

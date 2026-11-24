@@ -77,10 +77,14 @@ export type ApprovalRequest = {
 
 export type Joined = { name: string; id: string; sas: string };
 
+/** How far a `sendFile` or `fetchFile` has gone; `total` is known for uploads. */
+export type TransferProgress = { id: string; done: number; total: number | null };
+
 type Events = {
   onApprovalRequest: (request: ApprovalRequest) => void;
   onApprovalClosed: (event: { id: number }) => void;
   onDeviceJoined: (joined: Joined) => void;
+  onTransferProgress: (progress: TransferProgress) => void;
 };
 
 declare class PasserCoreNative extends NativeModule<Events> {
@@ -94,6 +98,14 @@ declare class PasserCoreNative extends NativeModule<Events> {
   call(device: string, capability: string, inputJson: string): Promise<string>;
   removeDevice(id: string): Promise<void>;
   stopAllSessions(): Promise<void>;
+  /**
+   * Sends the file at `uri` to an upload capability of another member (e.g. `file.drop`
+   * on the PC, with `{"name": "photo.jpg"}`). Progress arrives as `onTransferProgress`
+   * events tagged `transferId`. Resolves with the target's answer (JSON).
+   */
+  sendFile(device: string, capability: string, inputJson: string, uri: string, transferId: string): Promise<string>;
+  /** Gets a file from a download capability into `uri`, which appears only when complete. */
+  fetchFile(device: string, capability: string, inputJson: string, uri: string, transferId: string): Promise<string>;
   /** Asks the other members what they are and offer; resolves with how many answered. */
   refreshMembers(): Promise<number>;
   memberCapabilities(id: string): Promise<OfferedCapability[]>;

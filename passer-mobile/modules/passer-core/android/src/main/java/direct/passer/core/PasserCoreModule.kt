@@ -18,6 +18,7 @@ import uniffi.passer_ffi.KeyVault
 import uniffi.passer_ffi.NetworkKind
 import uniffi.passer_ffi.PasserDevice
 import uniffi.passer_ffi.PasserException
+import uniffi.passer_ffi.TransferProgress
 import java.io.File
 import java.security.KeyStore
 import java.util.concurrent.ConcurrentHashMap
@@ -40,7 +41,7 @@ class PasserCoreModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("PasserCore")
 
-    Events("onApprovalRequest", "onApprovalClosed", "onDeviceJoined")
+    Events("onApprovalRequest", "onApprovalClosed", "onDeviceJoined", "onTransferProgress")
 
     AsyncFunction("open") Coroutine { -> status(openDevice()) }
 
@@ -51,12 +52,12 @@ class PasserCoreModule : Module() {
     }
 
     AsyncFunction("join") Coroutine { link: String, deviceName: String ->
-      val r = openDevice().join(link, deviceName, NetworkKind.N0_DEV)
+      val r = openDevice().join(link, deviceName, NetworkKind.N0Dev)
       mapOf("groupName" to r.groupName, "sas" to r.sas)
     }
 
     AsyncFunction("start") Coroutine { coord: String? ->
-      openDevice().start(NetworkKind.N0_DEV, coord)
+      openDevice().start(NetworkKind.N0Dev, coord)
     }
 
     AsyncFunction("stop") Coroutine { -> device?.stop() }
@@ -72,6 +73,14 @@ class PasserCoreModule : Module() {
     AsyncFunction("removeDevice") Coroutine { id: String -> openDevice().removeDevice(id) }
 
     AsyncFunction("stopAllSessions") Coroutine { -> openDevice().stopAllSessions() }
+
+    AsyncFunction("sendFile") Coroutine { target: String, capability: String, inputJson: String, uri: String, transferId: String ->
+      openDevice().sendFile(target, capability, inputJson, filePath(uri), ProgressRelay(transferId))
+    }
+
+    AsyncFunction("fetchFile") Coroutine { target: String, capability: String, inputJson: String, uri: String, transferId: String ->
+      openDevice().fetchFile(target, capability, inputJson, filePath(uri), ProgressRelay(transferId))
+    }
 
     AsyncFunction("refreshMembers") Coroutine { -> openDevice().refreshMembers().toInt() }
 
@@ -157,6 +166,16 @@ class PasserCoreModule : Module() {
         )
       },
     )
+  }
+
+  /** Expo hands file URIs (`file:///...`); the core wants paths. */
+  private fun filePath(uri: String): String =
+    if (uri.startsWith("file://")) android.net.Uri.parse(uri).path ?: uri else uri
+
+  private inner class ProgressRelay(private val id: String) : TransferProgress {
+    override fun progress(done: ULong, total: ULong?) {
+      sendEvent("onTransferProgress", mapOf("id" to id, "done" to done.toDouble(), "total" to total?.toDouble()))
+    }
   }
 
   private fun effectName(effect: EffectKind) = when (effect) {

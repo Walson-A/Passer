@@ -16,7 +16,7 @@ public class PasserCoreModule: Module {
   public func definition() -> ModuleDefinition {
     Name("PasserCore")
 
-    Events("onApprovalRequest", "onApprovalClosed", "onDeviceJoined")
+    Events("onApprovalRequest", "onApprovalClosed", "onDeviceJoined", "onTransferProgress")
 
     AsyncFunction("open") { () async throws -> [String: Any?] in
       let device = try self.openDevice()
@@ -58,6 +58,20 @@ public class PasserCoreModule: Module {
 
     AsyncFunction("stopAllSessions") { () async throws in
       try await self.openDevice().stopAllSessions()
+    }
+
+    AsyncFunction("sendFile") {
+      (target: String, capability: String, inputJson: String, uri: String, transferId: String) async throws -> String in
+      try await self.openDevice().sendFile(
+        device: target, capability: capability, inputJson: inputJson,
+        path: Self.filePath(uri), progress: ProgressRelay(module: self, id: transferId))
+    }
+
+    AsyncFunction("fetchFile") {
+      (target: String, capability: String, inputJson: String, uri: String, transferId: String) async throws -> String in
+      try await self.openDevice().fetchFile(
+        device: target, capability: capability, inputJson: inputJson,
+        destination: Self.filePath(uri), progress: ProgressRelay(module: self, id: transferId))
     }
 
     AsyncFunction("refreshMembers") { () async throws -> Int in
@@ -146,6 +160,12 @@ public class PasserCoreModule: Module {
         ] as [String: Any?]
       },
     ]
+  }
+
+  /// Expo hands file URIs (`file:///...`); the core wants paths.
+  private static func filePath(_ uri: String) -> String {
+    if let url = URL(string: uri), url.isFileURL { return url.path }
+    return uri
   }
 
   private static func kindName(_ kind: DeviceKind) -> String {
@@ -262,6 +282,21 @@ final class JsPrompter: ApprovalPrompter, @unchecked Sendable {
     }
     module.emit("onApprovalClosed", ["id": requestId])
     return allowed
+  }
+}
+
+/// Forwards a transfer's progress to JavaScript.
+final class ProgressRelay: TransferProgress, @unchecked Sendable {
+  private weak var module: PasserCoreModule?
+  private let id: String
+
+  init(module: PasserCoreModule, id: String) {
+    self.module = module
+    self.id = id
+  }
+
+  func progress(done: UInt64, total: UInt64?) {
+    module?.emit("onTransferProgress", ["id": id, "done": Double(done), "total": total.map { Double($0) }])
   }
 }
 
