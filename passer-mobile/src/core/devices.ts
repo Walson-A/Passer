@@ -49,3 +49,19 @@ export function clock(seconds: number): string {
   const s = Math.max(0, Math.ceil(seconds));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
+
+/**
+ * What a member is: what it said itself (passer-core `members()`, from mobile-v0.2.0), or a
+ * guess from its name for a member on an older core.
+ */
+export function memberKind(member: { name: string; kind?: string | null; os?: string | null }): DeviceKind {
+  const said = member.kind;
+  if (said === 'phone' || said === 'tablet' || said === 'laptop' || said === 'desktop') return said;
+  return kindOf(member.name, member.os ?? undefined);
+}
+
+/** Minutes since a member last answered, from passer-core's `answeredAt` (Unix seconds). */
+export function minutesSince(answeredAt: number | null | undefined, now: number = Date.now()): number | null {
+  if (answeredAt === null || answeredAt === undefined) return null;
+  return Math.max(0, Math.floor((now / 1000 - answeredAt) / 60));
+}

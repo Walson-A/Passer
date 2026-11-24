@@ -2,7 +2,7 @@ import type { EdgeInsets } from 'react-native-safe-area-context';
 
 import type { FileTransport, UploadFile } from '@/core/client';
 
-import type { Status } from '../../modules/passer-core';
+import type { JournalEntry, OfferedCapability, Status } from '../../modules/passer-core';
 import type { PickedPhoto } from './media-types';
 
 /**
@@ -37,6 +37,11 @@ export type BenchCore = {
   call(device: string, capability: string, inputJson: string): Promise<string>;
   removeDevice(id: string): Promise<void>;
   stopAllSessions(): Promise<void>;
+  sendFile(device: string, capability: string, inputJson: string, uri: string, transferId: string): Promise<string>;
+  fetchFile(device: string, capability: string, inputJson: string, uri: string, transferId: string): Promise<string>;
+  refreshMembers(): Promise<number>;
+  memberCapabilities(id: string): Promise<OfferedCapability[]>;
+  journal(limit: number, id: string | null): Promise<JournalEntry[]>;
   answerApproval(id: number, allow: boolean): boolean;
   addListener(event: string, listener: (payload: never) => void): { remove: () => void };
 };

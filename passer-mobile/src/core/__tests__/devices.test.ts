@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { clock, kindOf, sasGroups, screenFor, SCREENS } from '../devices';
+import { clock, kindOf, memberKind, minutesSince, sasGroups, screenFor, SCREENS } from '../devices';
 
 describe('kindOf', () => {
   it.each([
@@ -49,5 +49,22 @@ describe('clock', () => {
     expect(clock(600)).toBe('10:00');
     expect(clock(42.2)).toBe('0:43');
     expect(clock(-3)).toBe('0:00');
+  });
+});
+
+describe('memberKind', () => {
+  it('trusts what the member said', () => {
+    expect(memberKind({ name: 'iPhone de Walson', kind: 'tablet' })).toBe('tablet');
+  });
+  it('guesses for an older core', () => {
+    expect(memberKind({ name: 'iPhone de Walson', kind: 'unknown' })).toBe('phone');
+    expect(memberKind({ name: 'WALSON-HP' })).toBe('laptop');
+  });
+});
+
+describe('minutesSince', () => {
+  it('counts whole minutes', () => {
+    expect(minutesSince(1_000, 1_000_000 + 90_000)).toBe(1);
+    expect(minutesSince(null)).toBeNull();
   });
 });

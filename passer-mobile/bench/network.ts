@@ -29,6 +29,7 @@ const BEHAVIOUR: Record<RegimeName, Behaviour> = {
   direct: { answers: HOME, ...QUICK, identity: 'paired', tokenAccepted: true },
   alone: { answers: HOME, ...QUICK, identity: 'paired', tokenAccepted: true },
   refuses: { answers: HOME, ...QUICK, identity: 'paired', tokenAccepted: true },
+  'old-pc': { answers: HOME, ...QUICK, identity: 'paired', tokenAccepted: true },
   broken: { answers: HOME, ...QUICK, identity: 'paired', tokenAccepted: true },
   'first-launch': { answers: HOME, ...QUICK, identity: 'paired', tokenAccepted: true },
   asleep: { answers: SILENT, ...QUICK, identity: 'paired', tokenAccepted: true },

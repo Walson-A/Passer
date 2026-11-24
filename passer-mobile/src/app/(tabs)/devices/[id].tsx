@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -13,7 +13,7 @@ import { Disc } from '@/components/ui/disc';
 import { BackHeader } from '@/components/ui/header';
 import { Group, Row } from '@/components/ui/list';
 import { Notice } from '@/components/ui/notice';
-import { kindOf } from '@/core/devices';
+import { memberKind } from '@/core/devices';
 import { format, t } from '@/i18n';
 import { announce } from '@/platform/accessibility';
 import { haptic } from '@/platform/haptics';
@@ -21,7 +21,9 @@ import { pickFiles } from '@/platform/media';
 import { errorMessage, roleOf, useDevices } from '@/state/devices';
 import { useTransfers } from '@/state/transfers';
 import { useTheme } from '@/theme/theme';
-import { deviceName } from '@/utils/format';
+import { deviceName, formatRelative } from '@/utils/format';
+
+import type { JournalEntry } from '../../../../modules/passer-core';
 
 /**
  * One device: drawn large (the desktop Showroom's stage, kept to a phone's scale), whether
@@ -38,6 +40,21 @@ export default function DeviceScreen() {
   const { status, me, reach, target } = devices;
   const [confirming, setConfirming] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  const [history, setHistory] = useState<JournalEntry[]>([]);
+  const { journal } = devices;
+
+  useEffect(() => {
+    if (!id) return;
+    let active = true;
+    journal(id, 8)
+      .then((entries) => {
+        if (active) setHistory(entries);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [id, journal]);
 
   const member = status?.members.find((one) => one.id === id) ?? null;
   const back = () => (router.canGoBack() ? router.back() : router.replace('/devices'));
@@ -53,7 +70,11 @@ export default function DeviceScreen() {
   const isMe = member.thisDevice;
   const isTarget = target?.id === member.id;
   const reachable = reach[member.id] !== 'unreachable';
-  const kind = isMe ? 'phone' : kindOf(member.name);
+  const kind = memberKind(member);
+  const offered = devices.offers[member.id];
+  /** Without the member's own list (an older core), every command is shown; the device decides. */
+  const offers = (name: string) => !offered || offered.some((offer) => offer.name === name);
+  const readOffer = offered?.find((offer) => offer.name === 'clipboard.read');
 
   const useAsTarget = () => {
     devices.setTarget(member.id);
@@ -102,7 +123,7 @@ export default function DeviceScreen() {
           ) : (
             <>
               <View style={styles.centerRow}>
-                <ReachLine reach={reach[member.id]} />
+                <ReachLine reach={reach[member.id]} answeredAt={member.answeredAt} />
               </View>
               {isTarget ? (
                 <AppText variant="footnote" tone="secondary" style={styles.center}>
@@ -117,37 +138,45 @@ export default function DeviceScreen() {
           <>
             <View style={styles.discs}>
               <Disc icon={SendIcon} label={t.device.sendHere} onPress={useAsTarget} disabled={!reachable} />
-              <Disc
-                icon={FileIcon}
-                label={t.send.file}
-                onPress={async () => {
-                  devices.setTarget(member.id);
-                  const files = await pickFiles();
-                  if (files.length > 0) {
+              {offers('file.drop') || offers('file.receive') ? (
+                <Disc
+                  icon={FileIcon}
+                  label={t.send.file}
+                  onPress={async () => {
+                    devices.setTarget(member.id);
+                    const files = await pickFiles();
+                    if (files.length > 0) {
+                      router.navigate('/');
+                      void transfers.sendFiles(files);
+                    }
+                  }}
+                  disabled={!reachable || transfers.active !== null}
+                />
+              ) : null}
+              {offers('clipboard.read') ? (
+                <Disc
+                  icon={ClipboardDownIcon}
+                  label={t.send.theirClipboard}
+                  locked={readOffer ? readOffer.needsApproval : true}
+                  lockedLabel={t.send.asksFirst}
+                  onPress={() => {
+                    devices.setTarget(member.id);
                     router.navigate('/');
-                    void transfers.sendFiles(files);
-                  }
-                }}
-                disabled={!reachable || transfers.active !== null}
-              />
-              <Disc
-                icon={ClipboardDownIcon}
-                label={t.send.theirClipboard}
-                locked
-                lockedLabel={t.send.asksFirst}
-                onPress={() => {
-                  devices.setTarget(member.id);
-                  router.navigate('/');
-                  void transfers.pull();
-                }}
-                disabled={!reachable || transfers.active !== null}
-              />
+                    void transfers.pull();
+                  }}
+                  disabled={!reachable || transfers.active !== null}
+                />
+              ) : null}
             </View>
           </>
         ) : null}
 
         <Group header={t.device.details}>
           <Row title={t.device.role} detail={roleOf(member)} />
+          {member.os ? (
+            <Row title={t.device.system} detail={[systemName(member.os), member.osVersion].filter(Boolean).join(' ')} />
+          ) : null}
+          {member.appVersion ? <Row title={t.device.app} detail={member.appVersion} /> : null}
           <Row
             title={t.device.id}
             subtitle={
@@ -157,6 +186,22 @@ export default function DeviceScreen() {
             }
           />
         </Group>
+
+        {history.length > 0 ? (
+          <Group header={t.device.history} footer={t.device.historyFooter}>
+            {history.map((entry) => (
+              <Row
+                key={entry.seq}
+                title={t.device.calls[entry.capability] ?? entry.capability}
+                subtitle={[
+                  entry.agent ? `${entry.agent} · ` : '',
+                  format(entry.outgoing ? t.device.toThem : t.device.fromThem, { name: entry.peerName }),
+                  ` · ${outcomeOf(entry)} · ${formatRelative(entry.at * 1000)}`,
+                ].join('')}
+              />
+            ))}
+          </Group>
+        ) : null}
 
         {problem ? <Notice tone="error" title={t.devices.failed} detail={problem} onClose={() => setProblem(null)} /> : null}
 
@@ -184,6 +229,19 @@ export default function DeviceScreen() {
       <StatusScrim />
     </View>
   );
+}
+
+/** The system's name as people say it. */
+function systemName(os: string): string {
+  const names: Record<string, string> = { ios: 'iOS', android: 'Android', windows: 'Windows', macos: 'macOS', linux: 'Linux' };
+  return names[os] ?? os;
+}
+
+function outcomeOf(entry: JournalEntry): string {
+  if (entry.outcome === 'ok') return t.device.outcomeOk;
+  if (entry.outcome === 'unreachable') return t.device.outcomeUnreachable;
+  if (entry.decision === 'deny' || entry.approved === false || /denied|timeout/.test(entry.outcome)) return t.device.outcomeDenied;
+  return t.device.outcomeFailed;
 }
 
 const styles = StyleSheet.create({

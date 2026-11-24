@@ -47,6 +47,13 @@ export default function SendScreen() {
   const { settings } = useSettings();
 
   const reachable = target ? reach[target.id] !== 'unreachable' : false;
+  // What the destination lets this phone ask for; an older core says nothing, and then every command shows.
+  const offered = target ? devices.offers[target.id] : undefined;
+  const offers = (name: string) => !offered || offered.some((offer) => offer.name === name);
+  const canWrite = offers('clipboard.write');
+  const canFile = offers('file.drop') || offers('file.receive');
+  const canRead = offers('clipboard.read');
+  const readOffer = offered?.find((offer) => offer.name === 'clipboard.read');
   const busy = active !== null;
 
   useEffect(() => {
@@ -183,13 +190,13 @@ export default function SendScreen() {
                 ) : null}
               </View>
               <View style={styles.targetRow}>
-                <DeviceGlyph id={target.id} name={target.name} size={60} dim={!reachable} />
+                <DeviceGlyph id={target.id} name={target.name} kind={target.kind} size={60} dim={!reachable} />
                 <View style={styles.flex}>
                   {/* A long name may wrap at its hyphen, like any word: never cut in the middle at large text sizes. */}
                   <AppText variant="heading" numberOfLines={3}>
                     {target.name}
                   </AppText>
-                  <ReachLine reach={reach[target.id]} suffix={target.approver ? roleOf(target) : undefined} />
+                  <ReachLine reach={reach[target.id]} answeredAt={target.answeredAt} suffix={target.approver ? roleOf(target) : undefined} />
                 </View>
               </View>
             </Pressable>
@@ -228,25 +235,40 @@ export default function SendScreen() {
             ) : null}
             {active ? <TransferNotice /> : outcome ? <OutcomeNotice /> : null}
 
-            <CopiedPanel
-              peer={target.name}
-              disabled={busy || !reachable}
-              onText={(text) => void transfers.sendText(text)}
-              onImage={(dataUri) => void transfers.sendPastedImage(dataUri)}
-            />
-
-            <View style={styles.discs}>
-              <Disc icon={ImageIcon} label={t.send.photo} onPress={() => void choosePhotos()} disabled={busy || !reachable} />
-              <Disc icon={FileIcon} label={t.send.file} onPress={() => void chooseFiles()} disabled={busy || !reachable} />
-              <Disc
-                icon={ClipboardDownIcon}
-                label={t.send.theirClipboard}
-                locked
-                lockedLabel={t.send.asksFirst}
-                onPress={() => void transfers.pull()}
+            {canWrite ? (
+              <CopiedPanel
+                peer={target.name}
                 disabled={busy || !reachable}
+                onText={(text) => void transfers.sendText(text)}
+                onImage={(dataUri) => void transfers.sendPastedImage(dataUri)}
               />
-            </View>
+            ) : null}
+
+            {canFile || canRead ? (
+              <View style={styles.discs}>
+                {canFile ? (
+                  <Disc icon={ImageIcon} label={t.send.photo} onPress={() => void choosePhotos()} disabled={busy || !reachable} />
+                ) : null}
+                {canFile ? (
+                  <Disc icon={FileIcon} label={t.send.file} onPress={() => void chooseFiles()} disabled={busy || !reachable} />
+                ) : null}
+                {canRead ? (
+                  <Disc
+                    icon={ClipboardDownIcon}
+                    label={t.send.theirClipboard}
+                    locked={readOffer ? readOffer.needsApproval : true}
+                    lockedLabel={t.send.asksFirst}
+                    onPress={() => void transfers.pull()}
+                    disabled={busy || !reachable}
+                  />
+                ) : null}
+              </View>
+            ) : null}
+            {!canWrite && !canFile && !canRead ? (
+              <AppText variant="callout" tone="secondary" style={styles.center}>
+                {format(t.send.nothingOffered, { name: target.name })}
+              </AppText>
+            ) : null}
             {!reachable ? (
               <AppText variant="footnote" tone="secondary" style={styles.center}>
                 {format(t.send.paused, { name: target.name })}

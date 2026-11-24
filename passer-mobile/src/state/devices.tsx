@@ -12,13 +12,21 @@ import {
 import { AppState } from 'react-native';
 
 import { CAPABILITIES, classifyCallError, type CoreCall } from '@/core/device-calls';
-import { kindOf } from '@/core/devices';
+import { memberKind } from '@/core/devices';
 import { format, t } from '@/i18n';
 import { announce } from '@/platform/accessibility';
 import { haptic } from '@/platform/haptics';
 import { storage } from '@/platform/storage';
 
-import { PasserCore, type Joined, type Member, type Received, type Status } from '../../modules/passer-core';
+import {
+  PasserCore,
+  type Joined,
+  type JournalEntry,
+  type Member,
+  type OfferedCapability,
+  type Received,
+  type Status,
+} from '../../modules/passer-core';
 import { useHistory } from './history';
 
 /**
@@ -68,6 +76,21 @@ type DevicesValue = {
   /** Stops this phone's node, after a code that didn't match. */
   disconnect: () => Promise<void>;
   call: CoreCall;
+  /**
+   * What each member lets this phone ask for, as it last said (`memberCapabilities`). Missing
+   * until known, and for a member on an older core: the screens then offer every command.
+   */
+  offers: Record<string, OfferedCapability[] | undefined>;
+  /** This phone's calls with a member (or all), newest first, never their content. */
+  journal: (id: string | null, limit?: number) => Promise<JournalEntry[]>;
+  /** Streams the file at `uri` to an upload capability (`file.drop`), reporting bytes as they go. */
+  sendFile: (
+    device: string,
+    capability: string,
+    input: object,
+    uri: string,
+    onProgress: (done: number, total: number | null) => void,
+  ) => Promise<string>;
 };
 
 const DevicesContext = createContext<DevicesValue | null>(null);
@@ -110,9 +133,11 @@ function withTimeout<T>(work: Promise<T>, ms: number): Promise<T> {
 
 /** Computers first (they are what people send to), then managers, then by name. */
 function rank(member: Member): number {
-  const kind = kindOf(member.name);
+  const kind = memberKind(member);
   return (kind === 'laptop' || kind === 'desktop' ? 0 : 2) + (member.approver ? 0 : 1);
 }
+
+let transfers = 0;
 
 export function DevicesProvider({ children }: { children: ReactNode }) {
   const { record } = useHistory();
@@ -123,6 +148,7 @@ export function DevicesProvider({ children }: { children: ReactNode }) {
   const [targetId, setTargetId] = useState<string | null>(null);
   const [received, setReceived] = useState<ReceivedNotice | null>(null);
   const [joinedHere, setJoinedHere] = useState<Joined | null>(null);
+  const [offers, setOffers] = useState<Record<string, OfferedCapability[] | undefined>>({});
   const receivedKey = useRef(0);
   const recordRef = useRef(record);
   recordRef.current = record;
@@ -188,6 +214,14 @@ export function DevicesProvider({ children }: { children: ReactNode }) {
       setPhase('ready');
       othersRef.current = current.members.filter((member) => !member.thisDevice);
       probe();
+      // Ask the members again what they are and offer; the core answers from its cache meanwhile.
+      if (current.running && core.refreshMembers) {
+        void core
+          .refreshMembers()
+          .then(() => core.status())
+          .then(setStatus)
+          .catch(() => {});
+      }
     } catch (error) {
       setLoadError(errorMessage(error));
       setPhase((currentPhase) => (currentPhase === 'ready' ? 'ready' : 'failed'));
@@ -215,7 +249,10 @@ export function DevicesProvider({ children }: { children: ReactNode }) {
       core.addListener('onDeviceJoined', (device) => {
         haptic.success();
         setJoinedHere(device);
-        void refresh().catch(() => {});
+        // Learn what the newcomer is and offers.
+        void (core.refreshMembers ? core.refreshMembers() : Promise.resolve(0))
+          .then(refresh)
+          .catch(() => {});
       }),
       core.addListener('onReceived', (event) => {
         receivedKey.current += 1;
@@ -256,6 +293,24 @@ export function DevicesProvider({ children }: { children: ReactNode }) {
     ];
     return () => subscriptions.forEach((subscription) => subscription.remove());
   }, [refresh, report, wake]);
+
+  // What each member offers, once the list is known and whenever it changes.
+  const memberIds = others.map((member) => member.id).join(',');
+  useEffect(() => {
+    if (!core?.memberCapabilities) return;
+    let active = true;
+    for (const member of othersRef.current) {
+      core
+        .memberCapabilities(member.id)
+        .then((list) => {
+          if (active) setOffers((current) => ({ ...current, [member.id]: list.length > 0 ? list : undefined }));
+        })
+        .catch(() => {});
+    }
+    return () => {
+      active = false;
+    };
+  }, [memberIds]);
 
   // While the app is in front, the Send destination is checked now and then.
   useEffect(() => {
@@ -335,8 +390,28 @@ export function DevicesProvider({ children }: { children: ReactNode }) {
         await refresh().catch(() => {});
       },
       call,
+      offers,
+      journal: async (id, limit = 30) => (core?.journal ? core.journal(limit, id) : []),
+      sendFile: async (device, capability, input, uri, onProgress) => {
+        if (!core?.sendFile) throw new Error('unknown_capability: this build has no streams');
+        transfers += 1;
+        const transferId = `send-${Date.now().toString(36)}-${transfers}`;
+        const subscription = core.addListener('onTransferProgress', (progress) => {
+          if (progress.id === transferId) onProgress(progress.done, progress.total);
+        });
+        try {
+          const output = await core.sendFile(device, capability, JSON.stringify(input), uri, transferId);
+          report(device, true);
+          return output;
+        } catch (error) {
+          if (classifyCallError(error).kind === 'unreachable') report(device, false);
+          throw error;
+        } finally {
+          subscription.remove();
+        }
+      },
     }),
-    [phase, loadError, status, me, others, reach, target, probe, probeOne, report, received, joinedHere, wake, refresh, call],
+    [phase, loadError, status, me, others, reach, target, probe, probeOne, report, received, joinedHere, wake, refresh, call, offers],
   );
 
   return <DevicesContext.Provider value={value}>{children}</DevicesContext.Provider>;

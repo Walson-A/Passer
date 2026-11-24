@@ -58,7 +58,8 @@ function start(state: BenchState) {
 
   const network = createFakeNetwork({ regime: state.regime, pcClipboard: () => pcClipboard(pcChoice), log: postLog });
   network.install();
-  const group = createFakeCore({ regime: state.regime, pcClipboard: () => pcClipboard(pcChoice), log: postLog });
+  const sizes = new Map([...PHOTOS, ...FILES, ...SMALL_FILES].map((file) => [file.uri, file.size ?? 0] as [string, number]));
+  const group = createFakeCore({ regime: state.regime, pcClipboard: () => pcClipboard(pcChoice), log: postLog, sizes });
   // The desk, or a URL's `event=`, plays what another device does.
   window.addEventListener('passer-bench-event', (event) => group.trigger((event as CustomEvent<BenchCoreEvent>).detail));
 

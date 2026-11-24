@@ -91,8 +91,8 @@ export default function DevicesScreen() {
                 <Row
                   key={member.id}
                   title={deviceName(member.name)}
-                  leading={<DeviceGlyph id={member.id} name={member.name} size={48} dim={reach[member.id] === 'unreachable'} />}
-                  subtitle={<ReachLine reach={reach[member.id]} suffix={roleOf(member)} />}
+                  leading={<DeviceGlyph id={member.id} name={member.name} kind={member.kind} size={48} dim={reach[member.id] === 'unreachable'} />}
+                  subtitle={<ReachLine reach={reach[member.id]} answeredAt={member.answeredAt} suffix={roleOf(member)} />}
                   onPress={() => router.push(`/devices/${member.id}`)}
                   chevron
                 />
@@ -101,7 +101,7 @@ export default function DevicesScreen() {
                 <Row
                   key={me.id}
                   title={t.status.thisPhone}
-                  leading={<DeviceGlyph id={me.id} name={me.name} kind="phone" size={48} />}
+                  leading={<DeviceGlyph id={me.id} name={me.name} kind={me.kind} size={48} />}
                   subtitle={`${deviceName(me.name)} · ${roleOf(me)}`}
                   onPress={() => router.push(`/devices/${me.id}`)}
                   chevron

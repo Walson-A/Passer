@@ -29,8 +29,8 @@ export default function TargetSheet() {
           <Row
             key={member.id}
             title={deviceName(member.name)}
-            leading={<DeviceGlyph id={member.id} name={member.name} size={44} dim={reach[member.id] === 'unreachable'} />}
-            subtitle={<ReachLine reach={reach[member.id]} suffix={roleOf(member)} />}
+            leading={<DeviceGlyph id={member.id} name={member.name} kind={member.kind} size={44} dim={reach[member.id] === 'unreachable'} />}
+            subtitle={<ReachLine reach={reach[member.id]} answeredAt={member.answeredAt} suffix={roleOf(member)} />}
             trailing={target?.id === member.id ? <CheckIcon size={20} color={colors.link} strokeWidth={2.6} /> : undefined}
             accessibilityLabel={target?.id === member.id ? `${member.name}, ${t.device.selected}` : member.name}
             onPress={() => {

@@ -16,7 +16,7 @@ public class PasserCoreModule: Module {
   public func definition() -> ModuleDefinition {
     Name("PasserCore")
 
-    Events("onApprovalRequest", "onApprovalClosed", "onDeviceJoined", "onReceived")
+    Events("onApprovalRequest", "onApprovalClosed", "onDeviceJoined", "onReceived", "onTransferProgress")
 
     AsyncFunction("open") { () async throws -> [String: Any?] in
       let device = try self.openDevice()
@@ -60,6 +60,57 @@ public class PasserCoreModule: Module {
       try await self.openDevice().stopAllSessions()
     }
 
+    AsyncFunction("sendFile") {
+      (target: String, capability: String, inputJson: String, uri: String, transferId: String) async throws -> String in
+      try await self.openDevice().sendFile(
+        device: target, capability: capability, inputJson: inputJson,
+        path: Self.filePath(uri), progress: ProgressRelay(module: self, id: transferId))
+    }
+
+    AsyncFunction("fetchFile") {
+      (target: String, capability: String, inputJson: String, uri: String, transferId: String) async throws -> String in
+      try await self.openDevice().fetchFile(
+        device: target, capability: capability, inputJson: inputJson,
+        destination: Self.filePath(uri), progress: ProgressRelay(module: self, id: transferId))
+    }
+
+    AsyncFunction("refreshMembers") { () async throws -> Int in
+      Int(try await self.openDevice().refreshMembers())
+    }
+
+    AsyncFunction("memberCapabilities") { (id: String) throws -> [[String: Any?]] in
+      try self.openDevice().memberCapabilities(device: id).map { c in
+        [
+          "name": c.name,
+          "title": c.title,
+          "description": c.description,
+          "effect": Self.effectName(c.effect),
+          "needsApproval": c.needsApproval,
+        ]
+      }
+    }
+
+    AsyncFunction("journal") { (limit: Int, id: String?) async throws -> [[String: Any?]] in
+      try await self.openDevice()
+        .journalRecent(limit: UInt32(max(1, min(limit, 200))), device: id)
+        .map { e in
+          [
+            "seq": Double(e.seq),
+            "at": Double(e.at),
+            "outgoing": e.outgoing,
+            "peerId": e.peerId,
+            "peerShortId": String(e.peerId.prefix(10)),
+            "peerName": e.peerName,
+            "agent": e.agent,
+            "capability": e.capability,
+            "target": e.target,
+            "decision": e.decision,
+            "approved": e.approved,
+            "outcome": e.outcome,
+          ]
+        }
+    }
+
     Function("answerApproval") { (id: Int, allow: Bool) -> Bool in
       self.prompts.answer(id: id, allow: allow)
     }
@@ -72,6 +123,15 @@ public class PasserCoreModule: Module {
       .url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
       .appendingPathComponent("passer-core", isDirectory: true)
     let device = try PasserDevice(home: home.path, vault: KeychainVault())
+    // UIDevice belongs to the main thread; never wait on it from the main thread itself.
+    let (idiom, systemVersion) = Thread.isMainThread
+      ? (UIDevice.current.userInterfaceIdiom, UIDevice.current.systemVersion)
+      : DispatchQueue.main.sync { (UIDevice.current.userInterfaceIdiom, UIDevice.current.systemVersion) }
+    device.setDeviceDetails(
+      kind: idiom == .pad ? .tablet : .phone,
+      osVersion: systemVersion,
+      appVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+    )
     device.setApprovalPrompter(prompter: JsPrompter(module: self, book: prompts))
     device.setAdmissionListener(listener: JoinRelay(module: self))
     // What other devices of the group can ask this phone. Declared before `start`, as
@@ -94,9 +154,39 @@ public class PasserCoreModule: Module {
           "name": m.name,
           "approver": m.approver,
           "thisDevice": m.thisDevice,
-        ] as [String: Any]
+          "kind": Self.kindName(m.kind),
+          "os": m.os,
+          "osVersion": m.osVersion,
+          "appVersion": m.appVersion,
+          "coreVersion": m.coreVersion,
+          "answeredAt": m.answeredAt.map { Double($0) },
+        ] as [String: Any?]
       },
     ]
+  }
+
+  /// Expo hands file URIs (`file:///...`); the core wants paths.
+  private static func filePath(_ uri: String) -> String {
+    if let url = URL(string: uri), url.isFileURL { return url.path }
+    return uri
+  }
+
+  private static func kindName(_ kind: DeviceKind) -> String {
+    switch kind {
+    case .phone: return "phone"
+    case .tablet: return "tablet"
+    case .laptop: return "laptop"
+    case .desktop: return "desktop"
+    case .unknown: return "unknown"
+    }
+  }
+
+  private static func effectName(_ effect: EffectKind) -> String {
+    switch effect {
+    case .read: return "read"
+    case .write: return "write"
+    case .sensitive: return "sensitive"
+    }
   }
 
   fileprivate func emit(_ name: String, _ body: [String: Any?]) {
@@ -200,8 +290,9 @@ final class JsPrompter: ApprovalPrompter, @unchecked Sendable {
 
 /// What this phone offers the other devices of its group: the same names, inputs and
 /// limits as the PC (`passer-app/src-tauri/src/devices.rs`), so the desktop's "Send my
-/// clipboard" and "Send a file" work towards the phone unchanged. The node only runs
-/// while the app is open, so both happen in front of the user.
+/// clipboard" and "Send a file" work towards the phone unchanged: text, small files in one
+/// call (`file.receive`) and files of any size as a stream (`file.drop`). The node only
+/// runs while the app is open, so all of it happens in front of the user.
 final class PhoneCapabilities: CapabilityHandler, @unchecked Sendable {
   static let maxText = 200_000
   static let maxFileBytes = 700 * 1024
@@ -214,7 +305,9 @@ final class PhoneCapabilities: CapabilityHandler, @unchecked Sendable {
       inputSchemaJson: #"{"type":"object","properties":{"text":{"type":"string","maxLength":200000}},"required":["text"],"additionalProperties":false}"#,
       effect: .write,
       targetKind: nil,
-      indicatorRequired: false
+      indicatorRequired: false,
+      stream: nil,
+      maxBytes: nil
     ),
     CapabilitySpec(
       name: "file.receive",
@@ -223,7 +316,20 @@ final class PhoneCapabilities: CapabilityHandler, @unchecked Sendable {
       inputSchemaJson: #"{"type":"object","properties":{"name":{"type":"string","minLength":1,"maxLength":255},"data_base64":{"type":"string","maxLength":955737}},"required":["name","data_base64"],"additionalProperties":false}"#,
       effect: .write,
       targetKind: nil,
-      indicatorRequired: false
+      indicatorRequired: false,
+      stream: nil,
+      maxBytes: nil
+    ),
+    CapabilitySpec(
+      name: "file.drop",
+      title: "Drop a file on the phone",
+      description: "Receives a file of any size, as a stream, in Passer on this phone.",
+      inputSchemaJson: #"{"type":"object","properties":{"name":{"type":"string","minLength":1,"maxLength":255}},"required":["name"],"additionalProperties":false}"#,
+      effect: .write,
+      targetKind: nil,
+      indicatorRequired: false,
+      stream: .upload,
+      maxBytes: nil
     ),
   ]
 
@@ -280,9 +386,52 @@ final class PhoneCapabilities: CapabilityHandler, @unchecked Sendable {
     }
   }
 
+  /// `file.drop`: the whole file arrived in the core's private folder; move it into Passer.
+  func receiveFile(capability: String, target: String?, inputJson: String, caller: CallerInfo, path: String) async throws -> String {
+    guard capability == "file.drop" else {
+      throw PasserError.Invalid(message: "unknown capability \(capability)")
+    }
+    let parsed = try? JSONSerialization.jsonObject(with: Data(inputJson.utf8))
+    let name = (parsed as? [String: Any])?["name"] as? String ?? ""
+    let url = try Self.destination(for: name)
+    let size: Int
+    do {
+      try FileManager.default.moveItem(at: URL(fileURLWithPath: path), to: url)
+      size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+    } catch {
+      throw PasserError.Storage(message: error.localizedDescription)
+    }
+    module?.emit("onReceived", [
+      "kind": "file",
+      "name": url.lastPathComponent,
+      "uri": url.absoluteString,
+      "size": size,
+      "from": caller.deviceName,
+      "fromId": String(caller.deviceId.prefix(10)),
+      "agent": caller.agent,
+    ])
+    return "{\"saved\":true,\"size\":\(size)}"
+  }
+
+  /// The phone offers no downloads.
+  func provideFile(capability: String, target: String?, inputJson: String, caller: CallerInfo) async throws -> String {
+    throw PasserError.Invalid(message: "unknown capability \(capability)")
+  }
+
   /// Saves into Documents › Passer, which the Files app shows under On My iPhone › Passer.
-  /// Like the PC, only the base name is kept, so a sender cannot write anywhere else.
   private static func save(_ data: Data, as rawName: String) throws -> URL {
+    let url = try destination(for: rawName)
+    do {
+      try data.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+    } catch {
+      throw PasserError.Storage(message: error.localizedDescription)
+    }
+    return url
+  }
+
+  /// A free name in Documents › Passer. Like the PC, only the base name is kept, so a
+  /// sender cannot write anywhere else.
+  private static func destination(for rawName: String) throws -> URL {
     let base = (rawName as NSString).lastPathComponent
     let name = (base.isEmpty || base == "." || base == "..") ? "received_file" : base
     let folder = try FileManager.default
@@ -297,12 +446,22 @@ final class PhoneCapabilities: CapabilityHandler, @unchecked Sendable {
       url = folder.appendingPathComponent(ext.isEmpty ? "\(stem) \(copy)" : "\(stem) \(copy).\(ext)")
       copy += 1
     }
-    do {
-      try data.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
-    } catch {
-      throw PasserError.Storage(message: error.localizedDescription)
-    }
     return url
+  }
+}
+
+/// Forwards a transfer's progress to JavaScript.
+final class ProgressRelay: TransferProgress, @unchecked Sendable {
+  private weak var module: PasserCoreModule?
+  private let id: String
+
+  init(module: PasserCoreModule, id: String) {
+    self.module = module
+    self.id = id
+  }
+
+  func progress(done: UInt64, total: UInt64?) {
+    module?.emit("onTransferProgress", ["id": id, "done": Double(done), "total": total.map { Double($0) }])
   }
 }
 

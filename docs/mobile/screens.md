@@ -20,9 +20,11 @@ Every screen of the phone app, with what it shows in each state. Captures come f
 | Load failed | *Your devices didn't load*, the raw detail, *Try again*. | [error](captures/15-erreur-chargement.jpg) |
 | Alone in the group | *Add your PC*, and the way to do it. | [alone](captures/16-seul-dans-le-groupe.jpg) |
 | Destination not reachable | Why it may be, *Try again*; commands paused until it answers. | [asleep](captures/13-pc-injoignable.jpg) |
+| Sending files | Originals of any size as a stream, progress across the batch, *Cancel transfer* between files. | [stream](captures/35-envoi-en-flux.jpg) |
 | Waiting for an approval | *Waiting for DESKTOP-…*: its user must allow it. | [waiting](captures/11-attente-approbation.jpg) |
 | Landed | Where it landed, felt (haptic) and announced. | [clipboard fetched](captures/12-presse-papiers-recupere.jpg) |
-| Refused | A sentence first: *Too large for now* and why, or *DESKTOP-… said no*, or no answer. | [too large](captures/14-trop-lourd.jpg) |
+| Refused | A sentence first: *DESKTOP-… said no*, no answer, or *Too large for now* and why (a PC without streams, no direct connection). | [too large](captures/14-trop-lourd.jpg) |
+| Only what it offers | The commands follow what the destination lets this phone ask for (an iPad doesn't share its clipboard); with nothing at all, a sentence says so. | [iPad](captures/37-fiche-ipad-clair.jpg) |
 | Received from another device | *DESKTOP-… sent you text*: it is on the clipboard. A file comes with *Share*. | [text](captures/10-recu-texte.jpg) |
 | Large text | Accessibility size: everything wraps, nothing is cut. | [huge](captures/31-envoyer-texte-accessibilite.jpg) |
 | Send to… (`target.tsx`) | Every other device, with whether it answers; the choice is kept. | [sheet](captures/22-envoyer-a.jpg) |
@@ -32,7 +34,7 @@ Every screen of the phone app, with what it shows in each state. Captures come f
 | Screen | What it shows | Captures |
 |---|---|---|
 | List (`(tabs)/devices/index.tsx`) | Every device, managers first, with its drawing, *Reachable* / *Not reachable* and its role; this phone last. *Add a device* for a phone that manages devices, otherwise which device can. *Stop remote activity*, end-to-end encryption and the preview network, explained on demand. | [dark](captures/17-appareils.jpg) · [Android, light, manages](captures/18-appareils-android-gere.jpg) |
-| A device (`(tabs)/devices/[id].tsx`) | The device drawn large (the desktop Showroom's stage, at a phone's scale), whether it answers, *Send to this device*, File, *Its clipboard*, its role and id. Removal, for a phone that manages devices, with an inline confirmation saying what it does. | [PC](captures/19-fiche-pc.jpg) · [this phone](captures/20-fiche-ce-telephone.jpg) · [removal](captures/21-fiche-retrait.jpg) |
+| A device (`(tabs)/devices/[id].tsx`) | The device drawn large (the desktop Showroom's stage, at a phone's scale), whether it answers or when it last did, the commands it offers, its role, system, Passer version and id, and *Recent exchanges* (what was asked, never what was sent). Removal, for a phone that manages devices, with an inline confirmation saying what it does. | [PC](captures/19-fiche-pc.jpg) · [exchanges](captures/36-fiche-pc-echanges.jpg) · [iPad](captures/37-fiche-ipad-clair.jpg) · [this phone](captures/20-fiche-ce-telephone.jpg) · [removal](captures/21-fiche-retrait.jpg) |
 | Add a device (`invite.tsx`) | First what the new device may do (send and receive, or also manage devices), then the one-time QR, *Expires in m:ss*, *Expired → New code*, the warning that it lets a device in, *Copy link* (*Copied*), *Share the link*. | [role](captures/23-inviter-role.jpg) · [code](captures/24-inviter-code.jpg) |
 | A device joined here | The code to compare with the new device; *Remove it* if it differs. | [sheet](captures/25-appareil-rejoint.jpg) |
 

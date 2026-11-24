@@ -1,7 +1,7 @@
 import { useId } from 'react';
 import Svg, { Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 
-import { kindOf, screenFor, type DeviceKind } from '@/core/devices';
+import { memberKind, screenFor } from '@/core/devices';
 import { useTheme } from '@/theme/theme';
 
 /**
@@ -18,7 +18,8 @@ export function DeviceGlyph({
 }: {
   id: string;
   name: string;
-  kind?: DeviceKind;
+  /** What the member said it is (passer-core); guessed from the name when missing or unknown. */
+  kind?: string | null;
   /** Width in points; the height follows the drawing. */
   size?: number;
   dim?: boolean;
@@ -26,7 +27,7 @@ export function DeviceGlyph({
   const { scheme } = useTheme();
   const gradient = `screen-${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
   const [from, to] = screenFor(id);
-  const shape = kind ?? kindOf(name);
+  const shape = memberKind({ name, kind });
   const body = scheme === 'dark' ? '#1F1F22' : '#2A2A2E';
   const edge = scheme === 'dark' ? 'rgba(255,255,255,0.38)' : 'rgba(0,0,0,0.0)';
   const base = scheme === 'dark' ? '#2A2A2E' : '#C7C7CC';

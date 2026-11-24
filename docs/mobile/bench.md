@@ -68,6 +68,7 @@ A fake that invents a field or a status makes a correct screen look broken, or a
 | Seul (alone) | A group with only this phone |
 | PC endormi (asleep) | The PC no longer answers, through either way |
 | Le PC refuse (refuses) | The PC's user says no to clipboard reads |
+| Ancien bureau (old PC) | The PC doesn't offer `file.drop`: one call per file, 700 KB at most |
 | Erreur au chargement (broken) | The core can't open: Send and Devices show the failure |
 | Lent (slow) | Every call three times slower, the direct connection slow: loading states and progress |
 | Sans .local, À distance, Jeton refusé, Autre PC | The direct connection's cases, as before the redesign |

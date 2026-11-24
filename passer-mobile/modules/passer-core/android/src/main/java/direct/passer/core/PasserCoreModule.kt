@@ -21,11 +21,14 @@ import uniffi.passer_ffi.ApprovalPrompter
 import uniffi.passer_ffi.CallerInfo
 import uniffi.passer_ffi.CapabilityHandler
 import uniffi.passer_ffi.CapabilitySpec
+import uniffi.passer_ffi.DeviceKind
 import uniffi.passer_ffi.EffectKind
 import uniffi.passer_ffi.KeyVault
 import uniffi.passer_ffi.NetworkKind
 import uniffi.passer_ffi.PasserDevice
 import uniffi.passer_ffi.PasserException
+import uniffi.passer_ffi.StreamKind
+import uniffi.passer_ffi.TransferProgress
 import java.io.File
 import java.security.KeyStore
 import java.util.concurrent.ConcurrentHashMap
@@ -48,7 +51,7 @@ class PasserCoreModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("PasserCore")
 
-    Events("onApprovalRequest", "onApprovalClosed", "onDeviceJoined", "onReceived")
+    Events("onApprovalRequest", "onApprovalClosed", "onDeviceJoined", "onReceived", "onTransferProgress")
 
     AsyncFunction("open") Coroutine { -> status(openDevice()) }
 
@@ -59,12 +62,12 @@ class PasserCoreModule : Module() {
     }
 
     AsyncFunction("join") Coroutine { link: String, deviceName: String ->
-      val r = openDevice().join(link, deviceName, NetworkKind.N0_DEV)
+      val r = openDevice().join(link, deviceName, NetworkKind.N0Dev)
       mapOf("groupName" to r.groupName, "sas" to r.sas)
     }
 
     AsyncFunction("start") Coroutine { coord: String? ->
-      openDevice().start(NetworkKind.N0_DEV, coord)
+      openDevice().start(NetworkKind.N0Dev, coord)
     }
 
     AsyncFunction("stop") Coroutine { -> device?.stop() }
@@ -81,6 +84,47 @@ class PasserCoreModule : Module() {
 
     AsyncFunction("stopAllSessions") Coroutine { -> openDevice().stopAllSessions() }
 
+    AsyncFunction("sendFile") Coroutine { target: String, capability: String, inputJson: String, uri: String, transferId: String ->
+      openDevice().sendFile(target, capability, inputJson, filePath(uri), ProgressRelay(transferId))
+    }
+
+    AsyncFunction("fetchFile") Coroutine { target: String, capability: String, inputJson: String, uri: String, transferId: String ->
+      openDevice().fetchFile(target, capability, inputJson, filePath(uri), ProgressRelay(transferId))
+    }
+
+    AsyncFunction("refreshMembers") Coroutine { -> openDevice().refreshMembers().toInt() }
+
+    AsyncFunction("memberCapabilities") { id: String ->
+      openDevice().memberCapabilities(id).map {
+        mapOf(
+          "name" to it.name,
+          "title" to it.title,
+          "description" to it.description,
+          "effect" to effectName(it.effect),
+          "needsApproval" to it.needsApproval,
+        )
+      }
+    }
+
+    AsyncFunction("journal") Coroutine { limit: Int, id: String? ->
+      openDevice().journalRecent(limit.coerceIn(1, 200).toUInt(), id).map {
+        mapOf(
+          "seq" to it.seq.toDouble(),
+          "at" to it.at.toDouble(),
+          "outgoing" to it.outgoing,
+          "peerId" to it.peerId,
+          "peerShortId" to it.peerId.take(10),
+          "peerName" to it.peerName,
+          "agent" to it.agent,
+          "capability" to it.capability,
+          "target" to it.target,
+          "decision" to it.decision,
+          "approved" to it.approved,
+          "outcome" to it.outcome,
+        )
+      }
+    }
+
     Function("answerApproval") { id: Int, allow: Boolean ->
       waiting.remove(id)?.complete(allow) ?: false
     }
@@ -93,6 +137,17 @@ class PasserCoreModule : Module() {
     device?.let { return it }
     val home = File(context.filesDir, "passer-core").apply { mkdirs() }
     val d = PasserDevice(home.absolutePath, KeystoreVault(context))
+    val tablet = context.resources.configuration.smallestScreenWidthDp >= 600
+    val appVersion = try {
+      context.packageManager.getPackageInfo(context.packageName, 0).versionName
+    } catch (e: Exception) {
+      null
+    }
+    d.setDeviceDetails(
+      if (tablet) DeviceKind.TABLET else DeviceKind.PHONE,
+      android.os.Build.VERSION.RELEASE,
+      appVersion,
+    )
     d.setApprovalPrompter(JsPrompter())
     d.setAdmissionListener(JoinRelay())
     // What other devices of the group can ask this phone; declared before `start`.
@@ -114,9 +169,31 @@ class PasserCoreModule : Module() {
           "name" to it.name,
           "approver" to it.approver,
           "thisDevice" to it.thisDevice,
+          "kind" to it.kind.name.lowercase(),
+          "os" to it.os,
+          "osVersion" to it.osVersion,
+          "appVersion" to it.appVersion,
+          "coreVersion" to it.coreVersion,
+          "answeredAt" to it.answeredAt?.toDouble(),
         )
       },
     )
+  }
+
+  /** Expo hands file URIs (`file:///...`); the core wants paths. */
+  private fun filePath(uri: String): String =
+    if (uri.startsWith("file://")) android.net.Uri.parse(uri).path ?: uri else uri
+
+  private inner class ProgressRelay(private val id: String) : TransferProgress {
+    override fun progress(done: ULong, total: ULong?) {
+      sendEvent("onTransferProgress", mapOf("id" to id, "done" to done.toDouble(), "total" to total?.toDouble()))
+    }
+  }
+
+  private fun effectName(effect: EffectKind) = when (effect) {
+    EffectKind.READ -> "read"
+    EffectKind.WRITE -> "write"
+    EffectKind.SENSITIVE -> "sensitive"
   }
 
   /** Asks the user through the app's UI; no answer within 55 s means no. */
@@ -188,8 +265,57 @@ class PasserCoreModule : Module() {
       }
     }
 
+    /** `file.drop`: the whole file arrived in the core's private folder; move it into Passer's. */
+    override suspend fun receiveFile(capability: String, target: String?, inputJson: String, caller: CallerInfo, path: String): String {
+      if (capability != "file.drop") throw PasserException.Invalid("unknown capability $capability")
+      val name = try {
+        JSONObject(inputJson).optString("name", "")
+      } catch (e: Exception) {
+        ""
+      }
+      val file = destination(name)
+      val source = File(path)
+      if (!source.renameTo(file)) {
+        try {
+          source.copyTo(file)
+          source.delete()
+        } catch (e: Exception) {
+          throw PasserException.Storage("could not save the file: ${e.message}")
+        }
+      }
+      sendEvent(
+        "onReceived",
+        mapOf(
+          "kind" to "file",
+          "name" to file.name,
+          "uri" to Uri.fromFile(file).toString(),
+          "size" to file.length(),
+          "from" to caller.deviceName,
+          "fromId" to caller.deviceId.take(10),
+          "agent" to caller.agent,
+        ),
+      )
+      return """{"saved":true,"size":${file.length()}}"""
+    }
+
+    /** The phone offers no downloads. */
+    override suspend fun provideFile(capability: String, target: String?, inputJson: String, caller: CallerInfo): String {
+      throw PasserException.Invalid("unknown capability $capability")
+    }
+
     /** Only the base name is kept, as on the PC, so a sender cannot write anywhere else. */
     private fun save(bytes: ByteArray, rawName: String): File {
+      val file = destination(rawName)
+      try {
+        file.writeBytes(bytes)
+      } catch (e: Exception) {
+        throw PasserException.Storage("could not save the file: ${e.message}")
+      }
+      return file
+    }
+
+    /** A free name in the app's received folder. */
+    private fun destination(rawName: String): File {
       val base = File(rawName).name
       val name = if (base.isEmpty() || base == "." || base == "..") "received_file" else base
       val folder = File(context.filesDir, "received").apply { mkdirs() }
@@ -200,11 +326,6 @@ class PasserCoreModule : Module() {
       while (file.exists()) {
         file = File(folder, if (ext.isEmpty()) "$stem $copy" else "$stem $copy.$ext")
         copy += 1
-      }
-      try {
-        file.writeBytes(bytes)
-      } catch (e: Exception) {
-        throw PasserException.Storage("could not save the file: ${e.message}")
       }
       return file
     }
@@ -222,6 +343,17 @@ private const val MAX_FILE_BYTES = 700 * 1024
 
 private val PHONE_CAPABILITIES = listOf(
   CapabilitySpec(
+    "file.drop",
+    "Drop a file on the phone",
+    "Receives a file of any size, as a stream, in Passer on this phone.",
+    """{"type":"object","properties":{"name":{"type":"string","minLength":1,"maxLength":255}},"required":["name"],"additionalProperties":false}""",
+    EffectKind.WRITE,
+    null,
+    false,
+    StreamKind.UPLOAD,
+    null,
+  ),
+  CapabilitySpec(
     "clipboard.write",
     "Put text on the phone clipboard",
     "Replaces the text on this phone's clipboard.",
@@ -229,6 +361,8 @@ private val PHONE_CAPABILITIES = listOf(
     EffectKind.WRITE,
     null,
     false,
+    null,
+    null,
   ),
   CapabilitySpec(
     "file.receive",
@@ -238,6 +372,8 @@ private val PHONE_CAPABILITIES = listOf(
     EffectKind.WRITE,
     null,
     false,
+    null,
+    null,
   ),
 )
 

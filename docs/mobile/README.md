@@ -24,7 +24,8 @@ What it does:
 - Join your devices with one code: scan the PC's *Add a device* QR (or paste its link), then compare the six digits on both screens
 - Send to the device of your choice: what you copied (Apple's paste control), photos, files
 - Fetch another device's clipboard, which its user approves each time ("It asks first")
-- Receive text and files from the PC (the phone now offers `clipboard.write` and `file.receive`)
+- Receive text and files of any size from the PC (the phone offers `clipboard.write`, `file.receive` and `file.drop`)
+- See what each device is, its system, when it last answered, the commands it offers and the recent exchanges with it
 - Answer permission requests, see every device and whether it answers, add one (from a phone that manages devices), remove one, stop remote activity
 - Activity, settings, the direct connection kept for Shortcuts and large files, updates
 - iPhone and Android conventions, dark and light, English and French, Dynamic Type, VoiceOver
@@ -67,11 +68,11 @@ passer-mobile/
 
 Since the redesign, everything goes through the **device network** (passer-core, [device-network.md](device-network.md)): one pairing, the other device's rules and approvals, end-to-end encryption. `src/core/device-calls.ts` calls the PC's capabilities and turns the core's refusals into the screens' words (denied, no answer, too large, unreachable).
 
-Two things a single call can't carry yet still use the **direct connection**, the HTTP pairing below, when the user set one up in Settings › Direct connection:
-- files over 700 KB (until the core streams);
-- images for the PC clipboard (the PC's `clipboard.write` takes text).
+Photos and files go to the PC as streams (`file.drop`, passer-core mobile-v0.3.0): originals, any size, with progress. Two things still use the **direct connection**, the HTTP pairing below, when the user set one up in Settings › Direct connection:
+- an image for the PC clipboard (the PC's `clipboard.write` takes text);
+- files over 700 KB to a PC whose desktop doesn't offer `file.drop` yet.
 
-Without it, photos are shrunk to fit one call and said so; larger files are refused with an explanation ("Too large for now"). The direct pairing's `passer://pair` link carries a permanent token, so it is never handed to other devices of the group (decision with the desktop session, 2026-11-24). Shortcuts, widgets and the share extension keep using it.
+Without it, against such a PC, photos are shrunk to fit one call and said so; larger files are refused with an explanation ("Too large for now"). The direct pairing's `passer://pair` link carries a permanent token, so it is never handed to other devices of the group (decision with the desktop session, 2026-11-24). Shortcuts, widgets and the share extension keep using it.
 
 ## The direct connection (HTTP)
 
@@ -135,6 +136,6 @@ Every screen and state, with captures: [screens.md](screens.md).
 
 - **A build of the redesign.** The passer-core module has been compiled by the two iOS builds of 2026-11-24; the redesign and the phone's capabilities (`PhoneCapabilities` in Swift and Kotlin, written against the UniFFI bindings without a compiler here) have not. The next build is the check; Kotlin has never been compiled, since there has been no Android build.
 - **Checks on the phone,** not recorded anywhere yet: how native errors read on the JavaScript side (the classification looks for the core's codes in the text), the Local Network prompt with iroh, the native tab bar's look, the paste control at large text sizes, VoiceOver, Android's back gesture.
-- **Waiting on passer-core** (`fa88722`, not pushed): each device's kind and system, when it last answered, the capabilities it offers and its journal. Until then the drawing is guessed from the name, reachability is probed with `device.info`, and every device gets the same three commands.
+- **Live presence** isn't in passer-core: reachability is probed with `device.info`, and *seen N min ago* comes from the last answer.
+- **Streams to the PC** need the desktop's `file.drop`, on `dev` and not yet released.
 - **Share extension, Shortcuts and widgets** still use the direct connection; moving them to the device network needs the core in the extensions.
-- **Large files without the direct connection** wait for streams in the core.

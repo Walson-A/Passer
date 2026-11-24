@@ -4,9 +4,19 @@
  */
 import { benchHost } from '@/platform/web-bench';
 
-import type { ApprovalRequest, Joined, Received, Status } from './index';
+import type { ApprovalRequest, Joined, JournalEntry, OfferedCapability, Received, Status, TransferProgress } from './index';
 
-export type { ApprovalRequest, Joined, Member, Received, Status } from './index';
+export type {
+  ApprovalRequest,
+  DeviceKind,
+  Joined,
+  JournalEntry,
+  Member,
+  OfferedCapability,
+  Received,
+  Status,
+  TransferProgress,
+} from './index';
 
 type Listener = (payload: never) => void;
 
@@ -21,8 +31,15 @@ const proxy = {
   call: (device: string, capability: string, inputJson: string) => benchHost().core.call(device, capability, inputJson),
   removeDevice: (id: string) => benchHost().core.removeDevice(id),
   stopAllSessions: () => benchHost().core.stopAllSessions(),
+  sendFile: (device: string, capability: string, inputJson: string, uri: string, transferId: string) =>
+    benchHost().core.sendFile(device, capability, inputJson, uri, transferId),
+  fetchFile: (device: string, capability: string, inputJson: string, uri: string, transferId: string) =>
+    benchHost().core.fetchFile(device, capability, inputJson, uri, transferId),
+  refreshMembers: () => benchHost().core.refreshMembers(),
+  memberCapabilities: (id: string) => benchHost().core.memberCapabilities(id),
+  journal: (limit: number, id: string | null) => benchHost().core.journal(limit, id),
   answerApproval: (id: number, allow: boolean) => benchHost().core.answerApproval(id, allow),
-  addListener: (event: 'onApprovalRequest' | 'onApprovalClosed' | 'onDeviceJoined' | 'onReceived', listener: Listener) =>
+  addListener: (event: string, listener: Listener) =>
     benchHost().core.addListener(event, listener),
 };
 
@@ -37,11 +54,17 @@ type Proxy = {
   call(device: string, capability: string, inputJson: string): Promise<string>;
   removeDevice(id: string): Promise<void>;
   stopAllSessions(): Promise<void>;
+  sendFile(device: string, capability: string, inputJson: string, uri: string, transferId: string): Promise<string>;
+  fetchFile(device: string, capability: string, inputJson: string, uri: string, transferId: string): Promise<string>;
+  refreshMembers(): Promise<number>;
+  memberCapabilities(id: string): Promise<OfferedCapability[]>;
+  journal(limit: number, id: string | null): Promise<JournalEntry[]>;
   answerApproval(id: number, allow: boolean): boolean;
   addListener(event: 'onApprovalRequest', listener: (request: ApprovalRequest) => void): { remove: () => void };
   addListener(event: 'onApprovalClosed', listener: (event: { id: number }) => void): { remove: () => void };
   addListener(event: 'onDeviceJoined', listener: (joined: Joined) => void): { remove: () => void };
   addListener(event: 'onReceived', listener: (received: Received) => void): { remove: () => void };
+  addListener(event: 'onTransferProgress', listener: (progress: TransferProgress) => void): { remove: () => void };
 };
 
 export const PasserCore = { available: true, module: proxy as unknown as Proxy };

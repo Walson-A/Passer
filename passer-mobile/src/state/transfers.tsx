@@ -134,7 +134,9 @@ function describe(error: unknown, name: string): string {
 }
 
 export function TransfersProvider({ children }: { children: ReactNode }) {
-  const { target, call, reach, report } = useDevices();
+  const { target, call, reach, report, offers, sendFile } = useDevices();
+  /** The destination takes files of any size as a stream (`file.drop`, desktop with passer-core streams). */
+  const streams = target ? (offers[target.id]?.some((offer) => offer.name === 'file.drop') ?? false) : false;
   const { pc } = usePairings();
   const { connection, reportUnauthorized, retry } = useConnection();
   const { record } = useHistory();
@@ -181,7 +183,11 @@ export function TransfersProvider({ children }: { children: ReactNode }) {
       await work(target, controller.signal);
       return true;
     } catch (error) {
-      if (error instanceof Cancelled || controller.signal.aborted || (error instanceof PasserError && error.kind === 'cancelled')) {
+      if (
+        error instanceof Cancelled ||
+        controller.signal.aborted ||
+        (error instanceof PasserError && error.kind === 'cancelled')
+      ) {
         notify(t.transfer.cancelled);
       } else {
         if (error instanceof PasserError) {
@@ -211,7 +217,17 @@ export function TransfersProvider({ children }: { children: ReactNode }) {
     record({ pcKey: to.id, peer: to.name, direction: 'sent', kind, destination, title, size });
 
   const begin = (to: Member, patch: Partial<ActiveTransfer> & Pick<ActiveTransfer, 'kind' | 'title'>) =>
-    setActive({ direction: 'up', peer: to.name, index: 0, count: 1, sent: 0, total: 0, waiting: false, cancellable: false, ...patch });
+    setActive({
+      direction: 'up',
+      peer: to.name,
+      index: 0,
+      count: 1,
+      sent: 0,
+      total: 0,
+      waiting: false,
+      cancellable: false,
+      ...patch,
+    });
 
   /** Over the direct connection, uploads report their progress across the whole batch. */
   const uploadDirect = async (
@@ -236,6 +252,27 @@ export function TransfersProvider({ children }: { children: ReactNode }) {
       };
       if (destination === 'pc-clipboard') await client.pushImage(file, onProgress, signal);
       else await client.pushFile(file, onProgress, signal);
+      done += file.size ?? 0;
+    }
+  };
+
+  /**
+   * Through the device network as streams: any size, with progress across the batch. A batch
+   * stops between files when cancelled.
+   */
+  const streamToGroup = async (signal: AbortSignal, to: Member, files: UploadFile[], kind: HistoryKind) => {
+    const total = files.every((file) => file.size !== null) ? files.reduce((sum, file) => sum + (file.size ?? 0), 0) : 0;
+    let done = 0;
+    for (const [index, file] of files.entries()) {
+      if (signal.aborted) throw new Cancelled();
+      const before = done;
+      begin(to, { kind, title: file.name, index, count: files.length, sent: before, total, cancellable: files.length > 1 });
+      await sendFile(to.id, 'file.drop', { name: file.name }, file.uri, (sent, fileTotal) => {
+        const size = file.size ?? fileTotal ?? 0;
+        setActive((current) =>
+          current ? { ...current, sent: before + Math.min(sent, size || sent), total: total || fileTotal || 0 } : current,
+        );
+      });
       done += file.size ?? 0;
     }
   };
@@ -267,7 +304,11 @@ export function TransfersProvider({ children }: { children: ReactNode }) {
       if (direct) {
         // Only the direct connection can put an image on the PC clipboard today.
         await uploadDirect(signal, to, [file], 'pc-clipboard', 'image');
-        land(to, sentItem(to, 'image', 'pc-clipboard', t.transfer.pastedImage, file.size), format(t.transfer.onClipboardOf, { name: to.name }));
+        land(
+          to,
+          sentItem(to, 'image', 'pc-clipboard', t.transfer.pastedImage, file.size),
+          format(t.transfer.onClipboardOf, { name: to.name }),
+        );
         return;
       }
       const base64 = dataUri.replace(/^data:[^;]+;base64,/, '');
@@ -284,13 +325,23 @@ export function TransfersProvider({ children }: { children: ReactNode }) {
         if (destination === 'clipboard') {
           const file = await asClipboardImage(photos[0]);
           await uploadDirect(signal, to, [file], 'pc-clipboard', 'image');
-          land(to, sentItem(to, 'image', 'pc-clipboard', photos[0].name, file.size), format(t.transfer.onClipboardOf, { name: to.name }));
+          land(
+            to,
+            sentItem(to, 'image', 'pc-clipboard', photos[0].name, file.size),
+            format(t.transfer.onClipboardOf, { name: to.name }),
+          );
           return;
         }
         const files: UploadFile[] = [];
         for (const photo of photos) files.push(await asPassboardFile(photo));
         await uploadDirect(signal, to, files, 'passboard', 'image');
         land(to, photosItem(to, files), format(t.transfer.inPasserFolderOf, { name: to.name }));
+        return;
+      }
+      if (streams) {
+        // Originals, whatever their size: the PC keeps them in its Passer folder.
+        await streamToGroup(signal, to, photos, 'image');
+        land(to, photosItem(to, photos), format(t.transfer.inPasserFolderOf, { name: to.name }));
         return;
       }
       const files: UploadFile[] = [];
@@ -302,7 +353,12 @@ export function TransfersProvider({ children }: { children: ReactNode }) {
         files.push(fitted.file);
       }
       await sendThroughGroup(signal, to, files, 'image');
-      land(to, photosItem(to, files), format(t.transfer.inPasserFolderOf, { name: to.name }), reduced ? t.transfer.reduced : null);
+      land(
+        to,
+        photosItem(to, files),
+        format(t.transfer.inPasserFolderOf, { name: to.name }),
+        reduced ? t.transfer.reduced : null,
+      );
     });
 
   const photosItem = (to: Member, files: UploadFile[]) =>
@@ -317,15 +373,10 @@ export function TransfersProvider({ children }: { children: ReactNode }) {
   const sendFiles = (picked: UploadFile[]) =>
     run(async (to, signal) => {
       if (picked.length === 0) return;
-      const large = picked.filter((file) => !fitsOneCall(file.size));
-      // Nothing leaves when part of the batch can't: a half-sent batch is harder to understand.
-      if (large.length > 0 && !direct) throw new CallFailure('too-large', `${large.length} files over 700 KB`);
-      const small = picked.filter((file) => fitsOneCall(file.size));
-      if (small.length > 0) await sendThroughGroup(signal, to, small, 'file');
-      if (large.length > 0) {
-        const staged: UploadFile[] = [];
-        for (const file of large) staged.push(await asUploadFile(file));
-        await uploadDirect(signal, to, staged, 'passboard', 'file');
+      if (streams) {
+        await streamToGroup(signal, to, picked, 'file');
+      } else {
+        await sendInCalls(signal, to, picked);
       }
       const item = sentItem(
         to,
@@ -336,6 +387,20 @@ export function TransfersProvider({ children }: { children: ReactNode }) {
       );
       land(to, item, format(t.transfer.inPasserFolderOf, { name: to.name }));
     });
+
+  /** A destination without streams: one call per small file, the direct connection for larger ones. */
+  const sendInCalls = async (signal: AbortSignal, to: Member, picked: UploadFile[]) => {
+    const large = picked.filter((file) => !fitsOneCall(file.size));
+    // Nothing leaves when part of the batch can't: a half-sent batch is harder to understand.
+    if (large.length > 0 && !direct) throw new CallFailure('too-large', `${large.length} files over 700 KB`);
+    const small = picked.filter((file) => fitsOneCall(file.size));
+    if (small.length > 0) await sendThroughGroup(signal, to, small, 'file');
+    if (large.length > 0) {
+      const staged: UploadFile[] = [];
+      for (const file of large) staged.push(await asUploadFile(file));
+      await uploadDirect(signal, to, staged, 'passboard', 'file');
+    }
+  };
 
   const pull = () =>
     run(async (to) => {
