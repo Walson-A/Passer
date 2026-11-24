@@ -8,6 +8,8 @@ import {
 import { DeviceInvite, InlineError } from "./DeviceInvite";
 import { DeviceRender } from "./DeviceRender";
 import { DeviceStage } from "./DeviceStage";
+import { DeviceFiles } from "./DeviceFiles";
+import { useCapabilities } from "../hooks/useCapabilities";
 import type { HistoryItem } from "../hooks/useHistory";
 import {
     Action, CAPABILITY_WORDS, FOCUS, SasDigits, isRecent, kindOfMember, osLabel, screenFor, seenLabel, thisOs,
@@ -301,6 +303,9 @@ export function Devices({ active, history, onOpenPassboard }: Props) {
                 <DeviceStage member={current} running={status.running} onRefresh={refreshMembers} refreshing={refreshing}
                     last={history.find(h => h.deviceId === current.id)} onOpenPassboard={() => onOpenPassboard(current.id)} />
 
+                {/* Files, per device: what it shares, or what this PC shares. */}
+                <CurrentFiles member={current} />
+
                 <div className="flex items-center gap-4 -mt-1">
                     <button
                         onClick={() => setDetails({ id: current.id, confirm: false })}
@@ -337,6 +342,12 @@ export function Devices({ active, history, onOpenPassboard }: Props) {
             )}
         </div>
     );
+}
+
+/** The files panel of the device on stage, once we know whether it shares any. */
+function CurrentFiles({ member }: { member: Member }) {
+    const caps = useCapabilities(member.this_device ? null : member.id, member.answered_at);
+    return <DeviceFiles key={member.id} member={member} offersList={!!caps?.caps?.some(c => c.name === "file.list")} />;
 }
 
 /** Other devices first (the ones that manage the group, then by name), this PC last. */

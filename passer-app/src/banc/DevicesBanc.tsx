@@ -261,6 +261,9 @@ function installBackend(scenario: Scenario) {
                     { name: "clipboard.write", title: "Put text on the PC clipboard", description: "", effect: "write", needs_approval: false },
                     { name: "clipboard.read", title: "Read the PC clipboard", description: "", effect: "sensitive", needs_approval: true },
                     { name: "file.receive", title: "Send a file to the PC", description: "", effect: "write", needs_approval: false },
+                    { name: "file.drop", title: "Send a file to the PC", description: "", effect: "write", needs_approval: false },
+                    { name: "file.list", title: "List the PC's shared files", description: "", effect: "read", needs_approval: false },
+                    { name: "file.get", title: "Get a shared file", description: "", effect: "read", needs_approval: false },
                 ];
             }
             case "devices_journal": {
@@ -275,6 +278,14 @@ function installBackend(scenario: Scenario) {
             case "devices_send_clipboard":
             case "devices_send_file":
                 return null;
+            case "devices_list_files":
+                return [
+                    { name: "Rapport annuel 2026.pdf", size: 4_820_113, modified: NOW - 3600 },
+                    { name: "Photos vacances.zip", size: 812_400_000, modified: NOW - 86400 * 2 },
+                    { name: "budget.xlsx", size: 48_200, modified: NOW - 86400 * 9 },
+                ];
+            case "space_files":
+                return [{ name: "plan-week-end.txt", size: 17, modified: NOW - 600 }];
             case "devices_get_clipboard":
                 return 42;
             default:

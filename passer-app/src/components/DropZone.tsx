@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
-import { Check, FileUp, Loader2, X } from "lucide-react";
+import { Check, FileUp, Loader2, Share2, X } from "lucide-react";
 import { DeviceRender } from "./DeviceRender";
 import { InlineError } from "./DeviceInvite";
 import { Action, FOCUS, ProgressLine, isRecent, kindOfMember, screenFor, seenLabel, type Capability, type DevicesStatus, type Member, type SendProgress } from "./deviceUi";
@@ -36,7 +36,7 @@ export function DropZone({ onOpenDevices }: Props) {
         let off: (() => void) | undefined;
         let alive = true;
         (async () => {
-            const un = await listen<SendProgress>("send-progress", e => {
+            const un = await listen<SendProgress>("transfer-progress", e => {
                 if (e.payload.transfer.startsWith("drop-")) setProgress(e.payload);
             });
             if (alive) off = un; else un();
@@ -114,6 +114,22 @@ export function DropZone({ onOpenDevices }: Props) {
         }
     };
 
+    // Or keep them here, shared: every device of the group can then get them.
+    const share = async () => {
+        if (!paths || sending) return;
+        setSending("share");
+        setError(null);
+        try {
+            const n = await invoke<number>("space_add_paths", { paths });
+            setDone(`${n === 1 ? "Shared" : `${n} files shared`} from this PC`);
+            setTimeout(() => setPaths(null), 1600);
+        } catch (e) {
+            setError({ text: "They couldn't be shared.", detail: String(e) });
+        } finally {
+            setSending(null);
+        }
+    };
+
     const names = paths?.map(p => p.split(/[\\/]/).pop() ?? p) ?? [];
 
     return (
@@ -181,6 +197,21 @@ export function DropZone({ onOpenDevices }: Props) {
                                         </button>
                                     );
                                 })
+                            )}
+                            {inGroup && targets !== null && (
+                                <button
+                                    onClick={share}
+                                    disabled={!!sending || !!done}
+                                    className={`mt-1 flex items-center gap-3 p-2.5 rounded-2xl border border-dashed border-white/12 text-left hover:bg-white/[0.04] hover:border-white/25 transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 ${FOCUS}`}
+                                >
+                                    <span className="w-11 h-11 shrink-0 rounded-xl bg-white/[0.04] flex items-center justify-center" aria-hidden>
+                                        {sending === "share" ? <Loader2 className="w-4 h-4 animate-spin text-white/70" /> : <Share2 className="w-4 h-4 text-white/70" strokeWidth={2} />}
+                                    </span>
+                                    <span className="min-w-0 flex-1">
+                                        <span className="block text-[13px] font-semibold text-white/90">Share from this PC</span>
+                                        <span className="block text-[12px] text-white/50">Your devices can get them whenever they want</span>
+                                    </span>
+                                </button>
                             )}
                             <div aria-live="polite">
                                 {sending && progress && <div className="px-2 pt-2"><ProgressLine p={progress} /></div>}

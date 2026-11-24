@@ -14,6 +14,8 @@
 //! | `clipboard.read` | sensitive | returns the text on this PC's clipboard, after the user approves |
 //! | `file.receive`   | write     | saves a small file (< 700 KB) to the Passboard folder (older apps) |
 //! | `file.drop`      | write     | receives a file of any size (up to 4 GB) as a stream, into the Passboard folder |
+//! | `file.get`       | read      | sends back a file from the Passer Space folder (the one already shared over WebDAV) |
+//! | `file.list`      | read      | lists the files in the Passer Space folder (names, sizes, dates) |
 //!
 //! Approvals are shown in the main window; a request nobody answers is refused.
 
@@ -33,7 +35,9 @@ use serde_json::json;
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::oneshot;
 
-use crate::paths::{get_config_dir, get_downloads_dir, get_target_dir, get_unique_file_path};
+use crate::paths::{
+    get_config_dir, get_downloads_dir, get_target_dir, get_unique_file_path, get_webdav_dir,
+};
 use crate::types::{ServerState, TransferEvent};
 
 /// Until Passer runs its own relays, devices reach each other through n0's public
@@ -162,6 +166,28 @@ fn pc_capabilities() -> Vec<CapabilitySpec> {
                 "additionalProperties": false
             }),
         ),
+        spec(
+            "file.list",
+            "List the PC's shared files",
+            "Lists the files in the PC's Passer Space folder, to get one with file.get.",
+            EffectKind::Read,
+            json!({ "type": "object", "additionalProperties": false }),
+        ),
+        CapabilitySpec {
+            stream: Some(StreamKind::Download),
+            ..spec(
+                "file.get",
+                "Get a file from the PC",
+                "Sends back a file from the PC's Passer Space folder, by name.",
+                EffectKind::Read,
+                json!({
+                    "type": "object",
+                    "properties": { "name": { "type": "string", "minLength": 1, "maxLength": 255 } },
+                    "required": ["name"],
+                    "additionalProperties": false
+                }),
+            )
+        },
         CapabilitySpec {
             stream: Some(StreamKind::Upload),
             ..spec(
@@ -178,6 +204,48 @@ fn pc_capabilities() -> Vec<CapabilitySpec> {
             )
         },
     ]
+}
+
+/// A file directly in the Passer Space folder, by name: no path, no link leading out of it.
+fn shared_file(name: &str) -> Result<std::path::PathBuf, PasserError> {
+    file_in(&get_webdav_dir(), name)
+}
+
+fn file_in(dir: &std::path::Path, name: &str) -> Result<std::path::PathBuf, PasserError> {
+    let root = std::fs::canonicalize(dir).map_err(failed)?;
+    let wanted = base_name(name);
+    let path = std::fs::canonicalize(root.join(&wanted)).map_err(|_| failed("no such file"))?;
+    if path.parent() != Some(root.as_path()) || !path.is_file() || wanted != name {
+        return Err(failed("no such file"));
+    }
+    Ok(path)
+}
+
+/// Regular files directly in `dir`, newest first, at most 500.
+fn list_files(dir: &std::path::Path) -> Vec<serde_json::Value> {
+    let mut files: Vec<(std::time::SystemTime, serde_json::Value)> = std::fs::read_dir(dir)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter_map(|e| {
+            let meta = e.metadata().ok()?;
+            if !meta.is_file() {
+                return None;
+            }
+            let name = e.file_name().into_string().ok()?;
+            if name.starts_with('.') {
+                return None;
+            }
+            let modified = meta.modified().unwrap_or(std::time::UNIX_EPOCH);
+            let secs = modified
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+            Some((modified, json!({ "name": name, "size": meta.len(), "modified": secs })))
+        })
+        .collect();
+    files.sort_by_key(|f| std::cmp::Reverse(f.0));
+    files.into_iter().take(500).map(|(_, v)| v).collect()
 }
 
 /// The base name only, so a sender cannot write outside the Passboard folder (same rule
@@ -260,6 +328,13 @@ impl CapabilityHandler for PcCapabilities {
                 });
                 Ok(json!({ "text": text }).to_string())
             }
+            "file.list" => {
+                let dir = get_webdav_dir();
+                let files = tokio::task::spawn_blocking(move || list_files(&dir))
+                    .await
+                    .map_err(failed)?;
+                Ok(json!({ "files": files }).to_string())
+            }
             "file.receive" => {
                 let name = base_name(input["name"].as_str().unwrap_or_default());
                 let bytes = base64::engine::general_purpose::STANDARD
@@ -334,14 +409,32 @@ impl CapabilityHandler for PcCapabilities {
         Ok(json!({ "saved": true, "size": size }).to_string())
     }
 
+    /// `file.get`: the core streams the file named here.
     async fn provide_file(
         &self,
         capability: String,
         _target: Option<String>,
-        _input_json: String,
-        _caller: CallerInfo,
+        input_json: String,
+        caller: CallerInfo,
     ) -> Result<String, PasserError> {
-        Err(failed(format!("unknown capability {capability}")))
+        if capability != "file.get" {
+            return Err(failed(format!("unknown capability {capability}")));
+        }
+        let input: serde_json::Value = serde_json::from_str(&input_json).map_err(failed)?;
+        let path = shared_file(input["name"].as_str().unwrap_or_default())?;
+        let size = std::fs::metadata(&path).map(|m| m.len()).ok();
+        self.record(TransferEvent {
+            kind: "file".into(),
+            direction: "outgoing".into(),
+            target: "folder".into(),
+            // The device is its own field now: the Passboard says "To <device>".
+            name: Some(path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()),
+            path: Some(path.to_string_lossy().into_owned()),
+            size,
+            device: Some(caller.device_name.clone()),
+            device_id: Some(caller.device_id.clone()),
+        });
+        Ok(path.to_string_lossy().into_owned())
     }
 }
 
@@ -688,9 +781,9 @@ pub async fn devices_get_clipboard(devices: DevicesState<'_>, id: String) -> Res
     Ok(count)
 }
 
-/// Reports a file's progress to the window as `send-progress` { transfer, name, done,
-/// total }, at most every 120 ms (and always at the end), so a 4 GB file does not
-/// flood the webview with events.
+/// Reports a file's progress to the window as `transfer-progress` { transfer, name,
+/// done, total }, sending or fetching, at most every 120 ms (and always at the end), so
+/// a 4 GB file does not flood the webview with events.
 struct EmitProgress {
     app: AppHandle,
     transfer: String,
@@ -709,7 +802,7 @@ impl passer_ffi::TransferProgress for EmitProgress {
             *last = std::time::Instant::now();
         }
         let _ = self.app.emit(
-            "send-progress",
+            "transfer-progress",
             json!({ "transfer": self.transfer, "name": self.name, "done": done, "total": total }),
         );
     }
@@ -775,7 +868,7 @@ async fn send_one(devices: &Devices, id: &str, path: std::path::PathBuf, transfe
 }
 
 /// "Send a file" on the Devices stage: a native file picker, then `send_one`.
-/// `None` when the user closed the picker. Progress comes as `send-progress` with
+/// `None` when the user closed the picker. Progress comes as `transfer-progress` with
 /// `transfer`.
 #[tauri::command]
 pub async fn devices_pick_and_send(
@@ -810,6 +903,115 @@ pub async fn devices_send_paths(devices: DevicesState<'_>, id: String, paths: Ve
 #[tauri::command]
 pub fn devices_answer_approval(devices: DevicesState<'_>, id: u64, allow: bool) -> bool {
     devices.answer(id, allow)
+}
+
+/// Progress of a file transfer started from this window.
+
+/// Gets a file by name from another member's `file.get`, into the Passboard folder,
+/// and lists it there as coming from that member. Progress comes as
+/// `transfer-progress` with `transfer`. Returns where it was saved.
+#[tauri::command]
+pub async fn devices_fetch_file(
+    devices: DevicesState<'_>,
+    id: String,
+    name: String,
+    transfer: String,
+) -> Result<String, String> {
+    let base = base_name(&name);
+    let dir = get_target_dir(&get_downloads_dir(), "application/octet-stream", &base);
+    let dest = get_unique_file_path(dir.join(&base));
+    let progress = Arc::new(EmitProgress {
+        app: devices.app.clone(),
+        transfer,
+        name: base.clone(),
+        last: Mutex::new(std::time::Instant::now() - Duration::from_secs(1)),
+    });
+    devices
+        .device
+        .fetch_file(
+            id.clone(),
+            "file.get".into(),
+            json!({ "name": name }).to_string(),
+            dest.to_string_lossy().into_owned(),
+            Some(progress),
+        )
+        .await
+        .map_err(|e| e.to_string())?;
+    let size = tokio::fs::metadata(&dest).await.map(|m| m.len()).ok();
+    record_with(&devices, &id, TransferEvent {
+        kind: "file".into(),
+        direction: "incoming".into(),
+        target: "folder".into(),
+        name: Some(base),
+        path: Some(dest.to_string_lossy().into_owned()),
+        size,
+        ..Default::default()
+    });
+    Ok(dest.to_string_lossy().into_owned())
+}
+
+/// The files a member shares (its `file.list`): `[{ name, size, modified }]`, newest
+/// first.
+#[tauri::command]
+pub async fn devices_list_files(devices: DevicesState<'_>, id: String) -> Result<serde_json::Value, String> {
+    let out = call_member(&devices, id, "file.list", json!({})).await?;
+    Ok(out.get("files").cloned().unwrap_or_else(|| json!([])))
+}
+
+// --- What this PC shares ------------------------------------------------------------
+// The Passer Space folder, which `file.list` / `file.get` offer to the other members.
+
+/// The files this PC shares, as the other members see them.
+#[tauri::command]
+pub async fn space_files() -> Result<Vec<serde_json::Value>, String> {
+    let dir = get_webdav_dir();
+    tokio::task::spawn_blocking(move || list_files(&dir)).await.map_err(|e| e.to_string())
+}
+
+/// "Share a file": a native picker (several files), each copied into the shared folder
+/// under a free name. Returns how many were added (0 when the picker was closed).
+#[tauri::command]
+pub async fn space_pick_and_add(app: AppHandle) -> Result<u32, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let picked = tokio::task::spawn_blocking(move || app.dialog().file().set_title("Share files").blocking_pick_files())
+        .await
+        .map_err(|e| e.to_string())?;
+    let Some(files) = picked else { return Ok(0) };
+    let paths = files.into_iter().filter_map(|f| f.into_path().ok()).collect::<Vec<_>>();
+    add_to_space(paths).await
+}
+
+/// Copies files into the shared folder (also what the "Share" choice of a drop does).
+#[tauri::command]
+pub async fn space_add_paths(paths: Vec<String>) -> Result<u32, String> {
+    add_to_space(paths.into_iter().map(std::path::PathBuf::from).collect()).await
+}
+
+async fn add_to_space(paths: Vec<std::path::PathBuf>) -> Result<u32, String> {
+    tokio::task::spawn_blocking(move || -> Result<u32, String> {
+        let dir = get_webdav_dir();
+        let mut added = 0;
+        for from in paths {
+            if !from.is_file() {
+                continue;
+            }
+            let name = base_name(&from.file_name().and_then(|n| n.to_str()).unwrap_or_default().to_owned());
+            let to = get_unique_file_path(dir.join(name));
+            std::fs::copy(&from, &to).map_err(|e| format!("{}: {e}", from.display()))?;
+            added += 1;
+        }
+        Ok(added)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Stops sharing a file: removes its copy from the shared folder (the original, where
+/// it was picked from, is untouched).
+#[tauri::command]
+pub async fn space_remove(name: String) -> Result<(), String> {
+    let path = shared_file(&name).map_err(|e| e.to_string())?;
+    tokio::fs::remove_file(path).await.map_err(|e| e.to_string())
 }
 
 /// Asks every other member, now, what it is and offers. Returns how many answered.
@@ -872,6 +1074,28 @@ pub async fn devices_journal(
 #[cfg(all(test, windows))]
 mod tests {
     use super::*;
+
+    #[test]
+    fn shared_files_stay_in_their_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("notes.pdf"), b"x").unwrap();
+        std::fs::write(dir.path().join(".hidden"), b"x").unwrap();
+        std::fs::create_dir(dir.path().join("sub")).unwrap();
+        std::fs::write(dir.path().join("sub").join("deep.txt"), b"x").unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        std::fs::write(outside.path().join("secret.txt"), b"x").unwrap();
+
+        assert!(file_in(dir.path(), "notes.pdf").is_ok());
+        assert!(file_in(dir.path(), "sub").is_err(), "folders are not files");
+        assert!(file_in(dir.path(), "sub/deep.txt").is_err(), "no paths");
+        assert!(file_in(dir.path(), r"..\secret.txt").is_err());
+        assert!(file_in(dir.path(), "../secret.txt").is_err());
+        assert!(file_in(dir.path(), "missing.txt").is_err());
+
+        let listed = list_files(dir.path());
+        assert_eq!(listed.len(), 1, "{listed:?}");
+        assert_eq!(listed[0]["name"], "notes.pdf");
+    }
 
     #[test]
     fn this_pc_describes_itself() {

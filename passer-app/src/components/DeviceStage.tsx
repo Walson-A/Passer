@@ -46,7 +46,7 @@ export function DeviceStage({ member: m, running, onRefresh, refreshing, last, o
         let off: (() => void) | undefined;
         let alive = true;
         (async () => {
-            const un = await listen<SendProgress>("send-progress", e => {
+            const un = await listen<SendProgress>("transfer-progress", e => {
                 if (e.payload.transfer === transfer) setProgress(e.payload);
             });
             if (alive) off = un; else un();
@@ -107,7 +107,7 @@ export function DeviceStage({ member: m, running, onRefresh, refreshing, last, o
                 </div>
 
                 <div className="w-[360px] min-w-0">
-                    <StateChip member={m} running={running} />
+                    <StateChip member={m} running={running} onRefresh={onRefresh} refreshing={refreshing} />
                     <h2 className="text-[32px] leading-[1.08] font-bold tracking-tight mt-3 break-words">{m.name}</h2>
                     <div className="flex items-center gap-2 mt-2.5 flex-wrap">
                         {osLabel(os) && <span className="text-[13px] text-white/60">{osLabel(os)}{m.os_version ? ` ${m.os_version}` : ""}</span>}
@@ -120,7 +120,7 @@ export function DeviceStage({ member: m, running, onRefresh, refreshing, last, o
 
                     <div className="mt-8">
                         {m.this_device ? (
-                            <Note>This is the PC you're on. Your other devices send here; choose one above to send to it.</Note>
+                            <Note>This is the PC you're on. Your other devices send here, and can get what it shares, below. Choose one of them above to send to it.</Note>
                         ) : !running ? (
                             <Note>This PC is offline, so it can't reach {m.name}.</Note>
                         ) : caps === undefined ? (
@@ -199,7 +199,7 @@ export function DeviceStage({ member: m, running, onRefresh, refreshing, last, o
     );
 }
 
-function StateChip({ member: m, running }: { member: Member; running: boolean }) {
+function StateChip({ member: m, running, onRefresh, refreshing }: { member: Member; running: boolean; onRefresh: () => void; refreshing: boolean }) {
     let dot = "bg-white/30";
     let label: string;
     if (m.this_device) {
@@ -210,6 +210,22 @@ function StateChip({ member: m, running }: { member: Member; running: boolean })
         // this second (that comes with the coordination server): say exactly that.
         if (isRecent(m.answered_at)) dot = "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]";
         label = seenLabel(m.answered_at);
+    }
+    // Another device's chip asks it again on click: what it is, offers and shares.
+    if (!m.this_device && running) {
+        return (
+            <button
+                onClick={onRefresh}
+                disabled={refreshing}
+                title="Check again"
+                aria-label={`${label}. Check again`}
+                className={`group inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.04] border border-white/[0.08] hover:border-white/20 transition-colors cursor-pointer ${FOCUS}`}
+            >
+                <span className={`w-2 h-2 rounded-full ${dot}`} aria-hidden />
+                <span className="text-[12px] font-semibold text-white/75">{label}</span>
+                <RefreshCw className={`w-3 h-3 text-white/35 group-hover:text-white/70 ${refreshing ? "animate-spin" : ""}`} strokeWidth={2.25} aria-hidden />
+            </button>
+        );
     }
     return (
         <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.04] border border-white/[0.08]" role="status">

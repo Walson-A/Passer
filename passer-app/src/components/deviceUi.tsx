@@ -49,7 +49,7 @@ export interface JournalLine {
     outcome: string;
 }
 
-/** Payload of `send-progress`: a file on its way to another device. */
+/** Payload of `transfer-progress`: a file on its way, to or from another device. */
 export interface SendProgress {
     transfer: string;
     name: string;
@@ -65,14 +65,14 @@ export function formatSize(bytes: number) {
     return `${v < 10 ? v.toFixed(1) : Math.round(v)} ${units[i]}`;
 }
 
-/** A file going out: its name, how far, a thin bar. */
-export function ProgressLine({ p }: { p: SendProgress }) {
+/** A file on its way: its name, how far, a thin bar. */
+export function ProgressLine({ p, verb = "Sending" }: { p: SendProgress; verb?: string }) {
     const ratio = p.total ? Math.min(1, p.done / p.total) : null;
     return (
-        <div className="flex flex-col gap-1.5" role="progressbar" aria-label={`Sending ${p.name}`}
+        <div className="flex flex-col gap-1.5" role="progressbar" aria-label={`${verb} ${p.name}`}
             aria-valuemin={0} aria-valuemax={100} aria-valuenow={ratio === null ? undefined : Math.round(ratio * 100)}>
             <p className="flex items-baseline justify-between gap-3 text-[12px]">
-                <span className="truncate text-white/75">Sending <span className="font-semibold text-white/90">{p.name}</span></span>
+                <span className="truncate text-white/75">{verb} <span className="font-semibold text-white/90">{p.name}</span></span>
                 <span className="shrink-0 tabular-nums text-white/50">
                     {ratio === null ? formatSize(p.done) : `${Math.round(ratio * 100)} %`}
                 </span>

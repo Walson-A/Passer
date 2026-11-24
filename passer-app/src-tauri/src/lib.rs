@@ -70,7 +70,13 @@ pub fn run() {
             devices::devices_send_paths,
             devices::devices_refresh,
             devices::devices_capabilities,
-            devices::devices_journal
+            devices::devices_journal,
+            devices::devices_fetch_file,
+            devices::devices_list_files,
+            devices::space_files,
+            devices::space_pick_and_add,
+            devices::space_add_paths,
+            devices::space_remove
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
