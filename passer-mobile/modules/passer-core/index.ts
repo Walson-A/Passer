@@ -39,10 +39,20 @@ export type ApprovalRequest = {
 
 export type Joined = { name: string; id: string; sas: string };
 
+/**
+ * Another device used one of this phone's capabilities (`clipboard.write`, `file.receive`).
+ * The native side has already done the work: the text is on the clipboard, the file is saved.
+ */
+export type Received = { from: string; fromId: string; agent: string | null } & (
+  | { kind: 'text'; text: string }
+  | { kind: 'file'; name: string; uri: string; size: number }
+);
+
 type Events = {
   onApprovalRequest: (request: ApprovalRequest) => void;
   onApprovalClosed: (event: { id: number }) => void;
   onDeviceJoined: (joined: Joined) => void;
+  onReceived: (received: Received) => void;
 };
 
 declare class PasserCoreNative extends NativeModule<Events> {

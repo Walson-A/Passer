@@ -57,6 +57,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       // The PC serves plain HTTP on the LAN. This is the scoped exception for
       // local addresses only; App Transport Security stays on for everything else.
       NSAppTransportSecurity: { NSAllowsLocalNetworking: true },
+      // Files another device sends land in Documents › Passer, shown by the Files app
+      // under On My iPhone › Passer (modules/passer-core, file.receive).
+      UIFileSharingEnabled: true,
+      LSSupportsOpeningDocumentsInPlace: true,
     },
   },
   android: {

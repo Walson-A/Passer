@@ -1,6 +1,7 @@
 import ExpoModulesCore
 import Foundation
 import Security
+import UIKit
 
 /// The Passer device network (passer-core) for the iPhone app.
 ///
@@ -15,7 +16,7 @@ public class PasserCoreModule: Module {
   public func definition() -> ModuleDefinition {
     Name("PasserCore")
 
-    Events("onApprovalRequest", "onApprovalClosed", "onDeviceJoined")
+    Events("onApprovalRequest", "onApprovalClosed", "onDeviceJoined", "onReceived")
 
     AsyncFunction("open") { () async throws -> [String: Any?] in
       let device = try self.openDevice()
@@ -73,6 +74,9 @@ public class PasserCoreModule: Module {
     let device = try PasserDevice(home: home.path, vault: KeychainVault())
     device.setApprovalPrompter(prompter: JsPrompter(module: self, book: prompts))
     device.setAdmissionListener(listener: JoinRelay(module: self))
+    // What other devices of the group can ask this phone. Declared before `start`, as
+    // the core requires; the core's policy and approvals apply before any of it runs.
+    device.addCapabilities(specs: PhoneCapabilities.specs, handler: PhoneCapabilities(module: self))
     self.device = device
     return device
   }
@@ -191,6 +195,114 @@ final class JsPrompter: ApprovalPrompter, @unchecked Sendable {
     }
     module.emit("onApprovalClosed", ["id": requestId])
     return allowed
+  }
+}
+
+/// What this phone offers the other devices of its group: the same names, inputs and
+/// limits as the PC (`passer-app/src-tauri/src/devices.rs`), so the desktop's "Send my
+/// clipboard" and "Send a file" work towards the phone unchanged. The node only runs
+/// while the app is open, so both happen in front of the user.
+final class PhoneCapabilities: CapabilityHandler, @unchecked Sendable {
+  static let maxText = 200_000
+  static let maxFileBytes = 700 * 1024
+
+  static let specs: [CapabilitySpec] = [
+    CapabilitySpec(
+      name: "clipboard.write",
+      title: "Put text on the phone clipboard",
+      description: "Replaces the text on this phone's clipboard.",
+      inputSchemaJson: #"{"type":"object","properties":{"text":{"type":"string","maxLength":200000}},"required":["text"],"additionalProperties":false}"#,
+      effect: .write,
+      targetKind: nil,
+      indicatorRequired: false
+    ),
+    CapabilitySpec(
+      name: "file.receive",
+      title: "Send a file to the phone",
+      description: "Saves a small file (under 700 KB) in Passer on this phone.",
+      inputSchemaJson: #"{"type":"object","properties":{"name":{"type":"string","minLength":1,"maxLength":255},"data_base64":{"type":"string","maxLength":955737}},"required":["name","data_base64"],"additionalProperties":false}"#,
+      effect: .write,
+      targetKind: nil,
+      indicatorRequired: false
+    ),
+  ]
+
+  private weak var module: PasserCoreModule?
+
+  init(module: PasserCoreModule) {
+    self.module = module
+  }
+
+  func invoke(capability: String, target: String?, inputJson: String, caller: CallerInfo) async throws -> String {
+    let parsed = try? JSONSerialization.jsonObject(with: Data(inputJson.utf8))
+    let input = parsed as? [String: Any] ?? [:]
+    switch capability {
+    case "clipboard.write":
+      guard let text = input["text"] as? String else {
+        throw PasserError.Invalid(message: "text is missing")
+      }
+      guard text.count <= Self.maxText else {
+        throw PasserError.Invalid(message: "text too long")
+      }
+      await MainActor.run { UIPasteboard.general.string = text }
+      module?.emit("onReceived", [
+        "kind": "text",
+        "text": String(text.prefix(160)),
+        "from": caller.deviceName,
+        "fromId": String(caller.deviceId.prefix(10)),
+        "agent": caller.agent,
+      ])
+      return #"{"ok":true}"#
+
+    case "file.receive":
+      guard let encoded = input["data_base64"] as? String,
+        let data = Data(base64Encoded: encoded, options: .ignoreUnknownCharacters)
+      else {
+        throw PasserError.Invalid(message: "data_base64 is not valid base64")
+      }
+      guard data.count <= Self.maxFileBytes else {
+        throw PasserError.Invalid(message: "file too large for this version (700 KB maximum)")
+      }
+      let url = try Self.save(data, as: input["name"] as? String ?? "")
+      module?.emit("onReceived", [
+        "kind": "file",
+        "name": url.lastPathComponent,
+        "uri": url.absoluteString,
+        "size": data.count,
+        "from": caller.deviceName,
+        "fromId": String(caller.deviceId.prefix(10)),
+        "agent": caller.agent,
+      ])
+      return "{\"saved\":true,\"size\":\(data.count)}"
+
+    default:
+      throw PasserError.Invalid(message: "unknown capability \(capability)")
+    }
+  }
+
+  /// Saves into Documents › Passer, which the Files app shows under On My iPhone › Passer.
+  /// Like the PC, only the base name is kept, so a sender cannot write anywhere else.
+  private static func save(_ data: Data, as rawName: String) throws -> URL {
+    let base = (rawName as NSString).lastPathComponent
+    let name = (base.isEmpty || base == "." || base == "..") ? "received_file" : base
+    let folder = try FileManager.default
+      .url(for: .documentDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+      .appendingPathComponent("Passer", isDirectory: true)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    var url = folder.appendingPathComponent(name)
+    let stem = (name as NSString).deletingPathExtension
+    let ext = (name as NSString).pathExtension
+    var copy = 2
+    while FileManager.default.fileExists(atPath: url.path) {
+      url = folder.appendingPathComponent(ext.isEmpty ? "\(stem) \(copy)" : "\(stem) \(copy).\(ext)")
+      copy += 1
+    }
+    do {
+      try data.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+    } catch {
+      throw PasserError.Storage(message: error.localizedDescription)
+    }
+    return url
   }
 }
 

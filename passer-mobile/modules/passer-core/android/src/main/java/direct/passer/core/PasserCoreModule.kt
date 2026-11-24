@@ -1,6 +1,9 @@
 package direct.passer.core
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
+import android.net.Uri
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
@@ -8,10 +11,17 @@ import expo.modules.kotlin.functions.Coroutine
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import org.json.JSONObject
 import uniffi.passer_ffi.AdmissionListener
 import uniffi.passer_ffi.ApprovalInfo
 import uniffi.passer_ffi.ApprovalPrompter
+import uniffi.passer_ffi.CallerInfo
+import uniffi.passer_ffi.CapabilityHandler
+import uniffi.passer_ffi.CapabilitySpec
+import uniffi.passer_ffi.EffectKind
 import uniffi.passer_ffi.KeyVault
 import uniffi.passer_ffi.NetworkKind
 import uniffi.passer_ffi.PasserDevice
@@ -38,7 +48,7 @@ class PasserCoreModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("PasserCore")
 
-    Events("onApprovalRequest", "onApprovalClosed", "onDeviceJoined")
+    Events("onApprovalRequest", "onApprovalClosed", "onDeviceJoined", "onReceived")
 
     AsyncFunction("open") Coroutine { -> status(openDevice()) }
 
@@ -85,6 +95,8 @@ class PasserCoreModule : Module() {
     val d = PasserDevice(home.absolutePath, KeystoreVault(context))
     d.setApprovalPrompter(JsPrompter())
     d.setAdmissionListener(JoinRelay())
+    // What other devices of the group can ask this phone; declared before `start`.
+    d.addCapabilities(PHONE_CAPABILITIES, PhoneCapabilities())
     device = d
     return d
   }
@@ -134,12 +146,100 @@ class PasserCoreModule : Module() {
     }
   }
 
+  /**
+   * What this phone offers the group: the PC's own names, inputs and limits
+   * (`passer-app/src-tauri/src/devices.rs`), so the desktop's commands work unchanged.
+   */
+  private inner class PhoneCapabilities : CapabilityHandler {
+    override suspend fun invoke(capability: String, target: String?, inputJson: String, caller: CallerInfo): String {
+      val input = try {
+        JSONObject(inputJson)
+      } catch (e: Exception) {
+        throw PasserException.Invalid("input is not JSON")
+      }
+      val from: Map<String, Any?> = mapOf("from" to caller.deviceName, "fromId" to caller.deviceId.take(10), "agent" to caller.agent)
+      return when (capability) {
+        "clipboard.write" -> {
+          if (!input.has("text")) throw PasserException.Invalid("text is missing")
+          val text = input.getString("text")
+          if (text.length > MAX_TEXT) throw PasserException.Invalid("text too long")
+          withContext(Dispatchers.Main) {
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            clipboard.setPrimaryClip(ClipData.newPlainText("Passer", text))
+          }
+          sendEvent("onReceived", from + mapOf("kind" to "text", "text" to text.take(160)))
+          """{"ok":true}"""
+        }
+        "file.receive" -> {
+          val bytes = try {
+            Base64.decode(input.optString("data_base64", ""), Base64.DEFAULT)
+          } catch (e: IllegalArgumentException) {
+            throw PasserException.Invalid("data_base64 is not valid base64")
+          }
+          if (bytes.size > MAX_FILE_BYTES) throw PasserException.Invalid("file too large for this version (700 KB maximum)")
+          val file = save(bytes, input.optString("name", ""))
+          sendEvent(
+            "onReceived",
+            from + mapOf("kind" to "file", "name" to file.name, "uri" to Uri.fromFile(file).toString(), "size" to bytes.size),
+          )
+          """{"saved":true,"size":${bytes.size}}"""
+        }
+        else -> throw PasserException.Invalid("unknown capability $capability")
+      }
+    }
+
+    /** Only the base name is kept, as on the PC, so a sender cannot write anywhere else. */
+    private fun save(bytes: ByteArray, rawName: String): File {
+      val base = File(rawName).name
+      val name = if (base.isEmpty() || base == "." || base == "..") "received_file" else base
+      val folder = File(context.filesDir, "received").apply { mkdirs() }
+      var file = File(folder, name)
+      val stem = file.nameWithoutExtension
+      val ext = file.extension
+      var copy = 2
+      while (file.exists()) {
+        file = File(folder, if (ext.isEmpty()) "$stem $copy" else "$stem $copy.$ext")
+        copy += 1
+      }
+      try {
+        file.writeBytes(bytes)
+      } catch (e: Exception) {
+        throw PasserException.Storage("could not save the file: ${e.message}")
+      }
+      return file
+    }
+  }
+
   private inner class JoinRelay : AdmissionListener {
     override fun admitted(deviceId: String, deviceName: String, sas: String) {
       sendEvent("onDeviceJoined", mapOf("name" to deviceName, "id" to deviceId.take(10), "sas" to sas))
     }
   }
 }
+
+private const val MAX_TEXT = 200_000
+private const val MAX_FILE_BYTES = 700 * 1024
+
+private val PHONE_CAPABILITIES = listOf(
+  CapabilitySpec(
+    "clipboard.write",
+    "Put text on the phone clipboard",
+    "Replaces the text on this phone's clipboard.",
+    """{"type":"object","properties":{"text":{"type":"string","maxLength":200000}},"required":["text"],"additionalProperties":false}""",
+    EffectKind.WRITE,
+    null,
+    false,
+  ),
+  CapabilitySpec(
+    "file.receive",
+    "Send a file to the phone",
+    "Saves a small file (under 700 KB) in Passer on this phone.",
+    """{"type":"object","properties":{"name":{"type":"string","minLength":1,"maxLength":255},"data_base64":{"type":"string","maxLength":955737}},"required":["name","data_base64"],"additionalProperties":false}""",
+    EffectKind.WRITE,
+    null,
+    false,
+  ),
+)
 
 /**
  * The device key, encrypted with an AES key that never leaves the Android Keystore,
