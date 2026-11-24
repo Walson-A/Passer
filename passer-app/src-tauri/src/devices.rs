@@ -14,6 +14,8 @@
 //! | `clipboard.read` | sensitive | returns the text on this PC's clipboard, after the user approves |
 //! | `file.receive`   | write     | saves a small file (< 700 KB) to the Passboard folder (older apps) |
 //! | `file.drop`      | write     | receives a file of any size (up to 4 GB) as a stream, into the Passboard folder |
+//! | `file.get`       | read      | sends back a file from the Passer Space folder (the one already shared over WebDAV) |
+//! | `file.list`      | read      | lists the files in the Passer Space folder (names, sizes, dates) |
 //!
 //! Approvals are shown in the main window; a request nobody answers is refused.
 
@@ -33,7 +35,9 @@ use serde_json::json;
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::oneshot;
 
-use crate::paths::{get_config_dir, get_downloads_dir, get_target_dir, get_unique_file_path};
+use crate::paths::{
+    get_config_dir, get_downloads_dir, get_target_dir, get_unique_file_path, get_webdav_dir,
+};
 use crate::types::{ServerState, TransferEvent};
 
 /// Until Passer runs its own relays, devices reach each other through n0's public
@@ -162,6 +166,28 @@ fn pc_capabilities() -> Vec<CapabilitySpec> {
                 "additionalProperties": false
             }),
         ),
+        spec(
+            "file.list",
+            "List the PC's shared files",
+            "Lists the files in the PC's Passer Space folder, to get one with file.get.",
+            EffectKind::Read,
+            json!({ "type": "object", "additionalProperties": false }),
+        ),
+        CapabilitySpec {
+            stream: Some(StreamKind::Download),
+            ..spec(
+                "file.get",
+                "Get a file from the PC",
+                "Sends back a file from the PC's Passer Space folder, by name.",
+                EffectKind::Read,
+                json!({
+                    "type": "object",
+                    "properties": { "name": { "type": "string", "minLength": 1, "maxLength": 255 } },
+                    "required": ["name"],
+                    "additionalProperties": false
+                }),
+            )
+        },
         CapabilitySpec {
             stream: Some(StreamKind::Upload),
             ..spec(
@@ -178,6 +204,48 @@ fn pc_capabilities() -> Vec<CapabilitySpec> {
             )
         },
     ]
+}
+
+/// A file directly in the Passer Space folder, by name: no path, no link leading out of it.
+fn shared_file(name: &str) -> Result<std::path::PathBuf, PasserError> {
+    file_in(&get_webdav_dir(), name)
+}
+
+fn file_in(dir: &std::path::Path, name: &str) -> Result<std::path::PathBuf, PasserError> {
+    let root = std::fs::canonicalize(dir).map_err(failed)?;
+    let wanted = base_name(name);
+    let path = std::fs::canonicalize(root.join(&wanted)).map_err(|_| failed("no such file"))?;
+    if path.parent() != Some(root.as_path()) || !path.is_file() || wanted != name {
+        return Err(failed("no such file"));
+    }
+    Ok(path)
+}
+
+/// Regular files directly in `dir`, newest first, at most 500.
+fn list_files(dir: &std::path::Path) -> Vec<serde_json::Value> {
+    let mut files: Vec<(std::time::SystemTime, serde_json::Value)> = std::fs::read_dir(dir)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter_map(|e| {
+            let meta = e.metadata().ok()?;
+            if !meta.is_file() {
+                return None;
+            }
+            let name = e.file_name().into_string().ok()?;
+            if name.starts_with('.') {
+                return None;
+            }
+            let modified = meta.modified().unwrap_or(std::time::UNIX_EPOCH);
+            let secs = modified
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+            Some((modified, json!({ "name": name, "size": meta.len(), "modified": secs })))
+        })
+        .collect();
+    files.sort_by_key(|f| std::cmp::Reverse(f.0));
+    files.into_iter().take(500).map(|(_, v)| v).collect()
 }
 
 /// The base name only, so a sender cannot write outside the Passboard folder (same rule
@@ -256,6 +324,13 @@ impl CapabilityHandler for PcCapabilities {
                 });
                 Ok(json!({ "text": text }).to_string())
             }
+            "file.list" => {
+                let dir = get_webdav_dir();
+                let files = tokio::task::spawn_blocking(move || list_files(&dir))
+                    .await
+                    .map_err(failed)?;
+                Ok(json!({ "files": files }).to_string())
+            }
             "file.receive" => {
                 let name = base_name(input["name"].as_str().unwrap_or_default());
                 let bytes = base64::engine::general_purpose::STANDARD
@@ -326,14 +401,33 @@ impl CapabilityHandler for PcCapabilities {
         Ok(json!({ "saved": true, "size": size }).to_string())
     }
 
+    /// `file.get`: the core streams the file named here.
     async fn provide_file(
         &self,
         capability: String,
         _target: Option<String>,
-        _input_json: String,
-        _caller: CallerInfo,
+        input_json: String,
+        caller: CallerInfo,
     ) -> Result<String, PasserError> {
-        Err(failed(format!("unknown capability {capability}")))
+        if capability != "file.get" {
+            return Err(failed(format!("unknown capability {capability}")));
+        }
+        let input: serde_json::Value = serde_json::from_str(&input_json).map_err(failed)?;
+        let path = shared_file(input["name"].as_str().unwrap_or_default())?;
+        let size = std::fs::metadata(&path).map(|m| m.len()).ok();
+        self.record(TransferEvent {
+            kind: "file".into(),
+            direction: "outgoing".into(),
+            target: "folder".into(),
+            name: Some(format!(
+                "{} to {}",
+                path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
+                caller.device_name
+            )),
+            path: Some(path.to_string_lossy().into_owned()),
+            size,
+        });
+        Ok(path.to_string_lossy().into_owned())
     }
 }
 
@@ -612,6 +706,77 @@ pub fn devices_answer_approval(devices: DevicesState<'_>, id: u64, allow: bool) 
     devices.answer(id, allow)
 }
 
+/// Progress of a file transfer started from this window.
+#[derive(Serialize, Clone)]
+struct TransferProgressEvent {
+    id: String,
+    done: u64,
+    total: Option<u64>,
+}
+
+struct WindowProgress {
+    app: AppHandle,
+    id: String,
+}
+
+impl passer_ffi::TransferProgress for WindowProgress {
+    fn progress(&self, done: u64, total: Option<u64>) {
+        let _ = self.app.emit(
+            "device-transfer-progress",
+            TransferProgressEvent { id: self.id.clone(), done, total },
+        );
+    }
+}
+
+/// Sends a file from this PC to another member's `file.drop` (its inbox). `transfer_id`
+/// tags the `device-transfer-progress` events. Returns the member's answer (JSON).
+#[tauri::command]
+pub async fn devices_send_file(
+    devices: DevicesState<'_>,
+    id: String,
+    path: String,
+    transfer_id: String,
+) -> Result<String, String> {
+    let name = std::path::Path::new(&path)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .ok_or("the path has no file name")?
+        .to_owned();
+    let progress = Arc::new(WindowProgress { app: devices.app.clone(), id: transfer_id });
+    devices
+        .device
+        .send_file(id, "file.drop".into(), json!({ "name": name }).to_string(), path, Some(progress))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Gets a file by name from another member's `file.get`, into the Passboard folder.
+/// Returns where it was saved.
+#[tauri::command]
+pub async fn devices_fetch_file(
+    devices: DevicesState<'_>,
+    id: String,
+    name: String,
+    transfer_id: String,
+) -> Result<String, String> {
+    let base = base_name(&name);
+    let dir = get_target_dir(&get_downloads_dir(), "application/octet-stream", &base);
+    let dest = get_unique_file_path(dir.join(&base));
+    let progress = Arc::new(WindowProgress { app: devices.app.clone(), id: transfer_id });
+    devices
+        .device
+        .fetch_file(
+            id,
+            "file.get".into(),
+            json!({ "name": name }).to_string(),
+            dest.to_string_lossy().into_owned(),
+            Some(progress),
+        )
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(dest.to_string_lossy().into_owned())
+}
+
 /// Asks every other member, now, what it is and offers. Returns how many answered.
 #[tauri::command]
 pub async fn devices_refresh(devices: DevicesState<'_>) -> Result<u32, String> {
@@ -672,6 +837,28 @@ pub async fn devices_journal(
 #[cfg(all(test, windows))]
 mod tests {
     use super::*;
+
+    #[test]
+    fn shared_files_stay_in_their_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("notes.pdf"), b"x").unwrap();
+        std::fs::write(dir.path().join(".hidden"), b"x").unwrap();
+        std::fs::create_dir(dir.path().join("sub")).unwrap();
+        std::fs::write(dir.path().join("sub").join("deep.txt"), b"x").unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        std::fs::write(outside.path().join("secret.txt"), b"x").unwrap();
+
+        assert!(file_in(dir.path(), "notes.pdf").is_ok());
+        assert!(file_in(dir.path(), "sub").is_err(), "folders are not files");
+        assert!(file_in(dir.path(), "sub/deep.txt").is_err(), "no paths");
+        assert!(file_in(dir.path(), r"..\secret.txt").is_err());
+        assert!(file_in(dir.path(), "../secret.txt").is_err());
+        assert!(file_in(dir.path(), "missing.txt").is_err());
+
+        let listed = list_files(dir.path());
+        assert_eq!(listed.len(), 1, "{listed:?}");
+        assert_eq!(listed[0]["name"], "notes.pdf");
+    }
 
     #[test]
     fn this_pc_describes_itself() {
