@@ -728,28 +728,6 @@ impl passer_ffi::TransferProgress for WindowProgress {
     }
 }
 
-/// Sends a file from this PC to another member's `file.drop` (its inbox). `transfer_id`
-/// tags the `device-transfer-progress` events. Returns the member's answer (JSON).
-#[tauri::command]
-pub async fn devices_send_file(
-    devices: DevicesState<'_>,
-    id: String,
-    path: String,
-    transfer_id: String,
-) -> Result<String, String> {
-    let name = std::path::Path::new(&path)
-        .file_name()
-        .and_then(|n| n.to_str())
-        .ok_or("the path has no file name")?
-        .to_owned();
-    let progress = Arc::new(WindowProgress { app: devices.app.clone(), id: transfer_id });
-    devices
-        .device
-        .send_file(id, "file.drop".into(), json!({ "name": name }).to_string(), path, Some(progress))
-        .await
-        .map_err(|e| e.to_string())
-}
-
 /// Gets a file by name from another member's `file.get`, into the Passboard folder.
 /// Returns where it was saved.
 #[tauri::command]

@@ -66,7 +66,6 @@ pub fn run() {
             devices::devices_refresh,
             devices::devices_capabilities,
             devices::devices_journal,
-            devices::devices_send_file,
             devices::devices_fetch_file
         ])
         .on_window_event(|window, event| {
