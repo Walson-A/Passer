@@ -5,6 +5,10 @@ call each other's capabilities (clipboard, files, device info) over iroh, with a
 anything sensitive. All of it lives in the Rust library
 [passer-core](https://github.com/Walson-A/passer-core); the app only hosts it.
 
+Since the redesign (2026-11-24) it is the app's main way to the PC: joining, sending, fetching
+and receiving all go through it. The HTTP pairing only remains for what a single call can't
+carry yet (see "Two ways to the PC" in [README.md](README.md)).
+
 ## Pieces
 
 | Piece | Role |
@@ -12,9 +16,11 @@ anything sensitive. All of it lives in the Rust library
 | `modules/passer-core/` | Expo local module. Swift (`ios/`) and Kotlin (`android/`) wrap the UniFFI bindings of `passer-ffi`. |
 | `modules/passer-core/passer-core.json` | The passer-core release the app uses (`mobile-v*` tag), and the SHA-256 of its assets once pinned. |
 | `scripts/fetch-passer-core.mjs` | Runs after `npm install`. Downloads the release assets into `ios/vendor/` and `android/vendor/` (ignored by git), checks their hash. Fails the install on CI and EAS, only warns elsewhere. `PASSER_CORE_SKIP=1` turns it off. |
-| `src/state/devices.tsx` | Opens the device, keeps its node running while the app is open, and shows approval requests over any screen. |
-| `src/app/devices.tsx` | The Devices sheet (Settings › Your devices): group, members, removal, stopping every session. |
-| `src/components/approval-prompt.tsx` | Allow or deny what another device asks. |
+| `src/core/device-calls.ts` | Calls the PC's capabilities, checks its limits first, and classifies the core's refusals. Unit-tested. |
+| `src/core/devices.ts` | A device's kind (guessed from its name until the core sends one), its wallpaper (the desktop's formula), the code's two groups. Unit-tested. |
+| `src/state/devices.tsx` | Opens the device, keeps its node running while the app is open, lists the members, probes whether each answers, keeps the Send destination, records what other devices send here. |
+| `src/state/approvals.tsx`, `src/components/approval-prompt.tsx` | Requests other devices send this phone's user, one at a time, each counting down from its arrival. |
+| `src/state/transfers.tsx` | Send, fetch, and the fallback to the direct connection. |
 
 The libraries come from passer-core's `Mobile libraries` workflow: an XCFramework with the
 Swift bindings for iOS, `jniLibs` with the Kotlin bindings for Android.
@@ -22,10 +28,41 @@ Swift bindings for iOS, `jniLibs` with the Kotlin bindings for Android.
 ## Joining
 
 1. The PC (Passer › Devices › Add a device) shows a `passer-core://join?…` QR code.
-2. The phone's scanner recognises it and hands it to the Devices sheet, out of the route.
-3. The core joins the group; both screens show the same six-digit code, to compare.
+2. The phone's scanner (or *Paste a link*) hands it to the Join screen, out of the route.
+3. The core joins the group; both screens show the same six-digit code, in two groups of three.
+   *It's different* stops the phone's node; the PC's *It's different* removes the phone.
 
-A phone can also start its own group, then other devices join it.
+A phone can also start its own group (*No PC yet?* on the welcome screen). A phone that manages
+devices can invite others: it shows its own one-time code, valid 10 minutes like the desktop's,
+and compares the code when a device joins through it.
+
+## What the phone asks the PC
+
+| Capability (the PC's, `devices.rs`) | On the phone | Limits checked before calling |
+|---|---|---|
+| `clipboard.write` | *What you copied* (text), the widget's send | 200 000 characters |
+| `file.receive` | Photo, File, a pasted image without the direct connection | 700 KB per file; photos are shrunk to JPEG to fit and the result says so |
+| `clipboard.read` | *Its clipboard*, with the lock *It asks first*: the PC's user approves each read | text only |
+| `device.info` | Whether a device answers (no presence in the core yet), every 30 s for the Send destination while the app is open | none |
+
+Refusals arrive as text; `classifyCallError` reads the core's stable codes in it (`denied`,
+`approval_timeout`, `too_large`, `not_member`, `unknown_capability`, network errors) and the
+screens say each in a sentence. How the native bridge words them is not yet checked on a phone.
+
+## What the phone offers
+
+So the desktop's *Send my clipboard* and *Send a file* work towards the phone, the module
+declares the PC's own capabilities, same names, inputs and limits (`PhoneCapabilities` in
+`PasserCoreModule.swift` and `.kt`, registered with `addCapabilities` before `start`):
+
+| Capability | Effect | What the phone does |
+|---|---|---|
+| `clipboard.write` | write | Puts the text on the phone's clipboard |
+| `file.receive` | write | Saves the file (< 700 KB, base name only) in Documents › Passer on iOS, which the Files app shows under On My iPhone › Passer (`UIFileSharingEnabled`); in the app's files on Android |
+
+Each one sends `onReceived` to JavaScript, which tells the user on Send, records it in Activity
+and offers *Share* for a file. The core's policy and approvals apply before anything runs. The
+node runs only while the app is open, so the PC can send only then.
 
 ## Keys and storage
 
@@ -37,13 +74,17 @@ A phone can also start its own group, then other devices join it.
 ## Approvals
 
 The core asks before anything sensitive. The module sends `onApprovalRequest` to JavaScript,
-which shows the prompt; no answer within 55 s is a no (the core's own limit is 60 s). The core
-decides; the UI only relays the answer.
+which shows the prompt; no answer within 55 s is a no (the core's own limit is 60 s). The prompt
+counts down from the request's arrival, so one waiting behind another keeps its real time. The
+core decides; the UI only relays the answer. A yes covers that request only: `minutes` is how
+long that one call may run, not a window of access.
 
 ## Limits for now
 
 - The node runs only while the app is open; iOS suspends it in the background.
-- It uses n0's development relays (`N0Dev`), not Passer's own.
+- It uses n0's development relays (`N0Dev`), not Passer's own (Devices › *Preview network* says so).
 - A JavaScript update reaching a binary built before this module sees `available: false`, and
-  the sheet asks for an app update instead of crashing.
-- No native build has compiled the module yet. The first EAS build is the check.
+  Send asks for an app update instead of crashing.
+- The core sends no device kind, system, presence or capability list yet (`fa88722` adds them,
+  not pinned): the drawing is guessed from the name, and every device gets the same commands.
+- No native build has compiled the module or the phone's capabilities yet. The first EAS build is the check.

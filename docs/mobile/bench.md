@@ -32,7 +32,10 @@ Only fake what a browser cannot have, never a piece of the app. Each stand-in si
 
 | Surface | Stand-in | Why |
 |---|---|---|
-| The Passer PC | `bench/fake-pc.ts`, reached through `fetch` and `src/platform/file-transport.web.ts` | There is no PC here, and the bench needs states it can choose |
+| The device network | `bench/core.ts`, behind `modules/passer-core/index.web.ts` | No passer-core in a browser. The fake group answers as the desktop's `devices.rs`: capability names, limits, the approval wait on `clipboard.read`, and refusals carrying the core's codes in their text |
+| The Passer PC (direct connection) | `bench/fake-pc.ts`, reached through `fetch` and `src/platform/file-transport.web.ts` | There is no PC here, and the bench needs states it can choose |
+| The native tab bar | `src/platform/tabs-layout.web.tsx` | expo-router's native tabs need UITabBar or Material's bar; the stand-in is drawn after either |
+| The platform and Dynamic Type | `src/platform/look.web.ts`, `src/platform/font-scale.web.ts` | A browser is neither iOS nor Android and has no system text size |
 | Keychain | `src/platform/secrets.web.ts` | `expo-secure-store` has no web implementation |
 | iPhone clipboard | `src/platform/clipboard.web.ts` | It is set from the bench's controls |
 | UIPasteControl | `src/platform/paste-button.web.tsx` | It is a native view. The stand-in is drawn after Apple's control, and greyed out when the clipboard holds nothing it accepts |
@@ -58,17 +61,23 @@ A fake that invents a field or a status makes a correct screen look broken, or a
 
 | Regime | What it shows |
 |---|---|
-| Appairé (paired) | The PC answers; a week of history with long file names |
-| Premier lancement (first launch) | No PC and no history: welcome and pairing |
-| PC endormi (asleep) | Nothing answers; requests end when the app gives up |
-| Lent (slow) | 0.9 s pings, 1.5 s requests, 450 KB/s: loading states and progress |
-| Sans .local (no mDNS) | Only the IP address answers |
-| À distance (remote) | Away from home over Tailscale: only the machine name answers, through a relay |
-| Jeton refusé (refused) | The PC expects another token: every transfer gets a 401 |
-| Autre PC (other PC) | Another Passer PC answers at the IP address |
+| Groupe (group) | The phone in a group with the PC and an iPad; the PC answers, the iPad doesn't; a week of activity |
+| Gère les appareils (manager) | The same, with this phone managing devices: *Add a device*, removal |
+| Connexion directe (direct) | The group plus the HTTP pairing: photos to the PC clipboard, files over 700 KB |
+| Premier lancement (first launch) | No group, no activity: welcome, scan, join |
+| Seul (alone) | A group with only this phone |
+| PC endormi (asleep) | The PC no longer answers, through either way |
+| Le PC refuse (refuses) | The PC's user says no to clipboard reads |
+| Erreur au chargement (broken) | The core can't open: Send and Devices show the failure |
+| Lent (slow) | Every call three times slower, the direct connection slow: loading states and progress |
+| Sans .local, À distance, Jeton refusé, Autre PC | The direct connection's cases, as before the redesign |
 
 The right rail also sets:
+- the platform the screens follow (iPhone or Android);
+- what another device does: ask for an approval (the iPad, or an AI agent through the PC), send a text or a file, join through this phone;
 - the device (iPhone 16, 16 Pro Max, SE);
+- the text size (default, very large, the first accessibility size);
+- which files the document picker hands over (one under 700 KB, or larger ones);
 - the appearance;
 - the iPhone's language;
 - what the iPhone and PC clipboards hold;
@@ -83,7 +92,7 @@ Changing the regime, device, language or update server relaunches the app, as iO
 - **Desk** (a wide window). The screens are on the left, the phone in the middle, and the controls and log on the right. The phone is an iframe the size of the device, so its window, sheets and safe areas are the phone's. Under "Depuis un widget", the screens list also has the `passer://action/<name>` links that widgets open, so each action can be played as it is on the phone.
 - **Phone** (`?bench=phone`, or a window as narrow as a phone). The phone alone, at 1:1. Agents screenshot this view, with the viewport set to the device size (393 × 852 for the iPhone 16).
 
-Both views accept the controls as URL parameters, for example `?bench=phone&regime=slow&scheme=light&language=en&device=iphone-se&update=available`. `&open=/settings` opens a modal route over Home.
+Both views accept the controls as URL parameters, for example `?bench=phone&regime=slow&scheme=light&language=en&device=iphone-se&update=available&look=android&text=huge&files=large`. `&open=/settings` opens a route over Send (`&open=/join` hands it the group's invitation, as the scanner would). `&event=approval`, `approval-agent`, `received-text`, `received-file` or `joined` plays another device's action once the app is up.
 
 `&motion=off` makes every animation jump to its end state. Use it for screenshots when the Browser pane is hidden: a hidden pane renders about two frames a second, so an entrance animation caught on its first frame looks like a faded screen. Network timeouts still run in real time, so give a regime such as "PC endormi" a few seconds before judging it.
 
@@ -110,7 +119,9 @@ expo-router doesn't mark full-screen modals on the web, so the bench recognises 
 - **Shadows and blur** are approximated.
 - **The camera** is unavailable in the desktop app's browser, so the scanner only shows its permission state.
 - **Native-only UI**, such as a SwiftUI share extension, cannot run here.
-- **Approval prompts over a sheet** show but can't be tapped: the web sheet makes the rest of the page inert. Try them from Home. To raise one, see `modules/passer-core/index.web.ts`.
+- **Approval prompts over a sheet** show but can't be tapped: the web sheet makes the rest of the page inert. Try them from a tab.
+- **The Android look** is drawn inside the iPhone frame, under iOS's status bar: it judges the app's own layout, not Android's system chrome.
+- **Native controls** (the tab bar, the paste control, switches) are stand-ins; their real look is the phone's.
 
 ## Adding a screen, a call or a native module
 

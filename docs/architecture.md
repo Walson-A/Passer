@@ -25,12 +25,13 @@ The project is divided into three main parts:
     - All content resides in `src/locales/`.
 - **Styling**: TailwindCSS 4 + Framer Motion.
 
-### 3. `passer-mobile/` (The iPhone App)
+### 3. `passer-mobile/` (The phone app, iOS and Android)
 - **Expo SDK 57 + expo-router**: React Native with strict TypeScript. Built on EAS, so no Mac is required.
-- **`src/core/`**: The desktop contract (pairing link, responses, connection strategy, API client). No React Native imports, unit-tested with Jest.
+- **`src/core/`**: Contracts with the PC: calls through the device network (`device-calls.ts`, `devices.ts`) and the direct HTTP connection (pairing link, responses, connection strategy, API client). No React Native imports, unit-tested with Jest.
 - **`src/platform/`**: Thin wrappers over native modules (Keychain, file transfers, pickers, clipboard, haptics), so Android can swap implementations without touching logic.
-- **`src/state/`**, **`src/components/`**, **`src/app/`**: Providers, the "Conduit" home screen pieces, and routes.
-- **Details**: `docs/mobile/README.md` (architecture and decisions) and `docs/mobile/SPEC.md` (the brief).
+- **`modules/passer-core/`**: The device network (passer-core over UniFFI), including the capabilities the phone offers the group.
+- **`src/state/`**, **`src/components/`**, **`src/app/`**: Providers, screen pieces, and routes: three native tabs (Send, Devices, Activity), native iOS structure with Passer's identity, Android conventions on Android.
+- **Details**: `docs/mobile/README.md` (architecture and decisions), `docs/mobile/device-network.md`, `docs/mobile/screens.md` (every screen and state, with captures) and `docs/mobile/SPEC.md` (the original brief).
 
 ## 🛠️ Development Standards
 

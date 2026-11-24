@@ -4,16 +4,16 @@ What is built in `passer-mobile/`, and the decisions behind it. The brief it ans
 
 ## Status
 
-Phase 1 is implemented and verified locally with the typecheck, unit tests, `expo-doctor` and an iOS bundle export. It has not run on a real iPhone yet; that needs the first EAS build.
+The app was redesigned on 2026-11-24 (branch `feat/mobile-redesign`): native iOS structure with Passer's identity, built on the device network. Every screen and state is checked in the bench, with captures in [screens.md](screens.md). It has not run on a real iPhone or Android phone yet; that needs the first EAS build.
 
-The owner widened Phase 1 beyond the spec's original scope. It includes:
-- QR pairing with an identity check, and a manual link fallback
-- Live connection status
-- Sending the clipboard through the native iOS paste button
-- Pulling the PC clipboard (text, image or ZIP)
-- Photos, with an explicit Clipboard or Passboard destination
-- Files, with progress and cancel
-- History, settings, dark and light themes, English and French
+What it does:
+- Join your devices with one code: scan the PC's *Add a device* QR (or paste its link), then compare the six digits on both screens
+- Send to the device of your choice: what you copied (Apple's paste control), photos, files
+- Fetch another device's clipboard, which its user approves each time ("It asks first")
+- Receive text and files from the PC (the phone now offers `clipboard.write` and `file.receive`)
+- Answer permission requests, see every device and whether it answers, add one (from a phone that manages devices), remove one, stop remote activity
+- Activity, settings, the direct connection kept for Shortcuts and large files, updates
+- iPhone and Android conventions, dark and light, English and French, Dynamic Type, VoiceOver
 
 ## Decisions (spec §11)
 
@@ -38,18 +38,28 @@ passer-mobile/
   assets/brand/     vector icon source
   modules/passer-core/  the device network (Rust passer-core), see device-network.md
   src/
-    app/            routes (expo-router)
-    core/           the desktop contract; no React Native imports, unit-tested
-    platform/       thin wrappers over native modules
-    state/          providers: pairings, connection, history, transfers, settings, devices
-    components/     conduit (home screen pieces) and ui primitives
-    theme/          tokens from the approved mockups
-    i18n/           strings, EN and FR
+    app/            routes (expo-router): (tabs)/ Send, Devices, Activity; sheets and flows beside
+    core/           contracts with the PC and the device network; no React Native imports, unit-tested
+    platform/       thin wrappers over native modules, and the platform look (iOS or Android)
+    state/          providers: devices, approvals, transfers, history, settings, and the direct pairing
+    components/     screen pieces (device drawing, code digits, approval prompt) and ui primitives
+    theme/          tokens: the desktop's palette, iOS and Material type scales
+    i18n/           strings, EN and FR, in the desktop's words
 ```
 
 `core/` is platform-agnostic on purpose (spec §9). It holds pairing link parsing, response interpretation, the connection strategy and the API client. Everything native sits behind `platform/`: Keychain, file transfers, pickers, clipboard, haptics. An Android-specific implementation replaces files there, not logic.
 
-## Talking to the PC
+## Two ways to the PC
+
+Since the redesign, everything goes through the **device network** (passer-core, [device-network.md](device-network.md)): one pairing, the other device's rules and approvals, end-to-end encryption. `src/core/device-calls.ts` calls the PC's capabilities and turns the core's refusals into the screens' words (denied, no answer, too large, unreachable).
+
+Two things a single call can't carry yet still use the **direct connection**, the HTTP pairing below, when the user set one up in Settings › Direct connection:
+- files over 700 KB (until the core streams);
+- images for the PC clipboard (the PC's `clipboard.write` takes text).
+
+Without it, photos are shrunk to fit one call and said so; larger files are refused with an explanation ("Too large for now"). The direct pairing's `passer://pair` link carries a permanent token, so it is never handed to other devices of the group (decision with the desktop session, 2026-11-24). Shortcuts, widgets and the share extension keep using it.
+
+## The direct connection (HTTP)
 
 - **Pairing.** `core/pairing.ts` parses `passer://pair?v=1&name=&host=&ip=&port=&token=&id=`. It ignores unknown parameters, and rejects newer versions with an "update the app" message. The link opens the `pair` route whether it comes from the in-app scanner, the manual field or the iOS Camera app, through the `passer` URL scheme. The scanner and the manual field hand it over in memory, so the token never sits in navigation state. The pairing screen waits for stored pairings to load before saving, and clears the onboarding screens underneath once paired.
 - **Identity before secrets.** `core/endpoint.ts` tries the preferred address first and starts the others 350 ms apart. Besides the `.local` host and the IP from the QR code, it tries the bare machine name (`desktop-4f7kq2m`): away from home, Tailscale's MagicDNS resolves it, because Tailscale names a machine after its OS hostname the way the desktop derives its mDNS label. It accepts the first `/ping` whose `id` matches the pairing, or whose `name` matches for older desktops without an id. The token is never sent to a PC that fails this check, which matters on networks with several Passer PCs.
@@ -71,8 +81,8 @@ passer-mobile/
 
 | Constraint | Handling |
 |---|---|
-| Reading the clipboard shows an alert | The send button is Apple's `UIPasteControl` (`ClipboardPasteButton`). Its label and icon are Apple's; only its colours, shape and size are ours. The kind of content on the clipboard is detected without reading it. |
-| No background receive | Pulling is explicit: the From PC button, or pulling the conduit down. |
+| Reading the clipboard shows an alert | The send button is Apple's `UIPasteControl` (`ClipboardPasteButton`). Its label ("Paste") and icon are Apple's; only its colours, shape and size are ours, so the title above it, *What you copied*, and the line saying what is copied carry the meaning. The kind of content is detected without reading it. Android has no such alert: its button says *Send what I copied*. |
+| No background receive | Fetching is explicit (the *Its clipboard* disc). The node runs only while the app is open, so the PC can send to the phone only then; the desktop shows the phone as not reachable otherwise. |
 | Local Network permission | Explained on the welcome screen before the first connection triggers the prompt. Requests fail until the alert is answered, so the first pairing try keeps retrying for 15 s, and at once when the app returns to the foreground. Unreachable states link to Settings. |
 | Cleartext HTTP | `NSAllowsLocalNetworking` only; App Transport Security stays on everywhere else. Android enables cleartext through `expo-build-properties`. |
 | HEIC | The PC cannot decode it, so photos sent to its clipboard are re-encoded as JPEG. Passboard sends keep the original file. |
@@ -93,24 +103,24 @@ passer-mobile/
 
 ## Design implementation
 
-The home screen is direction **B · Conduit** from the approved mockups:
-- **Top:** the PC, with two sockets (Clipboard, Passboard) showing the last item each one received.
-- **Middle:** a line down to this iPhone. It carries the connection state (glowing, a searching pulse, dashed when unreachable), the progress of file transfers, and a comet for completed transfers.
-- **Bottom:** the launch pad, with the native paste button, then Photo, From PC and File.
+Direction **native iOS with Passer's identity**, chosen by the owner on 2026-11-24 after the desktop became a full window with a Showroom (mockups: https://claude.ai/artifact/UhwZgK5xtLLmt9Zobju2hd, page *Natif + ADN Passer*). The Showroom itself was set aside on the phone.
 
-Known gap, noted by the owner: the middle of the conduit feels empty when idle.
+- **Structure from the platform.** Three tabs (Send, Devices, Activity), drawn by the system through expo-router's native tabs: UITabBar on iOS, Material 3's navigation bar on Android (`src/platform/tabs-layout.tsx`). Large titles, grouped lists and sheets on iOS; headlines, plain lists and dialogs on Android (`src/platform/look.ts` decides; `components/ui/list.tsx`, `header.tsx` and `approval-prompt.tsx` follow it). Back is the system's: the chevron and swipe on iOS, the arrow and back gesture on Android.
+- **Identity from Passer.** Near-black ground, the paste control as the one white action, commands as round discs with the amber lock *It asks first* (the desktop Showroom's grammar), the desktop's navy for confirming (*Add a device*, *Allow once*), each device drawn with the wallpaper the desktop derives from its id (`core/devices.ts`, same formula), the code as two groups of three digits in cells.
+- **Words from the desktop.** Reachable / Not reachable, Manages devices, It asks first, This request only, Allow once, Stop remote activity.
+- **States.** Loading draws the screen's shape; a failure says what happened in a sentence, the raw detail underneath, and *Try again*; an unreachable device says why it might be and pauses the commands; empty screens say what will appear and how.
+- **Accessibility.** Text follows Dynamic Type and Android's font size and nothing has a fixed height; long device names wrap rather than cut; every control has a label, the countdown is a timer VoiceOver reads, outcomes are announced. With Reduce Motion, entrances don't move.
 
-`src/theme/tokens.ts` mirrors the mockups. Motion runs on the UI thread through Reanimated shared values, using `.get()`/`.set()` as the React Compiler requires. With Reduce Motion on, every travel animation becomes a fade.
+Every screen and state, with captures: [screens.md](screens.md).
 
 ## The bench
 
-`npx expo start --web` renders the real screens in a browser, inside an iPhone frame, facing a fake PC that answers exactly like the desktop. It has regimes for first launch, a sleeping PC, a slow network and a rejected token, and it switches appearance, language and device. The web build exists only for the bench; the app never runs in a browser. See [bench.md](bench.md).
+`npx expo start --web` renders the real screens in a browser, inside an iPhone frame, facing a fake group of devices and a fake PC that answer exactly like the desktop. It has regimes for first launch, a phone alone in its group, a sleeping PC, a PC that refuses, a load failure and the direct connection's cases; it plays another device's actions (a request, a text or file sent, a device joining), and switches platform look, text size, appearance, language and device. The web build exists only for the bench; the app never runs in a browser. See [bench.md](bench.md).
 
 ## Not done yet
 
-- **Device network:** the passer-core module, the Devices sheet and approval prompts are written and checked in the bench; no native build has compiled them yet. See [device-network.md](device-network.md).
-- **Real-device checks:** the Local Network prompt, `.local` resolution on iOS, paste button sizing in French, upload progress.
-- **Share extension and Shortcuts actions:** built and signed, not yet tried on a phone. See [extensions.md](extensions.md).
-- **Widgets and Control Center controls:** written, not yet built. The first build needs the owner's Apple ID login for the new `direct.passer.app.widgets` identifier.
-- **Later phases:** multiple PCs in the UI, and mDNS discovery (phases 2 and 3).
-- **Device passes:** VoiceOver on a real iPhone, and 60 fps on the transfer animation.
+- **A native build.** No EAS build has compiled the redesign, the passer-core module or the phone's capabilities (`PhoneCapabilities` in Swift and Kotlin, written against the UniFFI bindings without a compiler here). The first build is the check.
+- **Real-device checks:** how native errors read on the JavaScript side (the classification looks for the core's codes in the text), the Local Network prompt with iroh, the native tab bar's look, the paste control at large text sizes, VoiceOver, Android's back gesture.
+- **Waiting on passer-core** (`fa88722`, not pushed): each device's kind and system, when it last answered, the capabilities it offers and its journal. Until then the drawing is guessed from the name, reachability is probed with `device.info`, and every device gets the same three commands.
+- **Share extension, Shortcuts and widgets** still use the direct connection; moving them to the device network needs the core in the extensions.
+- **Large files without the direct connection** wait for streams in the core.
