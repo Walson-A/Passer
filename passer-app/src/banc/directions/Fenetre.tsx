@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Bot, Inbox, Layers, Minus, MonitorSmartphone, Pin, Search, Settings, Square, X } from "lucide-react";
+import { Bot, Inbox, Layers, Minus, MonitorSmartphone, OctagonX, Pin, Search, Settings, Square, X } from "lucide-react";
 import type { Device } from "./donnees";
 
 /**
@@ -7,7 +7,7 @@ import type { Device } from "./donnees";
  * pin, window controls) and a sidebar for the destinations that the small panel
  * squeezed into a tab bar. Same dark glass as today, more room.
  */
-export function Fenetre({ children, active = "devices" }: { children: ReactNode; active?: string }) {
+export function Fenetre({ children, active = "devices", stop = false }: { children: ReactNode; active?: string; stop?: boolean }) {
     const nav = [
         { id: "passboard", label: "Passboard", Icon: Inbox, badge: "3" },
         { id: "space", label: "Space", Icon: Layers },
@@ -57,6 +57,13 @@ export function Fenetre({ children, active = "devices" }: { children: ReactNode;
                                 <span className="text-[11px] font-bold text-white/80">Ready</span>
                             </div>
                             <p className="text-[11px] text-white/45 mt-1 leading-snug">This PC is reachable by your devices</p>
+                            {/* The way out belongs to the PC, not to one device: it ends
+                                everything any device is doing here. */}
+                            {stop && (
+                                <p className="flex items-center gap-1.5 mt-2.5 pt-2.5 border-t border-white/[0.06] text-[11px] font-semibold text-red-200/85">
+                                    <OctagonX className="w-3.5 h-3.5" strokeWidth={2} /> Stop remote activity
+                                </p>
+                            )}
                         </div>
                     </div>
                 </nav>
