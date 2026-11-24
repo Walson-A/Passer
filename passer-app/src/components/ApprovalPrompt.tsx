@@ -16,6 +16,11 @@ interface Request {
     expires_in_secs: number;
 }
 
+/** A request as queued here: with the moment it arrived, which its deadline counts from. */
+interface Queued extends Request {
+    deadline: number;
+}
+
 /**
  * Another device asks this PC for something sensitive (reading the clipboard...).
  * One request at a time, on top of everything, with a countdown: no answer means no.
@@ -25,7 +30,7 @@ interface Request {
  * who asks, what they want, on what and for how long, and how long you have.
  */
 export function ApprovalPrompt() {
-    const [queue, setQueue] = useState<Request[]>([]);
+    const [queue, setQueue] = useState<Queued[]>([]);
     const [left, setLeft] = useState(0);
     const [answering, setAnswering] = useState(false);
     const denyRef = useRef<HTMLButtonElement>(null);
@@ -36,7 +41,10 @@ export function ApprovalPrompt() {
         let alive = true;
         (async () => {
             const a = await listen<Request>("approval-request", e => {
-                setQueue(q => [...q, e.payload]);
+                // The backend times every request from the moment it asks, even
+                // one that waits here behind another, so the countdown must too.
+                const deadline = Date.now() + e.payload.expires_in_secs * 1000;
+                setQueue(q => [...q, { ...e.payload, deadline }]);
             });
             const b = await listen<number>("approval-closed", e => {
                 setQueue(q => q.filter(r => r.id !== e.payload));
@@ -48,11 +56,13 @@ export function ApprovalPrompt() {
 
     useEffect(() => {
         if (!current) return;
-        setLeft(current.expires_in_secs);
+        const deadline = current.deadline;
+        const tick = () => setLeft(Math.max(0, Math.ceil((deadline - Date.now()) / 1000)));
+        tick();
         setAnswering(false);
         // The safe answer has the focus, so a stray Enter can never grant access.
         requestAnimationFrame(() => denyRef.current?.focus({ preventScroll: true }));
-        const t = setInterval(() => setLeft(s => Math.max(0, s - 1)), 1000);
+        const t = setInterval(tick, 250);
         return () => clearInterval(t);
     }, [current?.id]);
 
