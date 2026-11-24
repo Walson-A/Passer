@@ -85,6 +85,19 @@ function App() {
     };
   }, []);
 
+  // A device joined through an invitation of this PC: the code to compare is
+  // on the Devices tab, so go there. The invitation stays valid after the user
+  // leaves that tab, so the join can land while another view is showing.
+  useEffect(() => {
+    let off: (() => void) | undefined;
+    let alive = true;
+    (async () => {
+      const un = await listen("device-joined", () => goTo("devices"));
+      if (alive) off = un; else un();
+    })();
+    return () => { alive = false; off?.(); };
+  }, []);
+
   // Listen for backend logs
   useEffect(() => {
     let unlisten: () => void;

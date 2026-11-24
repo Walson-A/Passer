@@ -61,6 +61,7 @@ export function TabBar({ view, onChange }: Props) {
                             aria-current={active ? "page" : undefined}
                             className={`relative flex-1 flex flex-col items-center gap-1.5 py-1.5 rounded-xl cursor-pointer
                                 transition-colors duration-200 active:scale-[0.96]
+                                outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70
                                 ${active ? "text-white" : "text-white/35 hover:text-white/70"}`}
                         >
                             <Icon
