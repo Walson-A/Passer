@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { Check, FileUp, Loader2, X } from "lucide-react";
 import { DeviceRender } from "./DeviceRender";
 import { InlineError } from "./DeviceInvite";
-import { Action, FOCUS, isRecent, kindOfMember, screenFor, seenLabel, type Capability, type DevicesStatus, type Member } from "./deviceUi";
+import { Action, FOCUS, ProgressLine, isRecent, kindOfMember, screenFor, seenLabel, type Capability, type DevicesStatus, type Member, type SendProgress } from "./deviceUi";
 
 interface Props {
     /** Takes the user to the Devices space (when there is nobody to send to yet). */
@@ -15,8 +16,9 @@ type Target = { member: Member; canReceive: boolean };
 
 /**
  * Files dropped on the window go to one of your devices: drop, then choose
- * which. Only devices that accept files (`file.receive` in what they offer
- * this PC) can be picked; the others say why not. Files used to be copied
+ * which. Only devices that accept files (`file.drop`, streamed and of any size,
+ * or the older `file.receive`) can be picked; the others say why not. A bar
+ * shows each file on its way. Files used to be copied
  * into the "Passer Space" folder instead - Space is folded away until
  * passer-core can stream files of any size.
  */
@@ -28,6 +30,19 @@ export function DropZone({ onOpenDevices }: Props) {
     const [sending, setSending] = useState<string | null>(null);
     const [done, setDone] = useState<string | null>(null);
     const [error, setError] = useState<{ text: string; detail: string } | null>(null);
+    const [progress, setProgress] = useState<SendProgress | null>(null);
+
+    useEffect(() => {
+        let off: (() => void) | undefined;
+        let alive = true;
+        (async () => {
+            const un = await listen<SendProgress>("send-progress", e => {
+                if (e.payload.transfer.startsWith("drop-")) setProgress(e.payload);
+            });
+            if (alive) off = un; else un();
+        })();
+        return () => { alive = false; off?.(); };
+    }, []);
 
     useEffect(() => {
         let unlisten: (() => void) | undefined;
@@ -63,7 +78,7 @@ export function DropZone({ onOpenDevices }: Props) {
                 const others = status.members.filter(m => !m.this_device);
                 const list = await Promise.all(others.map(async member => {
                     const caps = await invoke<Capability[]>("devices_capabilities", { id: member.id }).catch(() => []);
-                    return { member, canReceive: caps.some(c => c.name === "file.receive") };
+                    return { member, canReceive: caps.some(c => c.name === "file.drop" || c.name === "file.receive") };
                 }));
                 if (alive) setTargets(list.sort((a, b) => Number(b.canReceive) - Number(a.canReceive)));
             } catch {
@@ -86,6 +101,7 @@ export function DropZone({ onOpenDevices }: Props) {
         if (!paths || sending) return;
         setSending(m.id);
         setError(null);
+        setProgress(null);
         try {
             const n = await invoke<number>("devices_send_paths", { id: m.id, paths });
             setDone(`${n === 1 ? "Sent" : `${n} files sent`} to ${m.name}`);
@@ -94,6 +110,7 @@ export function DropZone({ onOpenDevices }: Props) {
             setError({ text: `It didn't reach ${m.name}.`, detail: String(e) });
         } finally {
             setSending(null);
+            setProgress(null);
         }
     };
 
@@ -166,6 +183,7 @@ export function DropZone({ onOpenDevices }: Props) {
                                 })
                             )}
                             <div aria-live="polite">
+                                {sending && progress && <div className="px-2 pt-2"><ProgressLine p={progress} /></div>}
                                 {done && (
                                     <p className="flex items-center gap-1.5 px-2 pt-2 text-[13px] font-semibold text-emerald-300">
                                         <Check className="w-4 h-4" strokeWidth={2.5} aria-hidden />{done}

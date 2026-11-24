@@ -49,6 +49,42 @@ export interface JournalLine {
     outcome: string;
 }
 
+/** Payload of `send-progress`: a file on its way to another device. */
+export interface SendProgress {
+    transfer: string;
+    name: string;
+    done: number;
+    total: number | null;
+}
+
+export function formatSize(bytes: number) {
+    if (bytes < 1024) return `${bytes} B`;
+    const units = ["KB", "MB", "GB"];
+    let v = bytes / 1024, i = 0;
+    while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+    return `${v < 10 ? v.toFixed(1) : Math.round(v)} ${units[i]}`;
+}
+
+/** A file going out: its name, how far, a thin bar. */
+export function ProgressLine({ p }: { p: SendProgress }) {
+    const ratio = p.total ? Math.min(1, p.done / p.total) : null;
+    return (
+        <div className="flex flex-col gap-1.5" role="progressbar" aria-label={`Sending ${p.name}`}
+            aria-valuemin={0} aria-valuemax={100} aria-valuenow={ratio === null ? undefined : Math.round(ratio * 100)}>
+            <p className="flex items-baseline justify-between gap-3 text-[12px]">
+                <span className="truncate text-white/75">Sending <span className="font-semibold text-white/90">{p.name}</span></span>
+                <span className="shrink-0 tabular-nums text-white/50">
+                    {ratio === null ? formatSize(p.done) : `${Math.round(ratio * 100)} %`}
+                </span>
+            </p>
+            <span className="block h-1 rounded-full bg-white/[0.08] overflow-hidden">
+                <span className={`block h-full rounded-full bg-blue-400 transition-[width] duration-150 ${ratio === null ? "w-1/3 animate-pulse" : ""}`}
+                    style={ratio === null ? undefined : { width: `${ratio * 100}%` }} />
+            </span>
+        </div>
+    );
+}
+
 /** A member answered recently enough to call it here. */
 export const RECENT_S = 5 * 60;
 

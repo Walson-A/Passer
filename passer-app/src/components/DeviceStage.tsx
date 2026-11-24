@@ -1,13 +1,12 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { ArrowDownLeft, ArrowUpRight, Check, ChevronRight, Clipboard, Loader2, Lock, Paperclip, RefreshCw, Send, ShieldCheck } from "lucide-react";
 import { DeviceRender } from "./DeviceRender";
 import { InlineError } from "./DeviceInvite";
-import { FOCUS, isRecent, kindOfMember, osLabel, screenFor, seenLabel, thisOs, type Member } from "./deviceUi";
+import { FOCUS, ProgressLine, isRecent, kindOfMember, osLabel, screenFor, seenLabel, thisOs, type Member, type SendProgress } from "./deviceUi";
 import { useCapabilities } from "../hooks/useCapabilities";
 import type { HistoryItem } from "../hooks/useHistory";
-
-const MAX_FILE = 700 * 1024;
 
 type CommandId = "file" | "send-clipboard" | "get-clipboard";
 type CommandState =
@@ -37,12 +36,26 @@ export function DeviceStage({ member: m, running, onRefresh, refreshing, last, o
     const reachable = m.this_device ? running : isRecent(m.answered_at);
     const offers = (name: string) => caps?.caps?.find(c => c.name === name);
     const getCap = offers("clipboard.read");
-    const anything = !!(offers("file.receive") || offers("clipboard.write") || getCap);
+    const fileCap = offers("file.drop") ?? offers("file.receive");
+    const anything = !!(fileCap || offers("clipboard.write") || getCap);
     const [command, setCommand] = useState<CommandState | null>(null);
-    const fileRef = useRef<HTMLInputElement>(null);
+    const [progress, setProgress] = useState<SendProgress | null>(null);
+    const transfer = `stage-${m.id}`;
+
+    useEffect(() => {
+        let off: (() => void) | undefined;
+        let alive = true;
+        (async () => {
+            const un = await listen<SendProgress>("send-progress", e => {
+                if (e.payload.transfer === transfer) setProgress(e.payload);
+            });
+            if (alive) off = un; else un();
+        })();
+        return () => { alive = false; off?.(); };
+    }, [transfer]);
 
     // A result belongs to the device it was for.
-    useEffect(() => setCommand(null), [m.id]);
+    useEffect(() => { setCommand(null); setProgress(null); }, [m.id]);
 
     const run = async (id: CommandId, fn: () => Promise<string>, failText: string) => {
         if (command?.phase === "busy") return;
@@ -52,20 +65,22 @@ export function DeviceStage({ member: m, running, onRefresh, refreshing, last, o
             setCommand({ id, phase: "done", text });
             setTimeout(() => setCommand(c => (c?.id === id && c.phase === "done" ? null : c)), 3000);
         } catch (e) {
-            setCommand({ id, phase: "error", text: failText, detail: String(e) });
+            if (String(e).includes("cancelled")) setCommand(null);
+            else setCommand({ id, phase: "error", text: failText, detail: String(e) });
         }
     };
 
-    const sendFile = (file: File) => run("file", async () => {
-        if (file.size > MAX_FILE) throw new Error(`${file.name} is ${(file.size / 1024).toFixed(0)} KB; for now, files up to 700 KB can go this way.`);
-        const data = await new Promise<string>((resolve, reject) => {
-            const r = new FileReader();
-            r.onload = () => resolve(String(r.result).split(",")[1] ?? "");
-            r.onerror = () => reject(r.error);
-            r.readAsDataURL(file);
-        });
-        await invoke("devices_send_file", { id: m.id, name: file.name, dataBase64: data });
-        return `${file.name} sent`;
+    // A native picker, then the file goes by path: streamed (any size) to a device
+    // that offers `file.drop`, else through the older `file.receive` (700 KB).
+    const sendFile = () => run("file", async () => {
+        setProgress(null);
+        try {
+            const name = await invoke<string | null>("devices_pick_and_send", { id: m.id, transfer });
+            if (name === null) throw new Error("cancelled");
+            return `${name} sent`;
+        } finally {
+            setProgress(null);
+        }
     }, "The file didn't go through.");
 
     const sendClipboard = () => run("send-clipboard", async () => {
@@ -130,10 +145,10 @@ export function DeviceStage({ member: m, running, onRefresh, refreshing, last, o
                         ) : (
                             <>
                                 <div className="flex gap-5">
-                                    {offers("file.receive") && (
+                                    {fileCap && (
                                         <Disk icon={<Paperclip className="w-[21px] h-[21px]" strokeWidth={1.75} aria-hidden />} label="Send a file"
-                                            locked={offers("file.receive")?.needs_approval} hint={offers("file.receive")?.needs_approval ? "It asks first" : undefined}
-                                            state={command?.id === "file" ? command.phase : null} onClick={() => fileRef.current?.click()} />
+                                            locked={fileCap.needs_approval} hint={fileCap.needs_approval ? "It asks first" : undefined}
+                                            state={command?.id === "file" ? command.phase : null} onClick={sendFile} />
                                     )}
                                     {offers("clipboard.write") && (
                                         <Disk icon={<Send className="w-[21px] h-[21px]" strokeWidth={1.75} aria-hidden />} label="Send my clipboard"
@@ -146,17 +161,8 @@ export function DeviceStage({ member: m, running, onRefresh, refreshing, last, o
                                             state={command?.id === "get-clipboard" ? command.phase : null} onClick={getClipboard} />
                                     )}
                                 </div>
-                                <input
-                                    ref={fileRef}
-                                    type="file"
-                                    className="hidden"
-                                    onChange={e => {
-                                        const f = e.target.files?.[0];
-                                        e.target.value = "";
-                                        if (f) sendFile(f);
-                                    }}
-                                />
-                                <div className="mt-4 min-h-[22px]" aria-live="polite">
+                                <div className="mt-4 min-h-[22px] max-w-[360px]" aria-live="polite">
+                                    {command?.phase === "busy" && command.id === "file" && progress && <ProgressLine p={progress} />}
                                     {command?.phase === "busy" && command.id === "get-clipboard" && getCap?.needs_approval && (
                                         <p className="text-[12px] text-amber-100/80">Waiting for an answer on {m.name}…</p>
                                     )}

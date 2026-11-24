@@ -35,6 +35,7 @@ pub fn run() {
             }
         }))
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec![]))) 
         .invoke_handler(tauri::generate_handler![
             commands::get_ip,
@@ -65,7 +66,7 @@ pub fn run() {
             devices::devices_answer_approval,
             devices::devices_send_clipboard,
             devices::devices_get_clipboard,
-            devices::devices_send_file,
+            devices::devices_pick_and_send,
             devices::devices_send_paths,
             devices::devices_refresh,
             devices::devices_capabilities,

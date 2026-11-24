@@ -20,6 +20,8 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = ["protocol-asset", "tray-icon", "image-png"] }
 tauri-plugin-opener = "2"
+# A native "choose a file" window for "Send a file" (used from Rust only).
+tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 axum = { version = "0.8.7", features = ["multipart"] }
@@ -39,10 +41,7 @@ base64 = "0.21"
 headers = "0.3" 
 open = "5.0" # For auth headers handling if needed
 # The device network: identity, groups, encrypted connections, permissions.
-# TEMPORARY while passer-core changes are local: switch back to the GitHub rev before pushing.
-# The local repository at a fixed commit (fa88722, members' details, capabilities and
-# journal), not its working tree, so passer-core's work in progress cannot break this build.
-passer-ffi = { git = "file:///C:/Users/Walson/Documents/passer-core", rev = "fa88722c1dec39b2eed0fd14d8c8fa9a4d03d1fd" }
+passer-ffi = { git = "https://github.com/Walson-A/passer-core", rev = "94e25977401691233ae5538d291df2c5f561003e" }
 async-trait = "0.1"
 tauri-plugin-autostart = "2.5.1"
 tauri-plugin-single-instance = "2"
