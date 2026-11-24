@@ -5104,13 +5104,13 @@ dependencies = [
  "tempfile",
  "tokio",
  "tower-http",
+ "windows-sys 0.61.2",
  "zip",
 ]
 
 [[package]]
 name = "passer-bus"
 version = "0.1.0"
-source = "git+https://github.com/Walson-A/passer-core?rev=8f8f051e449f88b7f974e1c005c8ee56a135d3eb#8f8f051e449f88b7f974e1c005c8ee56a135d3eb"
 dependencies = [
  "async-trait",
  "blake3",
@@ -5127,7 +5127,6 @@ dependencies = [
 [[package]]
 name = "passer-coord"
 version = "0.1.0"
-source = "git+https://github.com/Walson-A/passer-core?rev=8f8f051e449f88b7f974e1c005c8ee56a135d3eb#8f8f051e449f88b7f974e1c005c8ee56a135d3eb"
 dependencies = [
  "anyhow",
  "clap",
@@ -5144,7 +5143,6 @@ dependencies = [
 [[package]]
 name = "passer-device-info"
 version = "0.1.0"
-source = "git+https://github.com/Walson-A/passer-core?rev=8f8f051e449f88b7f974e1c005c8ee56a135d3eb#8f8f051e449f88b7f974e1c005c8ee56a135d3eb"
 dependencies = [
  "async-trait",
  "passer-bus",
@@ -5154,7 +5152,6 @@ dependencies = [
 [[package]]
 name = "passer-ffi"
 version = "0.1.0"
-source = "git+https://github.com/Walson-A/passer-core?rev=8f8f051e449f88b7f974e1c005c8ee56a135d3eb#8f8f051e449f88b7f974e1c005c8ee56a135d3eb"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5165,6 +5162,7 @@ dependencies = [
  "passer-identity",
  "passer-membership",
  "passer-node",
+ "serde",
  "serde_json",
  "thiserror 2.0.21",
  "tokio",
@@ -5175,7 +5173,6 @@ dependencies = [
 [[package]]
 name = "passer-identity"
 version = "0.1.0"
-source = "git+https://github.com/Walson-A/passer-core?rev=8f8f051e449f88b7f974e1c005c8ee56a135d3eb#8f8f051e449f88b7f974e1c005c8ee56a135d3eb"
 dependencies = [
  "hex",
  "iroh-base",
@@ -5188,7 +5185,6 @@ dependencies = [
 [[package]]
 name = "passer-membership"
 version = "0.1.0"
-source = "git+https://github.com/Walson-A/passer-core?rev=8f8f051e449f88b7f974e1c005c8ee56a135d3eb#8f8f051e449f88b7f974e1c005c8ee56a135d3eb"
 dependencies = [
  "blake3",
  "hex",
@@ -5202,7 +5198,6 @@ dependencies = [
 [[package]]
 name = "passer-node"
 version = "0.1.0"
-source = "git+https://github.com/Walson-A/passer-core?rev=8f8f051e449f88b7f974e1c005c8ee56a135d3eb#8f8f051e449f88b7f974e1c005c8ee56a135d3eb"
 dependencies = [
  "anyhow",
  "async-trait",
