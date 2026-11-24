@@ -269,3 +269,114 @@ export function PasteIcon(props: IconProps) {
     </Glyph>
   );
 }
+
+/** Lucide `send`, the Send tab. */
+export function SendIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <Path d="M14.54 21.69a.5.5 0 0 0 .94-.03l6.5-19a.5.5 0 0 0-.64-.63l-19 6.5a.5.5 0 0 0-.02.93l7.93 3.18a2 2 0 0 1 1.11 1.11zM21.85 2.15 10.91 13.09" />
+    </Glyph>
+  );
+}
+
+/** Lucide `monitor-smartphone`, the Devices tab. */
+export function DevicesIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <Path d="M18 8V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h8M10 19v-3.96 3.15M7 19h5" />
+      <Rect x={16} y={12} width={6} height={10} rx={2} />
+    </Glyph>
+  );
+}
+
+/** Lucide `clock`, the Activity tab. */
+export function ClockIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <Circle cx={12} cy={12} r={10} />
+      <Path d="M12 6v6l4 2" />
+    </Glyph>
+  );
+}
+
+export function LockIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <Rect x={3} y={11} width={18} height={11} rx={2} />
+      <Path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </Glyph>
+  );
+}
+
+export function PlusIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <Path d="M5 12h14M12 5v14" />
+    </Glyph>
+  );
+}
+
+/** Lucide `qr-code`, for adding a device. */
+export function QrIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <Rect x={3} y={3} width={5} height={5} rx={1} />
+      <Rect x={16} y={3} width={5} height={5} rx={1} />
+      <Rect x={3} y={16} width={5} height={5} rx={1} />
+      <Path d="M21 16h-3a2 2 0 0 0-2 2v3M21 21v.01M12 7v3a2 2 0 0 1-2 2H7M3 12h.01M12 3h.01M12 16v.01M16 12h1M21 12v.01M12 21v-1" />
+    </Glyph>
+  );
+}
+
+export function ChevronLeftIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <Path d="m15 18-6-6 6-6" />
+    </Glyph>
+  );
+}
+
+export function ArrowLeftIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <Path d="m12 19-7-7 7-7M19 12H5" />
+    </Glyph>
+  );
+}
+
+/** Lucide `clipboard-paste`'s downward twin: fetching another device's clipboard. */
+export function ClipboardDownIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <Rect x={8} y={2} width={8} height={4} rx={1} />
+      <Path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2M12 11v6M9 14l3 3 3-3" />
+    </Glyph>
+  );
+}
+
+export function CopyIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <Rect x={8} y={8} width={14} height={14} rx={2} />
+      <Path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+    </Glyph>
+  );
+}
+
+export function InfoIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <Circle cx={12} cy={12} r={10} />
+      <Path d="M12 16v-4M12 8h.01" />
+    </Glyph>
+  );
+}
+
+export function CircleStopIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <Circle cx={12} cy={12} r={10} />
+      <Rect x={9} y={9} width={6} height={6} rx={1} />
+    </Glyph>
+  );
+}

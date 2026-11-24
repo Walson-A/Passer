@@ -179,7 +179,7 @@ export default function Pair() {
         ? format(t.pair.pairedTitle, { name: phase.name })
         : phase.title;
   const body =
-    phase.step === 'connecting' ? t.pair.connectingBody : phase.step === 'paired' ? t.pair.pairedBody : phase.body;
+    phase.step === 'connecting' ? t.pair.connectingBody : phase.step === 'paired' ? format(t.pair.pairedBody, { name: phase.name }) : phase.body;
 
   useEffect(() => {
     if (phase.step !== 'connecting') announce(`${title}. ${body}`);

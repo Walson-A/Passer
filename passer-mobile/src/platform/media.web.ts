@@ -77,6 +77,27 @@ export async function saveImageToPhotos(fileUri: string): Promise<boolean> {
   return true;
 }
 
+/**
+ * The bench's picks carry a name and a size, not real bytes: it hands over base64 of that
+ * size, which is what the fake device network measures (`modules/passer-core/index.web.ts`).
+ */
+export async function readBase64(uri: string): Promise<string> {
+  const marked = /#bench-size=(\d+)$/.exec(uri);
+  const known = [...(await benchHost().pickFiles()), ...(await benchHost().pickPhotos())].find((file) => file.uri === uri);
+  const size = marked ? Number(marked[1]) : (known?.size ?? 1024);
+  return 'A'.repeat(Math.ceil(size / 3) * 4);
+}
+
+/** A browser can't re-encode HEIC: the bench reports the size a phone's JPEG would have. */
+export async function fitPhoto(photo: PickedPhoto, maxBytes: number): Promise<{ file: UploadFile; reduced: boolean }> {
+  if (photo.size !== null && photo.size <= maxBytes) return { file: photo, reduced: false };
+  const size = Math.round(maxBytes * 0.86);
+  return {
+    file: { ...photo, uri: `${photo.uri}#bench-size=${size}`, name: withExtension(photo.name, 'jpg'), mimeType: 'image/jpeg', size },
+    reduced: true,
+  };
+}
+
 export async function shareFile(_fileUri: string, type: { mimeType: string; uti: string }): Promise<void> {
   benchHost().log('share', `Feuille de partage ouverte (${type.uti})`);
 }

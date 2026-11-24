@@ -43,6 +43,14 @@ export type Palette = {
   scrim: string;
   grabber: string;
   toggleOff: string;
+  /** The native-and-Passer screens: grouped lists, links, the desktop's navy action and the lock's amber. */
+  group: { cell: string; separator: string; header: string };
+  link: string;
+  navy: { background: string; border: string; text: string };
+  disc: { background: string; icon: string };
+  lock: string;
+  tab: { bar: string; border: string; active: string; inactive: string; indicator: string };
+  digit: { background: string; border: string; text: string };
 };
 
 export const palettes: Record<SchemeName, Palette> = {
@@ -105,6 +113,19 @@ export const palettes: Record<SchemeName, Palette> = {
     scrim: 'rgba(0,0,0,0.55)',
     grabber: 'rgba(255,255,255,0.22)',
     toggleOff: 'rgba(255,255,255,0.16)',
+    group: { cell: 'rgba(255,255,255,0.065)', separator: 'rgba(255,255,255,0.09)', header: 'rgba(255,255,255,0.55)' },
+    link: '#93C5FD',
+    navy: { background: '#1E2A44', border: '#3B5B8F', text: '#FFFFFF' },
+    disc: { background: 'rgba(255,255,255,0.085)', icon: 'rgba(255,255,255,0.92)' },
+    lock: '#FBBF24',
+    tab: {
+      bar: 'rgba(20,20,22,0.96)',
+      border: 'rgba(255,255,255,0.08)',
+      active: '#FFFFFF',
+      inactive: 'rgba(255,255,255,0.50)',
+      indicator: '#2E3A55',
+    },
+    digit: { background: 'rgba(52,211,153,0.09)', border: 'rgba(110,231,183,0.28)', text: '#FFFFFF' },
   },
   light: {
     ground: '#F3F3F0',
@@ -161,6 +182,19 @@ export const palettes: Record<SchemeName, Palette> = {
     scrim: 'rgba(21,21,20,0.28)',
     grabber: 'rgba(21,21,20,0.18)',
     toggleOff: 'rgba(21,21,20,0.14)',
+    group: { cell: '#FFFFFF', separator: 'rgba(21,21,20,0.10)', header: 'rgba(21,21,20,0.56)' },
+    link: '#1D4ED8',
+    navy: { background: '#1E2A44', border: '#1E2A44', text: '#FFFFFF' },
+    disc: { background: '#FFFFFF', icon: '#151514' },
+    lock: '#B45309',
+    tab: {
+      bar: 'rgba(249,249,247,0.96)',
+      border: 'rgba(21,21,20,0.12)',
+      active: '#151514',
+      inactive: 'rgba(21,21,20,0.48)',
+      indicator: '#DCE3F1',
+    },
+    digit: { background: '#ECFDF5', border: '#A7F3D0', text: '#151514' },
   },
 };
 
@@ -178,6 +212,14 @@ export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 24 } as const;
 
 /** Letter-spacing in points, converted from the mockups' em values. */
 export const type = {
+  /** iOS's large title; Android's headline. */
+  largeTitle: { fontSize: 34, lineHeight: 41, fontWeight: '700', letterSpacing: 0.37 },
+  heading: { fontSize: 22, lineHeight: 28, fontWeight: '700', letterSpacing: -0.26 },
+  headline: { fontSize: 17, lineHeight: 22, fontWeight: '600', letterSpacing: -0.43 },
+  callout: { fontSize: 17, lineHeight: 22, fontWeight: '400', letterSpacing: -0.43 },
+  subhead: { fontSize: 15, lineHeight: 20, fontWeight: '400', letterSpacing: -0.23 },
+  footnote: { fontSize: 13, lineHeight: 18, fontWeight: '400', letterSpacing: -0.08 },
+  digits: { fontSize: 30, lineHeight: 36, fontWeight: '800', letterSpacing: 0 },
   pcName: { fontSize: 22, lineHeight: 28, fontWeight: '600', letterSpacing: -0.44 },
   title: { fontSize: 17, lineHeight: 22, fontWeight: '600', letterSpacing: -0.17 },
   body: { fontSize: 14, lineHeight: 19, fontWeight: '500', letterSpacing: 0 },

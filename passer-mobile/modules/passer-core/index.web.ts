@@ -1,78 +1,51 @@
 /**
- * Bench version of the device network: a fake group with a PC, so the Devices screen
- * can be seen in a browser. Nothing here talks to a real device.
+ * Bench version of the device network: every call goes to the bench's fake group
+ * (`bench/core.ts`), which answers as the desktop does. Nothing here talks to a real device.
  */
-import type { ApprovalRequest, Joined, Member, Status } from './index';
+import { benchHost } from '@/platform/web-bench';
 
-export type { ApprovalRequest, Joined, Member, Status } from './index';
+import type { ApprovalRequest, Joined, Received, Status } from './index';
+
+export type { ApprovalRequest, Joined, Member, Received, Status } from './index';
 
 type Listener = (payload: never) => void;
-const listeners = new Map<string, Set<Listener>>();
 
-let joined = false;
-const pc: Member = { id: 'pc'.padEnd(64, '0'), shortId: '9cfff8cf59', name: 'WALSON-HP', approver: true, thisDevice: false };
-const me: Member = { id: 'me'.padEnd(64, '1'), shortId: '25eca2f067', name: 'iPhone', approver: false, thisDevice: true };
-
-const status = (): Status => ({
-  deviceId: me.id,
-  group: joined ? 'My devices' : null,
-  running: joined,
-  members: joined ? [pc, me] : [],
-});
-
-const fake = {
-  open: async () => status(),
-  status: async () => status(),
-  createGroup: async () => {
-    joined = true;
-  },
-  join: async () => {
-    joined = true;
-    return { groupName: 'My devices', sas: '972066' };
-  },
-  start: async () => {},
-  stop: async () => {},
-  invite: async () => 'passer-core://join?v=1&bench=1',
-  call: async (_device: string, capability: string, inputJson: string) => {
-    if (capability === 'clipboard.read') return JSON.stringify({ text: 'Copied on the PC' });
-    if (capability === 'device.info') return JSON.stringify({ name: 'WALSON-HP', os: 'windows', arch: 'x86_64', version: '0.1.0' });
-    return JSON.stringify({ ok: true, echo: inputJson.length });
-  },
-  removeDevice: async () => {},
-  stopAllSessions: async () => {},
-  answerApproval: () => true,
-  addListener(event: string, listener: Listener) {
-    const set = listeners.get(event) ?? new Set();
-    set.add(listener);
-    listeners.set(event, set);
-    return { remove: () => set.delete(listener) };
-  },
+const proxy = {
+  open: () => benchHost().core.open(),
+  status: () => benchHost().core.status(),
+  createGroup: (groupName: string, _deviceName: string) => benchHost().core.createGroup(groupName),
+  join: (_link: string, _deviceName: string) => benchHost().core.join(),
+  start: (_coord: string | null) => benchHost().core.start(),
+  stop: () => benchHost().core.stop(),
+  invite: (minutes: number, asApprover: boolean) => benchHost().core.invite(minutes, asApprover),
+  call: (device: string, capability: string, inputJson: string) => benchHost().core.call(device, capability, inputJson),
+  removeDevice: (id: string) => benchHost().core.removeDevice(id),
+  stopAllSessions: () => benchHost().core.stopAllSessions(),
+  answerApproval: (id: number, allow: boolean) => benchHost().core.answerApproval(id, allow),
+  addListener: (event: 'onApprovalRequest' | 'onApprovalClosed' | 'onDeviceJoined' | 'onReceived', listener: Listener) =>
+    benchHost().core.addListener(event, listener),
 };
 
-export const PasserCore = { available: true, module: fake };
+type Proxy = {
+  open(): Promise<Status>;
+  status(): Promise<Status>;
+  createGroup(groupName: string, deviceName: string): Promise<void>;
+  join(link: string, deviceName: string): Promise<{ groupName: string; sas: string }>;
+  start(coord: string | null): Promise<void>;
+  stop(): Promise<void>;
+  invite(minutes: number, asApprover: boolean): Promise<string>;
+  call(device: string, capability: string, inputJson: string): Promise<string>;
+  removeDevice(id: string): Promise<void>;
+  stopAllSessions(): Promise<void>;
+  answerApproval(id: number, allow: boolean): boolean;
+  addListener(event: 'onApprovalRequest', listener: (request: ApprovalRequest) => void): { remove: () => void };
+  addListener(event: 'onApprovalClosed', listener: (event: { id: number }) => void): { remove: () => void };
+  addListener(event: 'onDeviceJoined', listener: (joined: Joined) => void): { remove: () => void };
+  addListener(event: 'onReceived', listener: (received: Received) => void): { remove: () => void };
+};
+
+export const PasserCore = { available: true, module: proxy as unknown as Proxy };
 
 export function isCoreInvitation(link: string): boolean {
   return link.startsWith('passer-core://join?');
-}
-
-/** Bench only: simulate another device asking for something. */
-export function benchApproval(request: ApprovalRequest) {
-  listeners.get('onApprovalRequest')?.forEach((l) => (l as (r: ApprovalRequest) => void)(request));
-}
-
-export function benchJoined(j: Joined) {
-  listeners.get('onDeviceJoined')?.forEach((l) => (l as (r: Joined) => void)(j));
-}
-
-// From the browser console (detail is a JSON string, so it also crosses into the page from
-// a devtools or extension context):
-//   dispatchEvent(new CustomEvent('passer-core-bench', { detail: JSON.stringify({ approval: {...} }) }))
-//   dispatchEvent(new CustomEvent('passer-core-bench', { detail: JSON.stringify({ joined: {...} }) }))
-if (typeof window !== 'undefined') {
-  window.addEventListener('passer-core-bench', (event) => {
-    const detail = (event as CustomEvent<string>).detail;
-    const { approval, joined } = JSON.parse(detail) as { approval?: ApprovalRequest; joined?: Joined };
-    if (approval) benchApproval(approval);
-    if (joined) benchJoined(joined);
-  });
 }

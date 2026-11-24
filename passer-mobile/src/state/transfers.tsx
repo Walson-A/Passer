@@ -1,11 +1,21 @@
 import { createContext, useContext, useRef, useState, type ReactNode } from 'react';
 
 import { PasserClient, type TransferProgress, type UploadFile } from '@/core/client';
+import {
+  base64Size,
+  CallFailure,
+  classifyCallError,
+  fitsOneCall,
+  MAX_FILE_BYTES,
+  readClipboardOf,
+  sendFileTo,
+  sendTextTo,
+} from '@/core/device-calls';
 import { ping } from '@/core/endpoint';
-import { PasserError, type PasserErrorKind } from '@/core/errors';
+import { PasserError } from '@/core/errors';
 import { format, t } from '@/i18n';
 import { announce } from '@/platform/accessibility';
-import { copyImageFile, copyText } from '@/platform/clipboard';
+import { copyText } from '@/platform/clipboard';
 import { fileTransport } from '@/platform/file-transport';
 import { haptic } from '@/platform/haptics';
 import {
@@ -13,93 +23,118 @@ import {
   asPassboardFile,
   asUploadFile,
   clearOutgoing,
-  finalizePulled,
-  saveImageToPhotos,
-  shareFile,
+  fitPhoto,
+  readBase64,
   stagePastedImage,
   type PickedPhoto,
 } from '@/platform/media';
 import type { PhotoDestination } from '@/platform/storage';
 
+import type { Member } from '../../modules/passer-core';
 import { useConnection } from './connection';
+import { useDevices } from './devices';
 import { useHistory, type Destination, type HistoryItem, type HistoryKind } from './history';
 import { usePairings } from './pairings';
 
-type Socket = 'clipboard' | 'passboard';
+/**
+ * Sending to the device chosen on Send, and fetching its clipboard.
+ *
+ * Everything goes through the device network (passer-core), so the other device's own
+ * rules and approvals apply. Two things a single call can't carry yet use the direct
+ * connection to the PC, when the user set one up for Shortcuts (Settings): files over
+ * 700 KB, and images for the PC clipboard. Without it, photos are shrunk to fit and
+ * larger files are refused with an explanation.
+ */
 
 export type ActiveTransfer = {
   direction: 'up' | 'down';
   kind: HistoryKind;
-  destination: Destination;
   title: string;
+  peer: string;
   /** Position in a multi-file batch. */
   index: number;
   count: number;
-  /** Bytes; `total` is 0 when the size is unknown. */
+  /** Bytes; `total` is 0 when the progress is unknown. */
   sent: number;
   total: number;
+  /** The other device's user must allow it first. */
+  waiting: boolean;
+  /** Only uploads over the direct connection can stop halfway. */
+  cancellable: boolean;
 };
 
 export type Outcome =
-  | { kind: 'landed'; key: number; direction: 'up' | 'down'; socket: Socket | null; item: HistoryItem }
-  | { kind: 'pulled-image'; key: number; direction: 'down'; fileUri: string; item: HistoryItem }
-  | { kind: 'pulled-files'; key: number; direction: 'down'; fileUri: string; item: HistoryItem }
+  | { kind: 'landed'; key: number; direction: 'up' | 'down'; message: string; note: string | null; item: HistoryItem }
   | { kind: 'notice'; key: number; message: string }
-  | { kind: 'failed'; key: number; error: PasserErrorKind; message: string };
+  | { kind: 'failed'; key: number; message: string; body: string | null };
 
 type TransfersValue = {
   active: ActiveTransfer | null;
   outcome: Outcome | null;
-  /** Photos picked on the home screen, waiting for the destination sheet. */
+  /** A direct connection to the Send destination is up (Settings › Direct connection). */
+  direct: boolean;
+  /** Photos picked on Send, waiting for the destination sheet (direct connection only). */
   pendingPhotos: PickedPhoto[];
   setPendingPhotos: (photos: PickedPhoto[]) => void;
-  /** Transfers resolve to true when they went through, false when refused, failed or cancelled. */
+  /** Each resolves to true when it went through, false when refused, failed or cancelled. */
   sendText: (text: string) => Promise<boolean>;
   sendPastedImage: (dataUri: string) => Promise<boolean>;
-  sendPhotos: (photos: PickedPhoto[], destination: PhotoDestination) => Promise<boolean>;
+  sendPhotos: (photos: PickedPhoto[], destination?: PhotoDestination) => Promise<boolean>;
   sendFiles: (files: UploadFile[]) => Promise<boolean>;
   pull: () => Promise<boolean>;
-  /** Fails with the usual message when the PC isn't reachable, before anything is read or picked. */
+  /** Fails with the usual message when the destination isn't reachable, before anything is read or picked. */
   ensureReachable: () => boolean;
-  /** A notice in the conduit, for an action that ends before any transfer starts. */
+  /** A notice on Send, for an action that ends before any transfer starts. */
   inform: (message: string) => void;
-  saveImage: (fileUri: string) => Promise<void>;
-  shareFiles: (fileUri: string) => Promise<void>;
   cancel: () => void;
   dismissOutcome: () => void;
 };
 
 const TransfersContext = createContext<TransfersValue | null>(null);
 
-/** Only show a capsule for quick transfers if they take longer than this. */
+/** Quick transfers only show progress if they take longer than this. */
 const INDICATOR_DELAY_MS = 350;
-/** Uploads and pulls check the PC first, so a sleeping PC fails in seconds rather than minutes. */
+/** Direct uploads check the PC first, so a sleeping PC fails in seconds rather than minutes. */
 const PROBE_TIMEOUT_MS = 2_500;
 
-function describeFailure(error: PasserError, pcName: string): string {
-  switch (error.kind) {
+class Cancelled extends Error {}
+
+/** The direct (HTTP) pairing belongs to the same PC when the names match: both come from the PC's own name. */
+function samePc(a: string, b: string): boolean {
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
+function describe(error: unknown, name: string): string {
+  if (error instanceof PasserError) {
+    switch (error.kind) {
+      case 'unreachable':
+        return format(t.transfer.unreachable, { name });
+      case 'pc-failed':
+        return t.transfer.pcBusy;
+      default:
+        return t.transfer.failed;
+    }
+  }
+  switch (classifyCallError(error).kind) {
+    case 'denied':
+      return format(t.transfer.denied, { name });
+    case 'timeout':
+      return format(t.transfer.timeout, { name });
+    case 'too-large':
+      return t.transfer.tooLarge;
     case 'unreachable':
-      return format(t.transfer.unreachable, { name: pcName });
-    case 'unauthorized':
-      return format(t.home.unauthorizedTitle, { name: pcName });
-    case 'pc-failed':
-      return t.transfer.pcBusy;
-    case 'wrong-pc':
-      return t.pair.wrongPcTitle;
-    case 'not-passer':
-      return t.pair.notPasserTitle;
+      return format(t.transfer.unreachable, { name });
+    case 'not-member':
+      return t.transfer.notMember;
+    case 'not-offered':
+      return format(t.transfer.notOffered, { name });
     default:
       return t.transfer.failed;
   }
 }
 
-function totalSize(files: UploadFile[]): number | null {
-  return files.every((file) => file.size !== null)
-    ? files.reduce((sum, file) => sum + (file.size ?? 0), 0)
-    : null;
-}
-
 export function TransfersProvider({ children }: { children: ReactNode }) {
+  const { target, call, reach, report } = useDevices();
   const { pc } = usePairings();
   const { connection, reportUnauthorized, retry } = useConnection();
   const { record } = useHistory();
@@ -108,6 +143,9 @@ export function TransfersProvider({ children }: { children: ReactNode }) {
   const [pendingPhotos, setPendingPhotos] = useState<PickedPhoto[]>([]);
   const running = useRef<AbortController | null>(null);
   const lastKey = useRef(0);
+
+  const direct =
+    target !== null && pc !== null && samePc(pc.name, target.name) && connection.status === 'online' ? connection : null;
 
   const nextKey = () => {
     lastKey.current += 1;
@@ -119,49 +157,40 @@ export function TransfersProvider({ children }: { children: ReactNode }) {
     announce(message);
   };
 
-  const fail = (error: PasserErrorKind, message: string) => {
+  const fail = (message: string, body: string | null = null) => {
     haptic.error();
-    setOutcome({ kind: 'failed', key: nextKey(), error, message });
-    announce(message);
+    setOutcome({ kind: 'failed', key: nextKey(), message, body });
+    announce(body ? `${message}. ${body}` : message);
   };
 
+  type Work = (to: Member, signal: AbortSignal) => Promise<void>;
+
   /** One transfer at a time; failures become a designed outcome, never raw text. */
-  const run = async (
-    work: (client: PasserClient, pcKey: string, signal: AbortSignal) => Promise<void>,
-    { probe = false }: { probe?: boolean } = {},
-  ): Promise<boolean> => {
-    if (!pc) return false;
+  const run = async (work: Work): Promise<boolean> => {
+    if (!target) return false;
     if (running.current) {
-      // The running transfer's capsule stays on screen; the tap is refused with a felt and spoken cue.
+      // The running transfer stays on screen; the tap is refused with a felt and spoken cue.
       haptic.warning();
       announce(t.transfer.busy);
       return false;
     }
-    if (connection.status !== 'online') {
-      fail('unreachable', format(t.transfer.unreachable, { name: pc.name }));
-      return false;
-    }
-
     const controller = new AbortController();
     running.current = controller;
     setOutcome(null);
-    const client = new PasserClient(connection.endpoint, connection.token, fileTransport);
-
     try {
-      if (probe) await ping(connection.endpoint.baseUrl, PROBE_TIMEOUT_MS, controller.signal);
-      await work(client, pc.key, controller.signal);
+      await work(target, controller.signal);
       return true;
     } catch (error) {
-      const failure =
-        error instanceof PasserError
-          ? error
-          : new PasserError('protocol', error instanceof Error ? error.message : 'Transfer failed');
-      if (failure.kind === 'cancelled' || controller.signal.aborted) {
+      if (error instanceof Cancelled || controller.signal.aborted || (error instanceof PasserError && error.kind === 'cancelled')) {
         notify(t.transfer.cancelled);
       } else {
-        if (failure.kind === 'unauthorized') reportUnauthorized();
-        if (failure.kind === 'unreachable') retry();
-        fail(failure.kind, describeFailure(failure, pc.name));
+        if (error instanceof PasserError) {
+          if (error.kind === 'unauthorized') reportUnauthorized();
+          if (error.kind === 'unreachable') retry();
+        }
+        if (error instanceof CallFailure && error.kind === 'unreachable') report(target.id, false);
+        const tooLarge = !(error instanceof PasserError) && classifyCallError(error).kind === 'too-large';
+        fail(describe(error, target.name), tooLarge ? t.transfer.tooLargeBody : null);
       }
       return false;
     } finally {
@@ -171,214 +200,191 @@ export function TransfersProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const land = (item: HistoryItem, socket: Socket | null, direction: 'up' | 'down') => {
+  const land = (to: Member, item: HistoryItem, message: string, note: string | null = null) => {
     haptic.success();
-    setOutcome({ kind: 'landed', key: nextKey(), direction, socket, item });
-    if (pc) announce(format(direction === 'up' ? t.transfer.sentTo : t.transfer.receivedFrom, { name: pc.name }));
+    setOutcome({ kind: 'landed', key: nextKey(), direction: item.direction === 'sent' ? 'up' : 'down', message, note, item });
+    announce(note ? `${message}. ${note}` : message);
+    report(to.id, true);
   };
 
-  /** Uploads files one by one, reporting progress across the whole batch. */
-  const upload = async (
-    client: PasserClient,
+  const sentItem = (to: Member, kind: HistoryKind, destination: Destination, title: string, size: number | null) =>
+    record({ pcKey: to.id, peer: to.name, direction: 'sent', kind, destination, title, size });
+
+  const begin = (to: Member, patch: Partial<ActiveTransfer> & Pick<ActiveTransfer, 'kind' | 'title'>) =>
+    setActive({ direction: 'up', peer: to.name, index: 0, count: 1, sent: 0, total: 0, waiting: false, cancellable: false, ...patch });
+
+  /** Over the direct connection, uploads report their progress across the whole batch. */
+  const uploadDirect = async (
     signal: AbortSignal,
+    to: Member,
     files: UploadFile[],
     destination: 'pc-clipboard' | 'passboard',
     kind: HistoryKind,
   ) => {
-    const total = totalSize(files) ?? 0;
+    if (!direct) throw new PasserError('unreachable', 'no direct connection');
+    const client = new PasserClient(direct.endpoint, direct.token, fileTransport);
+    await ping(direct.endpoint.baseUrl, PROBE_TIMEOUT_MS, signal);
+    const total = files.every((file) => file.size !== null) ? files.reduce((sum, file) => sum + (file.size ?? 0), 0) : 0;
     let done = 0;
     for (const [index, file] of files.entries()) {
       const before = done;
-      setActive({ direction: 'up', kind, destination, title: file.name, index, count: files.length, sent: before, total });
+      begin(to, { kind, title: file.name, index, count: files.length, sent: before, total, cancellable: true });
       const onProgress = ({ sent, total: requestTotal }: TransferProgress) => {
         // Multipart framing makes the request slightly larger than the file itself.
         const ratio = requestTotal > 0 ? Math.min(1, sent / requestTotal) : 0;
-        const fileBytes = file.size ?? 0;
-        setActive((current) => (current ? { ...current, sent: before + Math.round(ratio * fileBytes) } : current));
+        setActive((current) => (current ? { ...current, sent: before + Math.round(ratio * (file.size ?? 0)) } : current));
       };
-      if (destination === 'pc-clipboard') {
-        await client.pushImage(file, onProgress, signal);
-      } else {
-        await client.pushFile(file, onProgress, signal);
-      }
+      if (destination === 'pc-clipboard') await client.pushImage(file, onProgress, signal);
+      else await client.pushFile(file, onProgress, signal);
       done += file.size ?? 0;
     }
   };
 
-  const stageAll = async (items: UploadFile[], prepare: (item: UploadFile) => Promise<UploadFile>) => {
-    const staged: UploadFile[] = [];
-    for (const item of items) staged.push(await prepare(item));
-    return staged;
+  /** Through the device network, one call per file; a batch stops between files when cancelled. */
+  const sendThroughGroup = async (signal: AbortSignal, to: Member, files: UploadFile[], kind: HistoryKind) => {
+    for (const [index, file] of files.entries()) {
+      if (signal.aborted) throw new Cancelled();
+      begin(to, { kind, title: file.name, index, count: files.length, cancellable: files.length > 1 });
+      await sendFileTo(call, to.id, file.name, await readBase64(file.uri));
+    }
   };
 
   const sendText = (text: string) =>
-    run(async (client, pcKey, signal) => {
+    run(async (to) => {
       if (text.length === 0) return;
-      const indicator = setTimeout(
-        () =>
-          setActive({
-            direction: 'up',
-            kind: 'text',
-            destination: 'pc-clipboard',
-            title: text.trim(),
-            index: 0,
-            count: 1,
-            sent: 0,
-            total: 0,
-          }),
-        INDICATOR_DELAY_MS,
-      );
+      const indicator = setTimeout(() => begin(to, { kind: 'text', title: text.trim() }), INDICATOR_DELAY_MS);
       try {
-        await client.pushText(text, signal);
+        await sendTextTo(call, to.id, text);
       } finally {
         clearTimeout(indicator);
       }
-      const item = record({ pcKey, direction: 'sent', kind: 'text', destination: 'pc-clipboard', title: text.trim(), size: null });
-      land(item, 'clipboard', 'up');
+      land(to, sentItem(to, 'text', 'pc-clipboard', text.trim(), null), format(t.transfer.onClipboardOf, { name: to.name }));
     });
 
   const sendPastedImage = (dataUri: string) =>
-    run(
-      async (client, pcKey, signal) => {
-        const file = stagePastedImage(dataUri);
-        await upload(client, signal, [file], 'pc-clipboard', 'image');
-        const item = record({ pcKey, direction: 'sent', kind: 'image', destination: 'pc-clipboard', title: t.transfer.pastedImage, size: file.size });
-        land(item, 'clipboard', 'up');
-      },
-      { probe: true },
-    );
+    run(async (to, signal) => {
+      const file = stagePastedImage(dataUri);
+      if (direct) {
+        // Only the direct connection can put an image on the PC clipboard today.
+        await uploadDirect(signal, to, [file], 'pc-clipboard', 'image');
+        land(to, sentItem(to, 'image', 'pc-clipboard', t.transfer.pastedImage, file.size), format(t.transfer.onClipboardOf, { name: to.name }));
+        return;
+      }
+      const base64 = dataUri.replace(/^data:[^;]+;base64,/, '');
+      if (base64Size(base64) > MAX_FILE_BYTES) throw new CallFailure('too-large', 'pasted image over 700 KB');
+      begin(to, { kind: 'image', title: t.transfer.pastedImage });
+      await sendFileTo(call, to.id, file.name, base64);
+      land(to, sentItem(to, 'image', 'passboard', file.name, file.size), format(t.transfer.inPasserFolderOf, { name: to.name }));
+    });
 
-  const sendPhotos = (photos: PickedPhoto[], destination: PhotoDestination) =>
-    run(
-      async (client, pcKey, signal) => {
-        if (photos.length === 0) return;
+  const sendPhotos = (photos: PickedPhoto[], destination: PhotoDestination = 'passboard') =>
+    run(async (to, signal) => {
+      if (photos.length === 0) return;
+      if (direct) {
         if (destination === 'clipboard') {
           const file = await asClipboardImage(photos[0]);
-          await upload(client, signal, [file], 'pc-clipboard', 'image');
-          const item = record({ pcKey, direction: 'sent', kind: 'image', destination: 'pc-clipboard', title: photos[0].name, size: file.size });
-          land(item, 'clipboard', 'up');
+          await uploadDirect(signal, to, [file], 'pc-clipboard', 'image');
+          land(to, sentItem(to, 'image', 'pc-clipboard', photos[0].name, file.size), format(t.transfer.onClipboardOf, { name: to.name }));
           return;
         }
-        const files = await stageAll(photos, asPassboardFile);
-        await upload(client, signal, files, 'passboard', 'image');
-        const item = record({
-          pcKey,
-          direction: 'sent',
-          kind: files.length > 1 ? 'files' : 'image',
-          destination: 'passboard',
-          title: files.length > 1 ? format(t.transfer.photosCount, { count: files.length }) : files[0].name,
-          size: totalSize(files),
-        });
-        land(item, 'passboard', 'up');
-      },
-      { probe: true },
+        const files: UploadFile[] = [];
+        for (const photo of photos) files.push(await asPassboardFile(photo));
+        await uploadDirect(signal, to, files, 'passboard', 'image');
+        land(to, photosItem(to, files), format(t.transfer.inPasserFolderOf, { name: to.name }));
+        return;
+      }
+      const files: UploadFile[] = [];
+      let reduced = false;
+      for (const photo of photos) {
+        begin(to, { kind: 'image', title: photo.name, count: photos.length, index: files.length });
+        const fitted = await fitPhoto(photo, MAX_FILE_BYTES);
+        reduced ||= fitted.reduced;
+        files.push(fitted.file);
+      }
+      await sendThroughGroup(signal, to, files, 'image');
+      land(to, photosItem(to, files), format(t.transfer.inPasserFolderOf, { name: to.name }), reduced ? t.transfer.reduced : null);
+    });
+
+  const photosItem = (to: Member, files: UploadFile[]) =>
+    sentItem(
+      to,
+      files.length > 1 ? 'files' : 'image',
+      'passboard',
+      files.length > 1 ? format(t.transfer.photosCount, { count: files.length }) : files[0].name,
+      files.every((file) => file.size !== null) ? files.reduce((sum, file) => sum + (file.size ?? 0), 0) : null,
     );
 
   const sendFiles = (picked: UploadFile[]) =>
-    run(
-      async (client, pcKey, signal) => {
-        if (picked.length === 0) return;
-        const files = await stageAll(picked, asUploadFile);
-        await upload(client, signal, files, 'passboard', 'file');
-        const item = record({
-          pcKey,
-          direction: 'sent',
-          kind: files.length > 1 ? 'files' : 'file',
-          destination: 'passboard',
-          title: files.length > 1 ? format(t.transfer.filesCount, { count: files.length }) : files[0].name,
-          size: totalSize(files),
-        });
-        land(item, 'passboard', 'up');
-      },
-      { probe: true },
-    );
+    run(async (to, signal) => {
+      if (picked.length === 0) return;
+      const large = picked.filter((file) => !fitsOneCall(file.size));
+      // Nothing leaves when part of the batch can't: a half-sent batch is harder to understand.
+      if (large.length > 0 && !direct) throw new CallFailure('too-large', `${large.length} files over 700 KB`);
+      const small = picked.filter((file) => fitsOneCall(file.size));
+      if (small.length > 0) await sendThroughGroup(signal, to, small, 'file');
+      if (large.length > 0) {
+        const staged: UploadFile[] = [];
+        for (const file of large) staged.push(await asUploadFile(file));
+        await uploadDirect(signal, to, staged, 'passboard', 'file');
+      }
+      const item = sentItem(
+        to,
+        picked.length > 1 ? 'files' : 'file',
+        'passboard',
+        picked.length > 1 ? format(t.transfer.filesCount, { count: picked.length }) : picked[0].name,
+        picked.every((file) => file.size !== null) ? picked.reduce((sum, file) => sum + (file.size ?? 0), 0) : null,
+      );
+      land(to, item, format(t.transfer.inPasserFolderOf, { name: to.name }));
+    });
 
   const pull = () =>
-    run(
-      async (client, pcKey, signal) => {
-        setActive({
-          direction: 'down',
-          kind: 'text',
-          destination: 'iphone-clipboard',
-          title: t.transfer.receiving,
-          index: 0,
-          count: 1,
-          sent: 0,
-          total: 0,
-        });
-        const result = await client.pull(signal);
-
-        if (result.kind === 'text') {
-          if (result.text.length === 0) {
-            haptic.warning();
-            notify(t.transfer.pcClipboardEmpty);
-            return;
-          }
-          await copyText(result.text);
-          const item = record({ pcKey, direction: 'received', kind: 'text', destination: 'iphone-clipboard', title: result.text.trim(), size: null });
-          land(item, null, 'down');
-          return;
-        }
-
-        if (result.kind === 'image') {
-          const file = await finalizePulled(result.fileUri, 'png');
-          await copyImageFile(file.uri);
-          const item = record({ pcKey, direction: 'received', kind: 'image', destination: 'iphone-clipboard', title: t.transfer.imageFromPc, size: file.size });
-          haptic.success();
-          setOutcome({ kind: 'pulled-image', key: nextKey(), direction: 'down', fileUri: file.uri, item });
-          if (pc) announce(format(t.transfer.receivedFrom, { name: pc.name }));
-          return;
-        }
-
-        const file = await finalizePulled(result.fileUri, 'zip');
-        const item = record({ pcKey, direction: 'received', kind: 'files', destination: 'files', title: file.name, size: file.size });
-        haptic.success();
-        setOutcome({ kind: 'pulled-files', key: nextKey(), direction: 'down', fileUri: file.uri, item });
-        if (pc) announce(format(t.transfer.receivedFrom, { name: pc.name }));
-        try {
-          await shareFile(file.uri, { mimeType: 'application/zip', uti: 'public.zip-archive' });
-        } catch {
-          // The files arrived; if the share sheet can't open, the Share button stays on the home screen.
-        }
-      },
-      { probe: true },
-    );
-
-  const saveImage = async (fileUri: string) => {
-    try {
-      if (await saveImageToPhotos(fileUri)) {
-        haptic.success();
-        notify(t.transfer.savedToPhotos);
+    run(async (to) => {
+      // The other device's user approves each read: the wait is shown as such.
+      setActive({
+        direction: 'down',
+        kind: 'text',
+        title: format(t.transfer.waitingApproval, { name: to.name }),
+        peer: to.name,
+        index: 0,
+        count: 1,
+        sent: 0,
+        total: 0,
+        waiting: true,
+        cancellable: false,
+      });
+      const text = await readClipboardOf(call, to.id);
+      if (text.length === 0) {
+        haptic.warning();
+        notify(format(t.transfer.pcClipboardEmpty, { name: to.name }));
+        report(to.id, true);
+        return;
       }
-    } catch {
-      fail('protocol', t.transfer.failed);
-    }
-  };
-
-  const shareFiles = async (fileUri: string) => {
-    try {
-      await shareFile(fileUri, { mimeType: 'application/zip', uti: 'public.zip-archive' });
-    } catch {
-      fail('protocol', t.transfer.failed);
-    }
-  };
+      await copyText(text);
+      const item = record({
+        pcKey: to.id,
+        peer: to.name,
+        direction: 'received',
+        kind: 'text',
+        destination: 'iphone-clipboard',
+        title: text.trim(),
+        size: null,
+      });
+      land(to, item, t.transfer.copiedHere);
+    });
 
   const ensureReachable = () => {
-    if (!pc) return false;
-    if (connection.status === 'online') return true;
-    fail('unreachable', format(t.transfer.unreachable, { name: pc.name }));
+    if (!target) return false;
+    if (reach[target.id] !== 'unreachable') return true;
+    fail(format(t.transfer.unreachable, { name: target.name }));
     return false;
   };
-
-  const cancel = () => running.current?.abort();
-
-  const dismissOutcome = () => setOutcome(null);
 
   return (
     <TransfersContext.Provider
       value={{
         active,
         outcome,
+        direct: direct !== null,
         pendingPhotos,
         setPendingPhotos,
         sendText,
@@ -388,10 +394,8 @@ export function TransfersProvider({ children }: { children: ReactNode }) {
         pull,
         ensureReachable,
         inform: notify,
-        saveImage,
-        shareFiles,
-        cancel,
-        dismissOutcome,
+        cancel: () => running.current?.abort(),
+        dismissOutcome: () => setOutcome(null),
       }}
     >
       {children}

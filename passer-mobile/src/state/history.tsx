@@ -13,7 +13,12 @@ export type Destination = 'pc-clipboard' | 'passboard' | 'iphone-clipboard' | 'p
 
 export type HistoryItem = {
   id: string;
+  /** The other device: its passer-core id, or the HTTP pairing's key for Shortcuts transfers. */
   pcKey: string;
+  /** Its name when the transfer happened. Older items, from before the device network, have none. */
+  peer?: string;
+  /** A received file, kept on this phone, that the activity list can share again. */
+  fileUri?: string;
   direction: Direction;
   kind: HistoryKind;
   destination: Destination;
@@ -101,9 +106,4 @@ export function useHistory(): HistoryValue {
   const value = useContext(HistoryContext);
   if (!value) throw new Error('useHistory must be used inside HistoryProvider');
   return value;
-}
-
-/** The latest item for one PC and destination, as shown in the home screen sockets. */
-export function latest(items: HistoryItem[], pcKey: string, destination: Destination): HistoryItem | null {
-  return items.find((item) => item.pcKey === pcKey && item.destination === destination) ?? null;
 }

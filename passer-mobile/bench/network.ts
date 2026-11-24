@@ -25,6 +25,11 @@ const SILENT = { host: false, ip: false, name: false };
 
 const BEHAVIOUR: Record<RegimeName, Behaviour> = {
   paired: { answers: HOME, ...QUICK, identity: 'paired', tokenAccepted: true },
+  manager: { answers: HOME, ...QUICK, identity: 'paired', tokenAccepted: true },
+  direct: { answers: HOME, ...QUICK, identity: 'paired', tokenAccepted: true },
+  alone: { answers: HOME, ...QUICK, identity: 'paired', tokenAccepted: true },
+  refuses: { answers: HOME, ...QUICK, identity: 'paired', tokenAccepted: true },
+  broken: { answers: HOME, ...QUICK, identity: 'paired', tokenAccepted: true },
   'first-launch': { answers: HOME, ...QUICK, identity: 'paired', tokenAccepted: true },
   asleep: { answers: SILENT, ...QUICK, identity: 'paired', tokenAccepted: true },
   // Pings stay under the app's 2.5 s timeout: any slower and the PC reads as asleep, not slow.

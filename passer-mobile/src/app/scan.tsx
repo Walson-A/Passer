@@ -55,16 +55,16 @@ export default function Scan() {
     return () => clearTimeout(timer);
   }, [rejected]);
 
-  const close = () => (router.canGoBack() ? router.back() : router.replace('/'));
+  const close = () => (router.canGoBack() ? router.back() : router.replace('/welcome'));
 
   const onScanned = ({ data }: BarcodeScanningResult) => {
     if (handled.current) return;
-    // An invitation to the device network: the Devices sheet joins with it.
+    // An invitation to the device network: the join screen uses it and shows the code to compare.
     if (isCoreInvitation(data)) {
       handled.current = true;
       setFocused(false);
       setPendingLink(data);
-      router.replace('/devices');
+      router.replace('/join');
       return;
     }
     const result = parsePairingLink(data);

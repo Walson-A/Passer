@@ -1,6 +1,6 @@
 import * as Application from 'expo-application';
 import { useRouter } from 'expo-router';
-import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
+import { useEffect, useState, type ComponentType } from 'react';
 import { AppState, Linking, Platform, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import Animated, {
   cancelAnimation,
@@ -13,23 +13,23 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { DeviceGlyph } from '@/components/device-glyph';
 import {
   ArrowDownToLineIcon,
   CheckIcon,
-  ChevronRightIcon,
   ImageIcon,
   LaptopIcon,
   LayersIcon,
-  LinkIcon,
+  LockIcon,
   RotateIcon,
   ScanIcon,
-  ShieldIcon,
   TrashIcon,
   VibrateIcon,
   WifiIcon,
   type IconProps,
 } from '@/components/icons';
 import { AppText } from '@/components/ui/app-text';
+import { Group, Row } from '@/components/ui/list';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { format, language, t } from '@/i18n';
 import { announce } from '@/platform/accessibility';
@@ -38,12 +38,13 @@ import { readPhotoAccess, requestPhotoAccess, type PhotoAccess } from '@/platfor
 import type { PhotoDestination } from '@/platform/storage';
 import type { UpdateStatus } from '@/platform/update-status';
 import { useAppUpdates } from '@/platform/updates';
+import { thisDeviceName, useDevices } from '@/state/devices';
 import { useHistory } from '@/state/history';
 import { usePairings } from '@/state/pairings';
 import { useSettings } from '@/state/settings';
 import { useTransfers } from '@/state/transfers';
 import { useTheme } from '@/theme/theme';
-import { radius } from '@/theme/tokens';
+import { deviceName } from '@/utils/format';
 
 /** Destructive actions arm on the first tap and disarm after this long, as on the desktop. */
 const DISARM_MS = 4_000;
@@ -51,17 +52,27 @@ const DISARM_MS = 4_000;
 const pairedDate = new Intl.DateTimeFormat(language, { day: 'numeric', month: 'long', year: 'numeric' });
 const updateDate = new Intl.DateTimeFormat(language, { day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' });
 
+function Icon({ icon: Glyph, color }: { icon: ComponentType<IconProps>; color?: string }) {
+  const { colors } = useTheme();
+  return <Glyph size={20} color={color ?? colors.icon.normal} strokeWidth={1.9} />;
+}
+
+/**
+ * Settings: this phone, preferences, the direct connection that Shortcuts and large files
+ * still use, updates. The device network itself lives in the Devices tab.
+ */
 export default function Settings() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { pc, forget } = usePairings();
+  const { me } = useDevices();
   const { settings, updateSettings } = useSettings();
   const { clear } = useHistory();
+  const { active } = useTransfers();
   const [armed, setArmed] = useState(false);
   const [photoAccess, setPhotoAccess] = useState<PhotoAccess | null>(null);
   const updates = useAppUpdates();
-  const { active } = useTransfers();
 
   useEffect(() => {
     if (!armed) return;
@@ -69,7 +80,7 @@ export default function Settings() {
     return () => clearTimeout(timer);
   }, [armed]);
 
-  // Coming back from iOS Settings may have changed the photo access.
+  // Coming back from the system settings may have changed the photo access.
   useEffect(() => {
     const refresh = () => {
       readPhotoAccess()
@@ -88,7 +99,6 @@ export default function Settings() {
       void Linking.openSettings();
       return;
     }
-    haptic.select();
     setPhotoAccess(await requestPhotoAccess());
   };
 
@@ -109,18 +119,16 @@ export default function Settings() {
       return;
     }
     haptic.success();
+    setArmed(false);
     await forget(pc);
-    router.dismissAll();
   };
 
   const checkForUpdate = async () => {
-    haptic.select();
     const outcome = await updates.check();
     if (outcome === 'ready') {
       haptic.success();
       announce(t.settings.restartToUpdate);
     } else if (outcome === 'up-to-date') {
-      haptic.tap();
       announce(t.settings.upToDate);
     } else {
       haptic.warning();
@@ -129,69 +137,35 @@ export default function Settings() {
   };
 
   const restartOntoUpdate = () => {
-    // Restarting would cut the transfer running on Home.
+    // Restarting would cut the transfer running on Send.
     if (active) {
       haptic.warning();
       announce(t.transfer.busy);
       return;
     }
-    haptic.tap();
     void updates.restart({ background: colors.ground, spinner: colors.text.secondary });
   };
 
   const updateFooter =
-    updates.status.kind === 'ready'
-      ? t.settings.restartHint
-      : updates.status.kind === 'failed'
-        ? t.settings.updateFailed
-        : undefined;
+    updates.status.kind === 'ready' ? t.settings.restartHint : updates.status.kind === 'failed' ? t.settings.updateFailed : undefined;
 
   const version = [Application.nativeApplicationVersion, Application.nativeBuildVersion].filter(Boolean).join(' · ');
+  const name = deviceName(me?.name ?? thisDeviceName());
 
   return (
     <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]}>
-      <AppText variant="title" accessibilityRole="header">
+      <AppText variant="heading" accessibilityRole="header" style={styles.title}>
         {t.settings.title}
       </AppText>
 
-      {pc ? (
-        <Section label={t.settings.pcSection}>
-          <View style={styles.pc}>
-            <View style={[styles.tile, { backgroundColor: colors.surface.raised, borderColor: colors.border.raised }]}>
-              <LaptopIcon size={20} color={colors.text.primary} strokeWidth={1.5} />
-            </View>
-            <View style={styles.flex}>
-              <AppText variant="body" style={styles.strong} numberOfLines={1}>
-                {pc.name}
-              </AppText>
-              <AppText variant="caption" tone="tertiary" numberOfLines={1}>
-                {[pc.host, pc.ip].filter(Boolean).join(' · ')}
-              </AppText>
-              <AppText variant="caption" tone="tertiary">
-                {format(t.settings.pairedOn, { date: pairedDate.format(pc.pairedAt) })}
-              </AppText>
-            </View>
-          </View>
-          <Divider />
-          <Row icon={ScanIcon} label={t.settings.pairAgain} onPress={() => router.push('/scan')} chevron />
-          <Divider />
-          <Row
-            icon={TrashIcon}
-            label={armed ? format(t.settings.forgetConfirm, { name: pc.name }) : t.settings.forget}
-            tint={colors.status.error}
-            onPress={() => void forgetPc()}
-          />
-        </Section>
-      ) : null}
+      <Group header={t.settings.thisPhone} footer={t.settings.nameHint}>
+        <Row title={name} leading={<DeviceGlyph id={me?.id ?? name} name={name} kind="phone" size={40} />} />
+      </Group>
 
-      <Section>
-        <Row icon={LinkIcon} label={t.devices.row} onPress={() => router.push('/devices')} chevron />
-      </Section>
-
-      <Section label={t.settings.preferences}>
+      <Group header={t.settings.preferences}>
         <Row
-          icon={VibrateIcon}
-          label={t.settings.haptics}
+          title={t.settings.haptics}
+          leading={<Icon icon={VibrateIcon} />}
           trailing={
             <Switch
               value={settings.haptics}
@@ -202,68 +176,107 @@ export default function Settings() {
             />
           }
         />
-        <Divider />
-        <View style={styles.choice}>
-          <AppText variant="body">{t.settings.photoDestination}</AppText>
-          <Segmented
-            value={settings.photoDestination}
-            options={[
-              { value: null, label: t.settings.askEachTime },
-              { value: 'clipboard', label: t.destination.clipboardTitle },
-              { value: 'passboard', label: t.destination.passboardTitle },
-            ]}
-            onChange={(value) => updateSettings({ photoDestination: value })}
+        {pc ? (
+          <View style={styles.choice}>
+            <AppText variant="callout">{t.settings.photoDestination}</AppText>
+            <Segmented
+              value={settings.photoDestination}
+              options={[
+                { value: null, label: t.settings.askEachTime },
+                { value: 'clipboard', label: t.destination.clipboardTitle },
+                { value: 'passboard', label: t.destination.passboardTitle },
+              ]}
+              onChange={(value) => updateSettings({ photoDestination: value })}
+            />
+          </View>
+        ) : null}
+      </Group>
+
+      <Group header={t.settings.direct} footer={t.settings.directHint}>
+        {pc ? (
+          <Row
+            key="pc"
+            title={pc.name}
+            leading={<Icon icon={LaptopIcon} />}
+            subtitle={format(t.settings.pairedOn, { date: pairedDate.format(pc.pairedAt) })}
           />
-        </View>
-      </Section>
+        ) : null}
+        <Row
+          key="pair"
+          title={pc ? t.pair.scanAgain : t.settings.directNone}
+          tone={pc ? 'default' : 'link'}
+          leading={<Icon icon={ScanIcon} color={pc ? undefined : colors.link} />}
+          onPress={() => router.push('/scan')}
+          chevron
+        />
+        {pc ? (
+          <Row
+            key="forget"
+            title={armed ? t.settings.forgetConfirm : t.settings.forget}
+            tone="destructive"
+            leading={<Icon icon={TrashIcon} color={colors.status.error} />}
+            onPress={() => void forgetPc()}
+          />
+        ) : null}
+      </Group>
 
       {Platform.OS !== 'android' ? (
-        <Section label={t.settings.shortcutsSection} footer={t.settings.shortcutsHint}>
-          <Row icon={LayersIcon} label={t.settings.shortcutsApp} onPress={() => void Linking.openURL('shortcuts://')} chevron />
-          <Divider />
-          <Row icon={ImageIcon} label={t.settings.photoAccess} value={photoAccessLabel} onPress={() => void askPhotoAccess()} chevron />
-        </Section>
+        <Group header={t.settings.shortcutsSection} footer={t.settings.shortcutsHint}>
+          <Row
+            title={t.settings.shortcutsApp}
+            leading={<Icon icon={LayersIcon} />}
+            onPress={() => void Linking.openURL('shortcuts://')}
+            chevron
+          />
+          <Row
+            title={t.settings.photoAccess}
+            leading={<Icon icon={ImageIcon} />}
+            detail={photoAccessLabel}
+            onPress={() => void askPhotoAccess()}
+            chevron
+          />
+        </Group>
       ) : null}
 
-      <Section>
+      <Group>
         <Row
-          icon={WifiIcon}
-          label={t.settings.localNetwork}
-          value={t.settings.manageInSettings}
+          title={t.settings.localNetwork}
+          leading={<Icon icon={WifiIcon} />}
+          detail={t.settings.manageInSettings}
           onPress={() => void Linking.openSettings()}
           chevron
         />
-        <Divider />
         <Row
-          icon={TrashIcon}
-          label={t.settings.clearHistory}
+          title={t.settings.clearHistory}
+          tone="destructive"
+          leading={<Icon icon={TrashIcon} color={colors.status.error} />}
           onPress={() => {
             haptic.warning();
             clear();
           }}
         />
-      </Section>
+      </Group>
 
       {updates.enabled ? (
-        <Section label={t.settings.updatesSection} footer={updateFooter}>
+        <Group header={t.settings.updatesSection} footer={updateFooter}>
           <UpdateRow status={updates.status} onCheck={() => void checkForUpdate()} onRestart={restartOntoUpdate} />
-        </Section>
+        </Group>
       ) : null}
 
       <View style={styles.footer}>
         <View style={styles.privacy}>
-          <ShieldIcon size={13} color={colors.icon.dim} strokeWidth={2} />
-          <AppText variant="caption" tone="tertiary">
+          <LockIcon size={13} color={colors.text.tertiary} strokeWidth={2} />
+          <AppText variant="footnote" tone="tertiary" style={styles.center}>
             {t.settings.privacy}
           </AppText>
         </View>
         {version ? (
-          <AppText variant="meta" tone="tertiary">
+          <AppText variant="footnote" tone="tertiary">
             {format(t.settings.version, { version })}
           </AppText>
         ) : null}
         {updates.runningSince ? (
-          <AppText variant="meta" tone="tertiary">
+          <AppText variant="footnote" tone="tertiary">
             {format(t.settings.runningUpdate, { date: updateDate.format(updates.runningSince) })}
           </AppText>
         ) : null}
@@ -272,111 +285,30 @@ export default function Settings() {
   );
 }
 
-function Section({ label, footer, children }: { label?: string; footer?: string; children: ReactNode }) {
-  const { colors } = useTheme();
-  return (
-    <View style={styles.section}>
-      {label ? (
-        <AppText variant="label" tone="label" style={styles.sectionLabel}>
-          {label}
-        </AppText>
-      ) : null}
-      <View style={[styles.card, { backgroundColor: colors.surface.card, borderColor: colors.border.subtle }]}>
-        {children}
-      </View>
-      {footer ? (
-        <AppText variant="caption" tone="tertiary" style={styles.sectionFooter}>
-          {footer}
-        </AppText>
-      ) : null}
-    </View>
-  );
-}
-
-function Divider() {
-  const { colors } = useTheme();
-  return <View style={[styles.divider, { backgroundColor: colors.border.subtle }]} />;
-}
-
-function Row({
-  icon: Icon,
-  label,
-  value,
-  tint,
-  iconColor,
-  trailing,
-  chevron = false,
-  busy = false,
-  onPress,
-}: {
-  icon: ComponentType<IconProps>;
-  label: string;
-  value?: string;
-  tint?: string;
-  /** Colours the icon alone; `tint` colours the icon and the label. */
-  iconColor?: string;
-  trailing?: ReactNode;
-  chevron?: boolean;
-  /** Work under way: VoiceOver reads the row as one busy element. */
-  busy?: boolean;
-  onPress?: () => void;
-}) {
-  const { colors } = useTheme();
-  const content = (
-    <>
-      <Icon size={18} color={iconColor ?? tint ?? colors.icon.normal} />
-      <AppText variant="body" color={tint} style={styles.flex} numberOfLines={2}>
-        {label}
-      </AppText>
-      {value ? (
-        <AppText variant="caption" tone="tertiary" numberOfLines={1}>
-          {value}
-        </AppText>
-      ) : null}
-      {trailing}
-      {chevron ? <ChevronRightIcon size={16} color={colors.icon.dim} strokeWidth={2} /> : null}
-    </>
-  );
-
-  if (!onPress) {
-    return (
-      <View style={styles.row} accessible={busy} accessibilityState={busy ? { busy } : undefined}>
-        {content}
-      </View>
-    );
-  }
-  return (
-    <PressableScale accessibilityRole="button" accessibilityLabel={label} onPress={onPress} pressedScale={0.99} style={styles.row}>
-      {content}
-    </PressableScale>
-  );
-}
-
 /** One row that follows the update from the first tap to the restart. */
 function UpdateRow({ status, onCheck, onRestart }: { status: UpdateStatus; onCheck: () => void; onRestart: () => void }) {
   const { colors } = useTheme();
   switch (status.kind) {
     case 'checking':
-      return <Row icon={SpinningRotateIcon} label={t.settings.checkingForUpdate} busy />;
+      return <Row title={t.settings.checkingForUpdate} leading={<SpinningRotateIcon size={20} color={colors.icon.normal} />} />;
     case 'downloading':
       return (
         <Row
-          icon={ArrowDownToLineIcon}
-          label={t.settings.downloadingUpdate}
-          value={
+          title={t.settings.downloadingUpdate}
+          leading={<Icon icon={ArrowDownToLineIcon} />}
+          detail={
             status.progress === null
               ? undefined
               : format(t.settings.downloadProgress, { percent: String(Math.round(status.progress * 100)) })
           }
-          busy
         />
       );
     case 'ready':
-      return <Row icon={RotateIcon} label={t.settings.restartToUpdate} tint={colors.status.ok} onPress={onRestart} />;
+      return <Row title={t.settings.restartToUpdate} leading={<Icon icon={RotateIcon} color={colors.status.ok} />} onPress={onRestart} />;
     case 'up-to-date':
-      return <Row icon={CheckIcon} iconColor={colors.status.ok} label={t.settings.upToDate} onPress={onCheck} />;
+      return <Row title={t.settings.upToDate} leading={<Icon icon={CheckIcon} color={colors.status.ok} />} onPress={onCheck} />;
     default:
-      return <Row icon={RotateIcon} label={t.settings.checkForUpdate} onPress={onCheck} />;
+      return <Row title={t.settings.checkForUpdate} leading={<Icon icon={RotateIcon} />} onPress={onCheck} />;
   }
 }
 
@@ -430,7 +362,7 @@ function Segmented({
               selected && { backgroundColor: colors.surface.raised, borderColor: colors.border.raised, borderWidth: 1 },
             ]}
           >
-            <AppText variant="caption" tone={selected ? 'primary' : 'tertiary'} style={selected && styles.strong} numberOfLines={1}>
+            <AppText variant="footnote" tone={selected ? 'primary' : 'secondary'} style={[styles.center, selected && styles.strong]} numberOfLines={2}>
               {option.label}
             </AppText>
           </PressableScale>
@@ -441,20 +373,13 @@ function Segmented({
 }
 
 const styles = StyleSheet.create({
-  content: { paddingHorizontal: 20, paddingTop: 28, gap: 20 },
-  section: { gap: 8 },
-  sectionLabel: { paddingHorizontal: 4 },
-  sectionFooter: { paddingHorizontal: 4 },
-  card: { borderRadius: radius.card, borderWidth: 1, overflow: 'hidden' },
-  pc: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
-  tile: { width: 44, height: 44, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  flex: { flex: 1, gap: 2 },
-  strong: { fontWeight: '600' },
-  divider: { height: StyleSheet.hairlineWidth, marginLeft: 44 },
-  row: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14 },
-  choice: { padding: 14, gap: 10 },
+  content: { paddingTop: 28, gap: 24 },
+  title: { paddingHorizontal: 20 },
+  choice: { padding: 16, gap: 10 },
   segmented: { flexDirection: 'row', borderRadius: 14, borderWidth: 1, padding: 4, gap: 4 },
   segment: { flex: 1, minHeight: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 },
-  footer: { alignItems: 'center', gap: 6, paddingTop: 4 },
+  strong: { fontWeight: '600' },
+  center: { textAlign: 'center' },
+  footer: { alignItems: 'center', gap: 6, paddingTop: 4, paddingHorizontal: 24 },
   privacy: { flexDirection: 'row', alignItems: 'center', gap: 6 },
 });

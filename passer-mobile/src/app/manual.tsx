@@ -4,12 +4,14 @@ import { StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/ui/app-text';
-import { PrimaryButton } from '@/components/ui/primary-button';
+import { Button } from '@/components/ui/button';
 import { parsePairingLink, type PairingParseError } from '@/core/pairing';
 import { t } from '@/i18n';
 import { isPasteButtonAvailable, PasteButton } from '@/platform/paste-button';
 import { setPendingLink } from '@/state/pending-link';
 import { useTheme } from '@/theme/theme';
+
+import { isCoreInvitation } from '../../modules/passer-core';
 import { radius, type as typeScale } from '@/theme/tokens';
 
 const PROBLEM: Record<PairingParseError, string> = {
@@ -27,22 +29,25 @@ export default function Manual() {
   const [link, setLink] = useState('');
 
   const trimmed = link.trim();
-  const parsed = trimmed ? parsePairingLink(trimmed) : null;
-  const problem = parsed && !parsed.ok ? PROBLEM[parsed.error] : null;
+  // An invitation to your devices joins the group; a `passer://pair` link sets up the direct connection.
+  const invitation = isCoreInvitation(trimmed);
+  const parsed = trimmed && !invitation ? parsePairingLink(trimmed) : null;
+  const problem = parsed && !parsed.ok ? (parsed.error === 'not-a-pairing-link' ? t.manual.notALink : PROBLEM[parsed.error]) : null;
+  const ready = invitation || Boolean(parsed?.ok);
 
   const connect = () => {
-    if (!parsed?.ok) return;
+    if (!ready) return;
     setPendingLink(trimmed);
-    router.replace('/pair');
+    router.replace(invitation ? '/join' : '/pair');
   };
 
   return (
     <View style={[styles.sheet, { paddingBottom: insets.bottom + 20 }]}>
       <View style={styles.head}>
-        <AppText variant="title" accessibilityRole="header">
+        <AppText variant="heading" accessibilityRole="header">
           {t.manual.title}
         </AppText>
-        <AppText variant="caption" tone="secondary">
+        <AppText variant="subhead" tone="secondary">
           {t.manual.help}
         </AppText>
       </View>
@@ -62,7 +67,7 @@ export default function Manual() {
         accessibilityLabel={t.manual.label}
         style={[
           styles.input,
-          typeScale.body,
+          typeScale.callout,
           {
             color: colors.text.primary,
             backgroundColor: colors.surface.well,
@@ -71,7 +76,7 @@ export default function Manual() {
         ]}
       />
       {problem ? (
-        <AppText variant="caption" color={colors.status.error} accessibilityRole="alert">
+        <AppText variant="subhead" color={colors.status.error} accessibilityRole="alert">
           {problem}
         </AppText>
       ) : null}
@@ -92,7 +97,7 @@ export default function Manual() {
           />
         ) : null}
         <View style={styles.connect}>
-          <PrimaryButton label={t.manual.connect} onPress={connect} disabled={!parsed?.ok} />
+          <Button label={t.manual.connect} onPress={connect} disabled={!ready} />
         </View>
       </View>
     </View>

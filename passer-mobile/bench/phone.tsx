@@ -11,11 +11,14 @@ import { installBenchHost, subscribeBenchPreferences, type IphoneClipboard } fro
 import { useSystemScheme } from '@/theme/system-scheme.web';
 import { palettes } from '@/theme/tokens';
 
-import { openOnMount, restartedOntoUpdate, stillMotion } from './boot';
-import { FILES, history, iphoneClipboard, pairedPc, PC, pcClipboard, PHOTOS } from './fixtures';
+import { setPendingLink } from '@/state/pending-link';
+
+import { eventOnMount, openOnMount, restartedOntoUpdate, stillMotion } from './boot';
+import { createFakeCore, type BenchCoreEvent } from './core';
+import { FILES, GROUP, history, iphoneClipboard, pairedPc, PC, pcClipboard, PHOTOS, SMALL_FILES } from './fixtures';
 import { postLog } from './log';
 import { createFakeNetwork } from './network';
-import { DEVICES, loadState, type BenchState, type Device } from './state';
+import { DEVICES, DIRECT_REGIMES, loadState, type BenchState, type Device } from './state';
 
 function clipboardStore(initial: IphoneClipboard) {
   let value = initial;
@@ -38,11 +41,13 @@ function clipboardStore(initial: IphoneClipboard) {
 /** Writes what the app finds on disk at launch, through the app's own storage module. */
 async function seed(state: BenchState): Promise<void> {
   const now = Date.now();
-  const paired = state.regime !== 'first-launch';
-  await storage.savePcs(paired ? [pairedPc(now)] : []);
-  await storage.saveHistory(paired ? history(now) : []);
+  const inGroup = state.regime !== 'first-launch' && state.regime !== 'broken';
+  const direct = DIRECT_REGIMES.includes(state.regime);
+  await storage.savePcs(direct ? [pairedPc(now)] : []);
+  await storage.saveHistory(inGroup && state.regime !== 'alone' ? history(now) : []);
   await storage.saveSettings(DEFAULT_SETTINGS);
-  if (paired) seedToken(PC.id, PC.token);
+  await storage.saveTarget(GROUP.pc.id);
+  if (direct) seedToken(PC.id, PC.token);
 }
 
 /** Puts the stand-ins in place before the app's first render, then seeds its storage. */
@@ -53,13 +58,17 @@ function start(state: BenchState) {
 
   const network = createFakeNetwork({ regime: state.regime, pcClipboard: () => pcClipboard(pcChoice), log: postLog });
   network.install();
+  const group = createFakeCore({ regime: state.regime, pcClipboard: () => pcClipboard(pcChoice), log: postLog });
+  // The desk, or a URL's `event=`, plays what another device does.
+  window.addEventListener('passer-bench-event', (event) => group.trigger((event as CustomEvent<BenchCoreEvent>).detail));
 
   installBenchHost({
+    core: group.core,
     log: postLog,
     clipboard,
     transport: network.transport,
     pickPhotos: async () => PHOTOS,
-    pickFiles: async () => FILES,
+    pickFiles: async () => (state.files === 'large' ? FILES : SMALL_FILES),
     latestScreenshot: async () => PHOTOS.find((photo) => photo.mimeType === 'image/png') ?? null,
     insets: DEVICES[state.device].insets,
     updates: {
@@ -80,7 +89,7 @@ function start(state: BenchState) {
     pcChoice = next.pcClipboard;
   });
 
-  return { device: DEVICES[state.device], seeded: seed(state) };
+  return { device: DEVICES[state.device], seeded: seed(state), trigger: group.trigger };
 }
 
 /** The phone: the app's real root, as `expo-router/entry` mounts it, under the device's status bar. */
@@ -105,8 +114,17 @@ export function Phone() {
   }, [phone]);
 
   useEffect(() => {
+    if (!ready || !eventOnMount) return;
+    // Once the app has opened its device and listens.
+    const timer = setTimeout(() => phone.trigger(eventOnMount as BenchCoreEvent), 1_800);
+    return () => clearTimeout(timer);
+  }, [ready, phone]);
+
+  useEffect(() => {
     if (!ready || !openOnMount) return;
     const target = openOnMount;
+    // The join screen takes the invitation the scanner would have handed over.
+    if (target.startsWith('/join')) setPendingLink(GROUP.invitation);
     const path = target.split('?')[0];
     let attempts = 0;
     // The router refuses to navigate until the root layout has mounted: try until the URL shows the route.

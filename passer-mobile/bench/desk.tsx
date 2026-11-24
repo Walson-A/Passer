@@ -3,18 +3,21 @@ import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } fr
 
 import type { BenchLogKind } from '@/platform/web-bench';
 
-import { pairingRoute } from './fixtures';
+import { GROUP, pairingRoute } from './fixtures';
 import { LOG_MESSAGE_SOURCE, type BenchLogEntry } from './log';
 import {
   DEVICE_CHOICES,
   DEVICES,
+  FILE_CHOICES,
   IPHONE_CLIPBOARDS,
+  LOOKS,
   LANGUAGES,
   loadState,
   PC_CLIPBOARDS,
   REGIMES,
   saveState,
   SCHEMES,
+  TEXT_SIZES,
   UPDATES,
   type BenchState,
   type Choice,
@@ -28,17 +31,28 @@ const ROUTE_GROUPS: { title: string; routes: Route[] }[] = [
     routes: [
       { label: 'Bienvenue', path: '/welcome', modal: false },
       { label: 'Scanner le QR code', path: '/scan', modal: true },
-      { label: 'Coller le lien', path: '/manual', modal: true },
-      { label: 'Appairage', path: pairingRoute(), modal: false },
+      { label: 'Coller un lien', path: '/manual', modal: true },
+      { label: 'Rejoindre et comparer le code', path: '/join', modal: true },
     ],
   },
   {
     title: 'Au quotidien',
     routes: [
-      { label: 'Accueil', path: '/', modal: false },
-      { label: 'Récents', path: '/recent', modal: true },
+      { label: 'Envoyer', path: '/', modal: false },
+      { label: 'Envoyer à…', path: '/target', modal: true },
+      { label: 'Appareils', path: '/devices', modal: false },
+      { label: 'Fiche du PC', path: `/devices/${GROUP.pc.id}`, modal: false },
+      { label: 'Fiche de ce téléphone', path: `/devices/${GROUP.phone.id}`, modal: false },
+      { label: 'Ajouter un appareil', path: '/invite', modal: true },
+      { label: 'Activité', path: '/activity', modal: false },
       { label: 'Réglages', path: '/settings', modal: true },
-      { label: 'Appareils', path: '/devices', modal: true },
+    ],
+  },
+  {
+    title: 'Connexion directe',
+    routes: [
+      { label: 'Appairage HTTP', path: pairingRoute(), modal: false },
+      { label: 'Destination des photos', path: '/destination', modal: true },
     ],
   },
   {
@@ -52,6 +66,15 @@ const ROUTE_GROUPS: { title: string; routes: Route[] }[] = [
       { label: 'Envoyer un fichier', path: '/action/send-file', modal: false },
     ],
   },
+];
+
+/** What another device does, played into the phone (`bench/core.ts`). */
+const EVENTS: { label: string; event: string }[] = [
+  { label: 'L’iPad demande une autorisation', event: 'approval' },
+  { label: 'Un agent IA demande, via le PC', event: 'approval-agent' },
+  { label: 'Le PC envoie du texte', event: 'received-text' },
+  { label: 'Le PC envoie un fichier', event: 'received-file' },
+  { label: 'Un appareil rejoint par ce téléphone', event: 'joined' },
 ];
 
 const ROUTES = ROUTE_GROUPS.flatMap((group) => group.routes);
@@ -120,6 +143,12 @@ export function Desk() {
   const relaunch = () => {
     setLog([]);
     setGeneration((value) => value + 1);
+  };
+
+  /** Plays another device's action into the phone, in its own window. */
+  const play = (event: string) => {
+    const frame = document.querySelector('iframe');
+    frame?.contentWindow?.dispatchEvent(new CustomEvent('passer-bench-event', { detail: event }));
   };
 
   const update = (patch: Partial<BenchState>) => {
@@ -208,11 +237,24 @@ export function Desk() {
         <Section title="Régime">
           <Choices choices={REGIMES} value={state.regime} onChange={(regime) => update({ regime })} stacked />
         </Section>
+        <Section title="Plateforme">
+          <Choices choices={LOOKS} value={state.look} onChange={(look) => update({ look })} />
+        </Section>
+        <Section title="Un autre appareil…">
+          {EVENTS.map((item) => (
+            <Pressable key={item.event} onPress={() => play(item.event)} style={styles.eventButton}>
+              <Text style={styles.eventText}>{item.label}</Text>
+            </Pressable>
+          ))}
+        </Section>
         <Section title="Appareil">
           <Choices choices={DEVICE_CHOICES} value={state.device} onChange={(value) => update({ device: value })} />
         </Section>
         <Section title="Apparence">
           <Choices choices={SCHEMES} value={state.scheme} onChange={(scheme) => update({ scheme })} />
+        </Section>
+        <Section title="Taille du texte">
+          <Choices choices={TEXT_SIZES} value={state.text} onChange={(text) => update({ text })} />
         </Section>
         <Section title="Langue de l’iPhone">
           <Choices choices={LANGUAGES} value={state.language} onChange={(language) => update({ language })} />
@@ -226,6 +268,9 @@ export function Desk() {
         </Section>
         <Section title="Presse-papiers du PC">
           <Choices choices={PC_CLIPBOARDS} value={state.pcClipboard} onChange={(pcClipboard) => update({ pcClipboard })} />
+        </Section>
+        <Section title="Fichiers choisis">
+          <Choices choices={FILE_CHOICES} value={state.files} onChange={(files) => update({ files })} />
         </Section>
         <Section title="Serveur de mises à jour">
           <Choices choices={UPDATES} value={state.update} onChange={(value) => update({ update: value })} />
@@ -323,6 +368,8 @@ const styles = StyleSheet.create({
   choiceLabelActive: { color: INK.activeText, fontWeight: '600' },
   choiceHelp: { color: INK.faint, fontSize: 11, marginTop: 1 },
   choiceHelpActive: { color: '#55554F' },
+  eventButton: { paddingVertical: 7, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1, borderColor: INK.line, marginBottom: 6 },
+  eventText: { color: INK.text, fontSize: 12 },
   logRow: { paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: INK.line, gap: 2 },
   logMeta: { color: INK.faint, fontSize: 10, fontVariant: ['tabular-nums'] },
   logText: { color: INK.text, fontSize: 12, lineHeight: 17 },

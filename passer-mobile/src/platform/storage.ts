@@ -7,6 +7,7 @@ const KEYS = {
   pcs: 'passer.pcs.v1',
   settings: 'passer.settings.v1',
   history: 'passer.history.v1',
+  target: 'passer.target.v1',
 } as const;
 
 export type PhotoDestination = 'clipboard' | 'passboard';
@@ -44,4 +45,8 @@ export const storage = {
 
   loadHistory: <T>() => readJson<T[]>(KEYS.history, []),
   saveHistory: <T>(items: T[]) => writeJson(KEYS.history, items),
+
+  /** The device of the group that Send sends to, by its id. */
+  loadTarget: () => readJson<string | null>(KEYS.target, null),
+  saveTarget: (id: string) => writeJson(KEYS.target, id),
 };

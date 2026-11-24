@@ -2,7 +2,23 @@ import type { EdgeInsets } from 'react-native-safe-area-context';
 
 import { BENCH_STORAGE_KEY, type BenchUpdateScenario } from '@/platform/web-bench';
 
-export type RegimeName = 'paired' | 'first-launch' | 'asleep' | 'slow' | 'no-mdns' | 'remote' | 'refused' | 'other-pc';
+export type RegimeName =
+  | 'paired'
+  | 'manager'
+  | 'direct'
+  | 'first-launch'
+  | 'alone'
+  | 'asleep'
+  | 'refuses'
+  | 'broken'
+  | 'slow'
+  | 'no-mdns'
+  | 'remote'
+  | 'refused'
+  | 'other-pc';
+export type LookChoice = 'ios' | 'android';
+export type FilesChoice = 'small' | 'large';
+export type TextChoice = 'default' | 'large' | 'huge';
 export type UpdateChoice = BenchUpdateScenario;
 export type DeviceName = 'iphone-16' | 'iphone-16-pro-max' | 'iphone-se';
 export type SchemeChoice = 'dark' | 'light' | 'system';
@@ -20,6 +36,12 @@ export type BenchState = {
   pcClipboard: PcClipboardChoice;
   /** What the update server holds, for Settings › Updates. */
   update: UpdateChoice;
+  /** Which platform's conventions the screens follow. */
+  look: LookChoice;
+  /** What the document picker hands over: a file one call carries, or ones over 700 KB. */
+  files: FilesChoice;
+  /** Simulated Dynamic Type. */
+  text: TextChoice;
   /** The route the phone opens on. */
   route: string;
 };
@@ -27,14 +49,38 @@ export type BenchState = {
 export type Choice<T extends string> = { value: T; label: string; help?: string };
 
 export const REGIMES: Choice<RegimeName>[] = [
-  { value: 'paired', label: 'Appairé', help: 'le PC répond, historique rempli' },
-  { value: 'first-launch', label: 'Premier lancement', help: 'aucun PC, aucun historique' },
-  { value: 'asleep', label: 'PC endormi', help: 'plus aucune réponse' },
-  { value: 'slow', label: 'Lent', help: 'réponses lentes, progression visible' },
-  { value: 'no-mdns', label: 'Sans .local', help: 'seule l’adresse IP répond' },
-  { value: 'remote', label: 'À distance', help: 'via Tailscale, seul le nom du PC répond' },
-  { value: 'refused', label: 'Jeton refusé', help: 'le PC a changé de jeton' },
-  { value: 'other-pc', label: 'Autre PC', help: 'un autre PC a pris son adresse' },
+  { value: 'paired', label: 'Groupe', help: 'le PC et un iPad ; le PC répond' },
+  { value: 'manager', label: 'Gère les appareils', help: 'ce téléphone peut ajouter et retirer' },
+  { value: 'direct', label: 'Connexion directe', help: 'groupe + appairage HTTP (Raccourcis, gros fichiers)' },
+  { value: 'first-launch', label: 'Premier lancement', help: 'aucun groupe, aucun historique' },
+  { value: 'alone', label: 'Seul', help: 'un groupe sans autre appareil' },
+  { value: 'asleep', label: 'PC endormi', help: 'le PC ne répond plus' },
+  { value: 'refuses', label: 'Le PC refuse', help: 'son utilisateur dit non aux lectures' },
+  { value: 'broken', label: 'Erreur au chargement', help: 'le noyau ne s’ouvre pas' },
+  { value: 'slow', label: 'Lent', help: 'connexion directe lente, progression visible' },
+  { value: 'no-mdns', label: 'Sans .local', help: 'connexion directe : seule l’adresse IP répond' },
+  { value: 'remote', label: 'À distance', help: 'connexion directe via Tailscale' },
+  { value: 'refused', label: 'Jeton refusé', help: 'connexion directe : le PC a changé de jeton' },
+  { value: 'other-pc', label: 'Autre PC', help: 'connexion directe : un autre PC a pris son adresse' },
+];
+
+/** Regimes where the phone also has the direct (HTTP) pairing, for Shortcuts and files over 700 KB. */
+export const DIRECT_REGIMES: RegimeName[] = ['direct', 'slow', 'no-mdns', 'remote', 'refused', 'other-pc'];
+
+export const LOOKS: Choice<LookChoice>[] = [
+  { value: 'ios', label: 'iPhone' },
+  { value: 'android', label: 'Android' },
+];
+
+export const TEXT_SIZES: Choice<TextChoice>[] = [
+  { value: 'default', label: 'Par défaut' },
+  { value: 'large', label: 'Très grand' },
+  { value: 'huge', label: 'Accessibilité' },
+];
+
+export const FILE_CHOICES: Choice<FilesChoice>[] = [
+  { value: 'small', label: 'Petit (180 Ko)' },
+  { value: 'large', label: 'Gros (> 700 Ko)' },
 ];
 
 export type Device = {
@@ -119,6 +165,9 @@ export const DEFAULT_STATE: BenchState = {
   iphoneClipboard: 'link',
   pcClipboard: 'text',
   update: 'none',
+  look: 'ios',
+  files: 'small',
+  text: 'default',
   route: '/',
 };
 
@@ -135,6 +184,9 @@ export function sanitizeState(raw: Partial<Record<keyof BenchState, unknown>>): 
     iphoneClipboard: pick(IPHONE_CLIPBOARDS, raw.iphoneClipboard, DEFAULT_STATE.iphoneClipboard),
     pcClipboard: pick(PC_CLIPBOARDS, raw.pcClipboard, DEFAULT_STATE.pcClipboard),
     update: pick(UPDATES, raw.update, DEFAULT_STATE.update),
+    look: pick(LOOKS, raw.look, DEFAULT_STATE.look),
+    files: pick(FILE_CHOICES, raw.files, DEFAULT_STATE.files),
+    text: pick(TEXT_SIZES, raw.text, DEFAULT_STATE.text),
     route: typeof raw.route === 'string' && raw.route.startsWith('/') ? raw.route : DEFAULT_STATE.route,
   };
 }

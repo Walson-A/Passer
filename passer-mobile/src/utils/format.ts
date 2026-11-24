@@ -26,3 +26,8 @@ export function formatRelative(at: number, now: number = Date.now()): string {
   if (hours < 48) return t.transfer.yesterday;
   return shortDate.format(at);
 }
+
+/** A device name never breaks at its hyphens: `DESKTOP-4F7KQ2M` stays on one line, or wraps whole. */
+export function deviceName(name: string): string {
+  return name.replace(/-/g, '‑');
+}

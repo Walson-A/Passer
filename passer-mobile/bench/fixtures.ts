@@ -78,12 +78,29 @@ export function pairedPc(now: number): PairedPc {
   };
 }
 
+/**
+ * The group the phone belongs to, as passer-core's `members()` lists it: 64-character
+ * hex ids, the names each device chose. The PC has the same name as in the direct
+ * pairing above, because both come from COMPUTERNAME.
+ */
+export const GROUP = {
+  name: 'Mes appareils',
+  pc: { id: '9cfff8cf59a4e2d81b7c60f3a95e1d24c8b07f6a3e2d1c9b8a7f6e5d4c3b2a19', name: PC.name },
+  ipad: { id: '7a1c04e2b9f83d6c5e1a2b9d8c7f6e5a4b3c2d1e0f9a8b7c6d5e4f3a2b1c0d9e', name: 'iPad de Walson' },
+  phone: { id: '842ffab39e17c6d5a4b3c2d1e0f9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1', name: 'iPhone de Walson' },
+  /** What `device.info` answers for the PC. */
+  pcInfo: { name: PC.name, os: 'windows', arch: 'x86_64', version: '0.1.1' },
+  sas: '696842',
+  invitation: 'passer-core://join?v=1&g=mes-appareils&t=bench0a1b2c3d4e5f60718293a4b5c6d7e8f9&a=0&e=1795540000',
+};
+
 /** A week of use, with the long names real files have. */
 export function history(now: number): HistoryItem[] {
   const entry = (id: string, ago: number, item: Omit<HistoryItem, 'id' | 'at' | 'pcKey'>): HistoryItem => ({
     id,
     at: now - ago,
-    pcKey: PC.id,
+    pcKey: GROUP.pc.id,
+    peer: PC.name,
     ...item,
   });
   return [
@@ -119,7 +136,7 @@ export function history(now: number): HistoryItem[] {
       direction: 'received',
       kind: 'image',
       destination: 'iphone-clipboard',
-      title: t.transfer.imageFromPc,
+      title: format(t.transfer.imageFromPc, { name: PC.name }),
       size: 342_118,
     }),
     entry('bench-6', 3 * DAY, {
@@ -157,6 +174,11 @@ export const PHOTOS: PickedPhoto[] = [
 ];
 
 const PLACEHOLDER_BYTES = 'data:application/octet-stream;base64,AA==';
+
+/** A file one call through the device network carries (under 700 KB). */
+export const SMALL_FILES: UploadFile[] = [
+  { uri: 'data:application/pdf;base64,AA==#billet', name: 'Billet de train Paris - Lyon 28 novembre.pdf', mimeType: 'application/pdf', size: 182_440 },
+];
 
 /** What the document picker hands over. The bench never reads the bytes, only the name, type and size. */
 export const FILES: UploadFile[] = [

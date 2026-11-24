@@ -2,6 +2,7 @@ import type { EdgeInsets } from 'react-native-safe-area-context';
 
 import type { FileTransport, UploadFile } from '@/core/client';
 
+import type { Status } from '../../modules/passer-core';
 import type { PickedPhoto } from './media-types';
 
 /**
@@ -24,7 +25,24 @@ export type IphoneClipboard =
   | { kind: 'text'; text: string }
   | { kind: 'image'; dataUri: string; width: number; height: number };
 
+/** The bench's fake device network (`bench/core.ts`), behind `modules/passer-core/index.web.ts`. */
+export type BenchCore = {
+  open(): Promise<Status>;
+  status(): Promise<Status>;
+  createGroup(groupName: string): Promise<void>;
+  join(): Promise<{ groupName: string; sas: string }>;
+  start(): Promise<void>;
+  stop(): Promise<void>;
+  invite(minutes: number, asApprover: boolean): Promise<string>;
+  call(device: string, capability: string, inputJson: string): Promise<string>;
+  removeDevice(id: string): Promise<void>;
+  stopAllSessions(): Promise<void>;
+  answerApproval(id: number, allow: boolean): boolean;
+  addListener(event: string, listener: (payload: never) => void): { remove: () => void };
+};
+
 export type BenchHost = {
+  core: BenchCore;
   log: (kind: BenchLogKind, message: string) => void;
   clipboard: {
     read: () => IphoneClipboard;
@@ -58,7 +76,7 @@ export function benchHost(): BenchHost {
 }
 
 /** A bench choice the app reads as it starts (language) or live (appearance). */
-export function benchPreference(name: 'scheme' | 'language'): string | null {
+export function benchPreference(name: 'scheme' | 'language' | 'look' | 'text'): string | null {
   try {
     const raw = window.localStorage.getItem(BENCH_STORAGE_KEY);
     const value: unknown = raw ? (JSON.parse(raw) as Record<string, unknown>)[name] : null;

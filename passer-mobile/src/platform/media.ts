@@ -188,6 +188,36 @@ export async function saveImageToPhotos(fileUri: string): Promise<boolean> {
   return true;
 }
 
+/** A file's content, for a call through the device network. */
+export function readBase64(uri: string): Promise<string> {
+  return new File(uri).base64();
+}
+
+/**
+ * A photo small enough for one call through the device network (`maxBytes`), as JPEG.
+ * It is shrunk step by step; `reduced` says whether the sent copy is smaller than the original.
+ */
+export async function fitPhoto(photo: PickedPhoto, maxBytes: number): Promise<{ file: UploadFile; reduced: boolean }> {
+  if (photo.size !== null && photo.size <= maxBytes && (photo.mimeType === 'image/jpeg' || photo.mimeType === 'image/png')) {
+    return { file: photo, reduced: false };
+  }
+  const longest = Math.max(photo.width, photo.height);
+  for (const [edge, compress] of [
+    [Math.min(longest, 2560), 0.82],
+    [1920, 0.75],
+    [1440, 0.7],
+    [1080, 0.65],
+  ] as const) {
+    const context = ImageManipulator.manipulate(photo.uri);
+    if (longest > edge) context.resize(photo.width >= photo.height ? { width: edge } : { height: edge });
+    const image = await context.renderAsync();
+    const saved = await image.saveAsync({ format: SaveFormat.JPEG, compress });
+    const staged = await stage(saved.uri, withExtension(photo.name, 'jpg'), 'image/jpeg');
+    if (staged.size !== null && staged.size <= maxBytes) return { file: staged, reduced: true };
+  }
+  throw new Error('too_large: the photo stays too large once shrunk');
+}
+
 export async function shareFile(fileUri: string, type: { mimeType: string; uti: string }): Promise<void> {
   if (await isAvailableAsync()) {
     await shareAsync(fileUri, { mimeType: type.mimeType, UTI: type.uti });
