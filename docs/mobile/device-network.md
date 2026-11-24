@@ -87,4 +87,4 @@ long that one call may run, not a window of access.
   Send asks for an app update instead of crashing.
 - The core sends no device kind, system, presence or capability list yet (`fa88722` adds them,
   not pinned): the drawing is guessed from the name, and every device gets the same commands.
-- No native build has compiled the module or the phone's capabilities yet. The first EAS build is the check.
+- The module compiled in the iOS preview builds of 2026-11-24 (`ef8af9d`, `68a3cce`); see Builds in [README.md](README.md). The phone's capabilities (`PhoneCapabilities`) came after and haven't been compiled yet, and no Android build has ever been made.

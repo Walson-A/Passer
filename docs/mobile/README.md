@@ -4,7 +4,21 @@ What is built in `passer-mobile/`, and the decisions behind it. The brief it ans
 
 ## Status
 
-The app was redesigned on 2026-11-24 (branch `feat/mobile-redesign`): native iOS structure with Passer's identity, built on the device network. Every screen and state is checked in the bench, with captures in [screens.md](screens.md). It has not run on a real iPhone or Android phone yet; that needs the first EAS build.
+The app was redesigned on 2026-11-24 (branch `feat/mobile-redesign`): native iOS structure with Passer's identity, built on the device network. Every screen and state is checked in the bench, with captures in [screens.md](screens.md). The redesign itself has not been built yet: the owner's iPhone runs the previous screens, from the builds below.
+
+## Builds
+
+Read from EAS (`eas build:list`) on 2026-11-24. Every build so far is iOS, internal distribution (`preview`) or simulator; there has never been an Android build, a TestFlight build or an App Store build.
+
+| Date (UTC) | Profile | App version | Commit | What it carried |
+|---|---|---|---|---|
+| 2026-09-12 13:36 | preview | 1.0.0 | `ae81ce8` | Phase 1: pairing, sending, pulling, history |
+| 2026-09-12 19:25 | preview | 1.1.0 | `fd9fd1d` | + share extension and Shortcuts actions |
+| 2026-10-02 10:44 | preview | 1.1.0 | `0894ad5` | + widgets and Control Center controls |
+| 2026-11-24 14:07 | preview | 1.1.0 | `ef8af9d` | + the device network (passer-core mobile-v0.1.0) |
+| 2026-11-24 17:45 | preview | 1.1.0 | `68a3cce` | passer-core mobile-v0.2.0, what members are and offer |
+
+Simulator builds on 2026-09-12 checked the Swift of the extensions (three failed before `baebc93`). OTA updates published on the `preview` channel reach these builds while the app version stays 1.1.0; JavaScript that needs native code a build lacks must wait for the next build.
 
 What it does:
 - Join your devices with one code: scan the PC's *Add a device* QR (or paste its link), then compare the six digits on both screens
@@ -119,8 +133,8 @@ Every screen and state, with captures: [screens.md](screens.md).
 
 ## Not done yet
 
-- **A native build.** No EAS build has compiled the redesign, the passer-core module or the phone's capabilities (`PhoneCapabilities` in Swift and Kotlin, written against the UniFFI bindings without a compiler here). The first build is the check.
-- **Real-device checks:** how native errors read on the JavaScript side (the classification looks for the core's codes in the text), the Local Network prompt with iroh, the native tab bar's look, the paste control at large text sizes, VoiceOver, Android's back gesture.
+- **A build of the redesign.** The passer-core module has been compiled by the two iOS builds of 2026-11-24; the redesign and the phone's capabilities (`PhoneCapabilities` in Swift and Kotlin, written against the UniFFI bindings without a compiler here) have not. The next build is the check; Kotlin has never been compiled, since there has been no Android build.
+- **Checks on the phone,** not recorded anywhere yet: how native errors read on the JavaScript side (the classification looks for the core's codes in the text), the Local Network prompt with iroh, the native tab bar's look, the paste control at large text sizes, VoiceOver, Android's back gesture.
 - **Waiting on passer-core** (`fa88722`, not pushed): each device's kind and system, when it last answered, the capabilities it offers and its journal. Until then the drawing is guessed from the name, reachability is probed with `device.info`, and every device gets the same three commands.
 - **Share extension, Shortcuts and widgets** still use the direct connection; moving them to the device network needs the core in the extensions.
 - **Large files without the direct connection** wait for streams in the core.
