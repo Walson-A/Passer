@@ -46,7 +46,8 @@ The new way devices talk to this PC, built on [passer-core](https://github.com/W
   | `device.info` | read | allowed | name, kind (laptop or desktop: a PC with a battery is a laptop), Windows version (`RtlGetVersion`), Passer and passer-core versions |
   | `clipboard.write` | write | allowed | puts text (≤ 200 000 characters) on the clipboard; history + HUD |
   | `clipboard.read` | sensitive | **asks** | returns the clipboard text after the user approves |
-  | `file.receive` | write | allowed | saves a file (≤ 700 KB until the core has streams) into the Passboard folder, base name only |
+  | `file.receive` | write | allowed | saves a small file (≤ 700 KB, sent inline) into the Passboard folder, base name only; kept for older apps |
+  | `file.drop` | write | allowed | receives a file of any size (up to 4 GB) as a stream; the core keeps it private until it is complete, then it moves into the Passboard folder, base name only |
 
 - **Approvals**: `WindowPrompter` brings the main window forward and emits `approval-request`; the frontend answers with `devices_answer_approval`. No answer within 55 s means no (the core's own limit is 60 s). `approval-closed` removes the card.
 - **Joins**: when a device joins through an invitation of this PC, `device-joined` carries its name and the 6-digit code to compare. The PC then asks the newcomer what it is and offers, and emits `devices-changed` when it has answered.

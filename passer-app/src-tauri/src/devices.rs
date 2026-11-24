@@ -12,7 +12,8 @@
 //! | `device.info`    | read      | name, OS, version (built into the core) |
 //! | `clipboard.write`| write     | puts text on this PC's clipboard |
 //! | `clipboard.read` | sensitive | returns the text on this PC's clipboard, after the user approves |
-//! | `file.receive`   | write     | saves a small file (< 700 KB) to the Passboard folder |
+//! | `file.receive`   | write     | saves a small file (< 700 KB) to the Passboard folder (older apps) |
+//! | `file.drop`      | write     | receives a file of any size (up to 4 GB) as a stream, into the Passboard folder |
 //!
 //! Approvals are shown in the main window; a request nobody answers is refused.
 
@@ -25,7 +26,7 @@ use async_trait::async_trait;
 use base64::Engine;
 use passer_ffi::{
     AdmissionListener, ApprovalInfo, ApprovalPrompter, CallerInfo, CapabilityHandler,
-    CapabilitySpec, DeviceKind, EffectKind, NetworkKind, PasserDevice, PasserError,
+    CapabilitySpec, DeviceKind, EffectKind, NetworkKind, PasserDevice, PasserError, StreamKind,
 };
 use serde::Serialize;
 use serde_json::json;
@@ -122,6 +123,8 @@ fn pc_capabilities() -> Vec<CapabilitySpec> {
             effect,
             target_kind: None,
             indicator_required: false,
+            stream: None,
+            max_bytes: None,
         }
     };
     vec![
@@ -159,7 +162,33 @@ fn pc_capabilities() -> Vec<CapabilitySpec> {
                 "additionalProperties": false
             }),
         ),
+        CapabilitySpec {
+            stream: Some(StreamKind::Upload),
+            ..spec(
+                "file.drop",
+                "Send a file to the PC",
+                "Saves the file you send into the PC's Passboard folder, under its name.",
+                EffectKind::Write,
+                json!({
+                    "type": "object",
+                    "properties": { "name": { "type": "string", "minLength": 1, "maxLength": 255 } },
+                    "required": ["name"],
+                    "additionalProperties": false
+                }),
+            )
+        },
     ]
+}
+
+/// The base name only, so a sender cannot write outside the Passboard folder (same rule
+/// as the HTTP upload).
+fn base_name(raw: &str) -> String {
+    std::path::Path::new(raw)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .filter(|n| !n.is_empty() && *n != "." && *n != "..")
+        .unwrap_or("received_file")
+        .to_owned()
 }
 
 struct PcCapabilities {
@@ -228,15 +257,7 @@ impl CapabilityHandler for PcCapabilities {
                 Ok(json!({ "text": text }).to_string())
             }
             "file.receive" => {
-                let raw_name = input["name"].as_str().unwrap_or_default();
-                // Same rule as the HTTP upload: keep the base name only, so a sender
-                // cannot write outside the Passboard folder.
-                let name = std::path::Path::new(raw_name)
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .filter(|n| !n.is_empty() && *n != "." && *n != "..")
-                    .unwrap_or("received_file")
-                    .to_owned();
+                let name = base_name(input["name"].as_str().unwrap_or_default());
                 let bytes = base64::engine::general_purpose::STANDARD
                     .decode(input["data_base64"].as_str().unwrap_or_default())
                     .map_err(|_| failed("data_base64 is not valid base64"))?;
@@ -263,6 +284,56 @@ impl CapabilityHandler for PcCapabilities {
             }
             other => Err(failed(format!("unknown capability {other}"))),
         }
+    }
+
+    /// `file.drop`: the whole file arrived in the core's private folder; move it into
+    /// the Passboard folder under a free name.
+    async fn receive_file(
+        &self,
+        capability: String,
+        _target: Option<String>,
+        input_json: String,
+        _caller: CallerInfo,
+        path: String,
+    ) -> Result<String, PasserError> {
+        if capability != "file.drop" {
+            return Err(failed(format!("unknown capability {capability}")));
+        }
+        let input: serde_json::Value = serde_json::from_str(&input_json).map_err(failed)?;
+        let name = base_name(input["name"].as_str().unwrap_or_default());
+        let dir = get_target_dir(&get_downloads_dir(), "application/octet-stream", &name);
+        let dest = get_unique_file_path(dir.join(&name));
+        let (from, to) = (std::path::PathBuf::from(&path), dest.clone());
+        let size = tokio::task::spawn_blocking(move || -> std::io::Result<u64> {
+            let size = std::fs::metadata(&from)?.len();
+            // A rename fails across volumes (the Passboard folder may be on another disk).
+            if std::fs::rename(&from, &to).is_err() {
+                std::fs::copy(&from, &to)?;
+            }
+            Ok(size)
+        })
+        .await
+        .map_err(failed)?
+        .map_err(failed)?;
+        self.record(TransferEvent {
+            kind: "file".into(),
+            direction: "incoming".into(),
+            target: "folder".into(),
+            name: Some(name),
+            path: Some(dest.to_string_lossy().into_owned()),
+            size: Some(size),
+        });
+        Ok(json!({ "saved": true, "size": size }).to_string())
+    }
+
+    async fn provide_file(
+        &self,
+        capability: String,
+        _target: Option<String>,
+        _input_json: String,
+        _caller: CallerInfo,
+    ) -> Result<String, PasserError> {
+        Err(failed(format!("unknown capability {capability}")))
     }
 }
 
