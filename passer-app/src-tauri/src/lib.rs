@@ -62,7 +62,10 @@ pub fn run() {
             devices::devices_invite,
             devices::devices_remove,
             devices::devices_stop_sessions,
-            devices::devices_answer_approval
+            devices::devices_answer_approval,
+            devices::devices_refresh,
+            devices::devices_capabilities,
+            devices::devices_journal
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {

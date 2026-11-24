@@ -43,15 +43,16 @@ The new way devices talk to this PC, built on [passer-core](https://github.com/W
 
   | Capability | Effect | Default | What it does |
   |---|---|---|---|
-  | `device.info` | read | allowed | name, OS, version |
+  | `device.info` | read | allowed | name, kind (laptop or desktop: a PC with a battery is a laptop), Windows version (`RtlGetVersion`), Passer and passer-core versions |
   | `clipboard.write` | write | allowed | puts text (≤ 200 000 characters) on the clipboard; history + HUD |
   | `clipboard.read` | sensitive | **asks** | returns the clipboard text after the user approves |
   | `file.receive` | write | allowed | saves a file (≤ 700 KB until the core has streams) into the Passboard folder, base name only |
 
 - **Approvals**: `WindowPrompter` brings the main window forward and emits `approval-request`; the frontend answers with `devices_answer_approval`. No answer within 55 s means no (the core's own limit is 60 s). `approval-closed` removes the card.
-- **Joins**: when a device joins through an invitation of this PC, `device-joined` carries its name and the 6-digit code to compare.
+- **Joins**: when a device joins through an invitation of this PC, `device-joined` carries its name and the 6-digit code to compare. The PC then asks the newcomer what it is and offers, and emits `devices-changed` when it has answered.
+- **What the other members are and offer**: after start, on a join, and on `devices_refresh`, the core asks each member for `bus.capabilities` and, only where it runs without approval, `device.info`. Answers are cached in `devices\members.json` for display only: every call is still decided by the target. A refresh never makes another device ask its user anything.
 - **Network**: n0's development relays for now (`NetworkKind::N0Dev`), shown as a preview in the UI. Production needs Passer's own relay and coordination server.
-- **Commands**: `devices_status`, `devices_create_group`, `devices_join`, `devices_invite` (one-time link, 10 min, optionally as approver), `devices_remove`, `devices_stop_sessions` (the stop button), `devices_answer_approval`.
+- **Commands**: `devices_status` (members with kind, OS, versions and when they last answered), `devices_create_group`, `devices_join`, `devices_invite` (one-time link, 10 min, optionally as approver), `devices_remove`, `devices_stop_sessions` (the stop button), `devices_answer_approval`, `devices_refresh`, `devices_capabilities` (what a member lets this PC call, and what needs approval), `devices_journal` (calls made and received, newest first, never their content; optionally with one member).
 
 ## ✂️ Core Utilities
 - **`clipboard.rs`**: Safe reading and writing to the system clipboard (Text, HTML, Image, file lists) for iOS push/pull integrations.

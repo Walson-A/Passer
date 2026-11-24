@@ -25,7 +25,7 @@ use async_trait::async_trait;
 use base64::Engine;
 use passer_ffi::{
     AdmissionListener, ApprovalInfo, ApprovalPrompter, CallerInfo, CapabilityHandler,
-    CapabilitySpec, EffectKind, NetworkKind, PasserDevice, PasserError,
+    CapabilitySpec, DeviceKind, EffectKind, NetworkKind, PasserDevice, PasserError,
 };
 use serde::Serialize;
 use serde_json::json;
@@ -58,6 +58,11 @@ impl Devices {
     pub fn init(app: AppHandle, server: Arc<ServerState>) -> Result<Arc<Self>, String> {
         let home = get_config_dir().join("devices");
         let device = PasserDevice::open_on_desktop(home).map_err(|e| e.to_string())?;
+        device.set_device_details(
+            this_pc_kind(),
+            windows_version(),
+            Some(app.package_info().version.to_string()),
+        );
         let devices = Arc::new(Self {
             device,
             pending: Mutex::default(),
@@ -82,6 +87,17 @@ impl Devices {
             self.device.start(NETWORK, None).await.map_err(|e| e.to_string())?;
         }
         Ok(())
+    }
+
+    /// Asks the other members what they are and offer, then tells the window.
+    fn refresh_in_background(app: &AppHandle) {
+        let app = app.clone();
+        tauri::async_runtime::spawn(async move {
+            let devices = app.state::<Arc<Devices>>().inner().clone();
+            if devices.device.refresh_members().await.is_ok() {
+                let _ = app.emit("devices-changed", ());
+            }
+        });
     }
 
     fn answer(&self, id: u64, allow: bool) -> bool {
@@ -324,7 +340,54 @@ impl AdmissionListener for JoinNotifier {
     fn admitted(&self, device_id: String, device_name: String, sas: String) {
         bring_main_window(&self.0);
         let _ = self.0.emit("device-joined", Joined { name: device_name, id: short(&device_id), sas });
+        // Learn what the newcomer is and offers.
+        Devices::refresh_in_background(&self.0);
     }
+}
+
+// ---------------------------------------------------------------------------------------
+// What this PC says about itself
+// ---------------------------------------------------------------------------------------
+
+/// A PC with a battery is a laptop.
+#[cfg(windows)]
+fn this_pc_kind() -> DeviceKind {
+    use windows_sys::Win32::System::Power::{GetSystemPowerStatus, SYSTEM_POWER_STATUS};
+    // SAFETY: GetSystemPowerStatus fills the struct it is given and keeps no pointer.
+    let mut status: SYSTEM_POWER_STATUS = unsafe { std::mem::zeroed() };
+    if unsafe { GetSystemPowerStatus(&mut status) } == 0 {
+        return DeviceKind::Unknown;
+    }
+    match status.BatteryFlag {
+        128 => DeviceKind::Desktop, // no system battery
+        255 => DeviceKind::Unknown, // unknown status
+        _ => DeviceKind::Laptop,
+    }
+}
+
+#[cfg(not(windows))]
+fn this_pc_kind() -> DeviceKind {
+    DeviceKind::Unknown
+}
+
+/// The real Windows version, e.g. `10.0.26100` (Windows 11 reports 10.0 too). Unlike
+/// `GetVersionEx`, `RtlGetVersion` is not capped by the application manifest.
+#[cfg(windows)]
+fn windows_version() -> Option<String> {
+    use windows_sys::Wdk::System::SystemServices::RtlGetVersion;
+    use windows_sys::Win32::System::SystemInformation::OSVERSIONINFOW;
+    // SAFETY: RtlGetVersion fills the struct whose size is set first and keeps no pointer.
+    let mut info: OSVERSIONINFOW = unsafe { std::mem::zeroed() };
+    info.dwOSVersionInfoSize = std::mem::size_of::<OSVERSIONINFOW>() as u32;
+    if unsafe { RtlGetVersion(&mut info) } != 0 {
+        return None;
+    }
+    Some(format!("{}.{}.{}", info.dwMajorVersion, info.dwMinorVersion, info.dwBuildNumber))
+}
+
+#[cfg(not(windows))]
+fn windows_version() -> Option<String> {
+    None
 }
 
 // ---------------------------------------------------------------------------------------
@@ -338,6 +401,53 @@ pub struct MemberView {
     name: String,
     approver: bool,
     this_device: bool,
+    /// `phone`, `tablet`, `laptop`, `desktop` or `unknown`.
+    kind: &'static str,
+    /// What the member last said about itself; display only.
+    os: Option<String>,
+    os_version: Option<String>,
+    app_version: Option<String>,
+    core_version: Option<String>,
+    /// When it last answered this PC (Unix seconds).
+    answered_at: Option<u64>,
+}
+
+fn kind_name(kind: DeviceKind) -> &'static str {
+    match kind {
+        DeviceKind::Phone => "phone",
+        DeviceKind::Tablet => "tablet",
+        DeviceKind::Laptop => "laptop",
+        DeviceKind::Desktop => "desktop",
+        DeviceKind::Unknown => "unknown",
+    }
+}
+
+/// What another member lets this PC call.
+#[derive(Serialize)]
+pub struct CapabilityView {
+    name: String,
+    title: String,
+    description: String,
+    /// `read`, `write` or `sensitive`.
+    effect: &'static str,
+    needs_approval: bool,
+}
+
+/// One line of this PC's journal: what was called, never what was sent.
+#[derive(Serialize)]
+pub struct JournalView {
+    seq: u64,
+    at: u64,
+    outgoing: bool,
+    peer_id: String,
+    peer_short_id: String,
+    peer_name: String,
+    agent: Option<String>,
+    capability: String,
+    target: Option<String>,
+    decision: String,
+    approved: Option<bool>,
+    outcome: String,
 }
 
 #[derive(Serialize)]
@@ -365,6 +475,12 @@ pub async fn devices_status(devices: DevicesState<'_>) -> Result<DevicesStatus, 
                     name: m.name,
                     approver: m.approver,
                     this_device: m.this_device,
+                    kind: kind_name(m.kind),
+                    os: m.os,
+                    os_version: m.os_version,
+                    app_version: m.app_version,
+                    core_version: m.core_version,
+                    answered_at: m.answered_at,
                 })
                 .collect()
         })
@@ -423,4 +539,73 @@ pub async fn devices_stop_sessions(devices: DevicesState<'_>) -> Result<(), Stri
 #[tauri::command]
 pub fn devices_answer_approval(devices: DevicesState<'_>, id: u64, allow: bool) -> bool {
     devices.answer(id, allow)
+}
+
+/// Asks every other member, now, what it is and offers. Returns how many answered.
+#[tauri::command]
+pub async fn devices_refresh(devices: DevicesState<'_>) -> Result<u32, String> {
+    devices.device.refresh_members().await.map_err(|e| e.to_string())
+}
+
+/// What a member (by id) lets this PC call, as it last said.
+#[tauri::command]
+pub fn devices_capabilities(devices: DevicesState<'_>, id: String) -> Result<Vec<CapabilityView>, String> {
+    let list = devices.device.member_capabilities(id).map_err(|e| e.to_string())?;
+    Ok(list
+        .into_iter()
+        .map(|c| CapabilityView {
+            name: c.name,
+            title: c.title,
+            description: c.description,
+            effect: match c.effect {
+                EffectKind::Read => "read",
+                EffectKind::Write => "write",
+                EffectKind::Sensitive => "sensitive",
+            },
+            needs_approval: c.needs_approval,
+        })
+        .collect())
+}
+
+/// The latest journal lines, newest first; only those with one member when `id` is set.
+#[tauri::command]
+pub async fn devices_journal(
+    devices: DevicesState<'_>,
+    id: Option<String>,
+    limit: Option<u32>,
+) -> Result<Vec<JournalView>, String> {
+    let lines = devices
+        .device
+        .journal_recent(limit.unwrap_or(50).min(200), id)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(lines
+        .into_iter()
+        .map(|l| JournalView {
+            peer_short_id: short(&l.peer_id),
+            seq: l.seq,
+            at: l.at,
+            outgoing: l.outgoing,
+            peer_id: l.peer_id,
+            peer_name: l.peer_name,
+            agent: l.agent,
+            capability: l.capability,
+            target: l.target,
+            decision: l.decision,
+            approved: l.approved,
+            outcome: l.outcome,
+        })
+        .collect())
+}
+
+#[cfg(all(test, windows))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn this_pc_describes_itself() {
+        let version = windows_version().expect("RtlGetVersion answers");
+        assert!(version.starts_with("10.0."), "{version}");
+        assert_ne!(this_pc_kind(), DeviceKind::Unknown);
+    }
 }
