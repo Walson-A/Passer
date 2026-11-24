@@ -77,6 +77,11 @@ export async function saveImageToPhotos(fileUri: string): Promise<boolean> {
   return true;
 }
 
+/** The bench has no file system: a fetched file gets the path it would have on the phone. */
+export function receivedFileUri(rawName: string): string {
+  return `file:///bench/Documents/Passer/${encodeURIComponent(rawName)}`;
+}
+
 /**
  * The bench's picks carry a name and a size, not real bytes: it hands over base64 of that
  * size, which is what the fake device network measures (`modules/passer-core/index.web.ts`).

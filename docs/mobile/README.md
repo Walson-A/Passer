@@ -23,7 +23,7 @@ Simulator builds on 2026-09-12 checked the Swift of the extensions (three failed
 What it does:
 - Join your devices with one code: scan the PC's *Add a device* QR (or paste its link), then compare the six digits on both screens
 - Send to the device of your choice: what you copied (Apple's paste control), photos, files
-- Fetch another device's clipboard, which its user approves each time ("It asks first")
+- Fetch another device's clipboard, which its user approves each time ("It asks first"), and the files it shares (on its page, *Get*)
 - Receive text and files of any size from the PC (the phone offers `clipboard.write`, `file.receive` and `file.drop`)
 - See what each device is, its system, when it last answered, the commands it offers and the recent exchanges with it
 - Answer permission requests, see every device and whether it answers, add one (from a phone that manages devices), remove one, stop remote activity

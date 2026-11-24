@@ -188,6 +188,23 @@ export async function saveImageToPhotos(fileUri: string): Promise<boolean> {
   return true;
 }
 
+/**
+ * Where a file fetched from another device lands: Documents › Passer, which the Files app
+ * shows under On My iPhone › Passer, under a free name. Only the base name is kept.
+ */
+export function receivedFileUri(rawName: string): string {
+  const base = rawName.split(/[\\/]/).pop() ?? '';
+  const name = base && base !== '.' && base !== '..' ? base : 'received_file';
+  const folder = new Directory(Paths.document, 'Passer');
+  if (!folder.exists) folder.create({ intermediates: true });
+  const dot = name.lastIndexOf('.');
+  const stem = dot > 0 ? name.slice(0, dot) : name;
+  const extension = dot > 0 ? name.slice(dot) : '';
+  let file = new File(folder, name);
+  for (let copy = 2; file.exists; copy += 1) file = new File(folder, `${stem} ${copy}${extension}`);
+  return file.uri;
+}
+
 /** A file's content, for a call through the device network. */
 export function readBase64(uri: string): Promise<string> {
   return new File(uri).base64();

@@ -15,6 +15,16 @@ import type { RegimeName } from './state';
 /** `MAX_FILE_BYTES` in devices.rs. */
 const MAX_FILE_BYTES = 700 * 1024;
 
+const NOW = Math.round(Date.now() / 1000);
+
+/** What the PC shares (its Passer Space folder), as `file.list` answers: newest first. */
+const SHARED = [
+  { name: 'Compte rendu réunion 24 novembre.docx', size: 84_212, modified: NOW - 1_800 },
+  { name: 'Plan d’accès salle Pasteur.pdf', size: 412_880, modified: NOW - 7_200 },
+  { name: 'Photos chantier cuisine.zip', size: 48_221_904, modified: NOW - 86_400 * 2 },
+  { name: 'Devis rénovation cuisine - Maison Tessier (v3 définitive).pdf', size: 2_204_871, modified: NOW - 86_400 * 6 },
+];
+
 type Listener = (payload: never) => void;
 
 export type BenchCoreEvent = 'approval' | 'approval-agent' | 'received-text' | 'received-file' | 'joined';
@@ -87,7 +97,11 @@ export function createFakeCore({
       ];
       // A PC on an older desktop has no streams: the app falls back to one call per file.
       if (regime !== 'old-pc') {
-        list.push({ name: 'file.drop', title: 'Drop a file on the PC', description: 'Receives a file of any size, as a stream, into the Passboard folder.', effect: 'write', needsApproval: false });
+        list.push(
+          { name: 'file.drop', title: 'Send a file to the PC', description: "Saves the file you send into the PC's Passboard folder, under its name.", effect: 'write', needsApproval: false },
+          { name: 'file.list', title: "List the PC's shared files", description: "Lists the files in the PC's Passer Space folder, to get one with file.get.", effect: 'read', needsApproval: false },
+          { name: 'file.get', title: 'Get a file from the PC', description: "Sends back a file from the PC's Passer Space folder, by name.", effect: 'read', needsApproval: false },
+        );
       }
       return list;
     }
@@ -169,6 +183,11 @@ export function createFakeCore({
       switch (capability) {
         case 'device.info':
           return JSON.stringify(GROUP.pcInfo);
+        case 'file.list':
+          if (!offers(member).some((offer) => offer.name === 'file.list')) {
+            throw new Error('unknown_capability: no such capability on this device');
+          }
+          return JSON.stringify({ files: SHARED });
         case 'clipboard.write': {
           const text = String(input.text ?? '');
           log('pc', `Presse-papiers du PC : « ${text.slice(0, 80)} »`);
@@ -217,8 +236,25 @@ export function createFakeCore({
       log('pc', `Passboard du PC (flux) : ${name} (${Math.round(total / 1024)} Ko)`);
       return JSON.stringify({ saved: true, size: total, name });
     },
-    fetchFile: async () => {
-      throw new Error('unknown_capability: no such capability on this device');
+    fetchFile: async (device: string, capability: string, inputJson: string, _uri: string, transferId: string) => {
+      const member = find(device);
+      if (!answers(member)) {
+        await wait(2_000);
+        throw new Error('network error: connection timed out');
+      }
+      if (capability !== 'file.get' || !offers(member).some((offer) => offer.name === capability)) {
+        throw new Error('unknown_capability: no such capability on this device');
+      }
+      const name = String((JSON.parse(inputJson) as { name?: string }).name ?? '');
+      const file = SHARED.find((one) => one.name === name);
+      if (!file) throw new Error('module_error: no shared file with that name');
+      const steps = 6;
+      for (let step = 1; step <= steps; step += 1) {
+        await wait(260);
+        emit('onTransferProgress', { id: transferId, done: Math.round((file.size * step) / steps), total: file.size });
+      }
+      log('pc', `Envoyé depuis Passer Space du PC : ${name}`);
+      return JSON.stringify({ bytes: file.size });
     },
     refreshMembers: async () => {
       await wait(300);

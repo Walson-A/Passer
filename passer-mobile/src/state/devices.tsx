@@ -85,6 +85,14 @@ type DevicesValue = {
   journal: (id: string | null, limit?: number) => Promise<JournalEntry[]>;
   /** This build carries streams (passer-core mobile-v0.3.0); an older one reached over the air doesn't. */
   canStream: boolean;
+  /** Gets a file from a download capability (`file.get`) into `uri`, reporting bytes as they come. */
+  fetchFile: (
+    device: string,
+    capability: string,
+    input: object,
+    uri: string,
+    onProgress: (done: number, total: number | null) => void,
+  ) => Promise<string>;
   /** Streams the file at `uri` to an upload capability (`file.drop`), reporting bytes as they go. */
   sendFile: (
     device: string,
@@ -393,7 +401,25 @@ export function DevicesProvider({ children }: { children: ReactNode }) {
       },
       call,
       offers,
-      canStream: typeof core?.sendFile === 'function',
+      canStream: typeof core?.sendFile === 'function' && typeof core?.fetchFile === 'function',
+      fetchFile: async (device, capability, input, uri, onProgress) => {
+        if (!core?.fetchFile) throw new Error('unknown_capability: this build has no streams');
+        transfers += 1;
+        const transferId = `get-${Date.now().toString(36)}-${transfers}`;
+        const subscription = core.addListener('onTransferProgress', (progress) => {
+          if (progress.id === transferId) onProgress(progress.done, progress.total);
+        });
+        try {
+          const output = await core.fetchFile(device, capability, JSON.stringify(input), uri, transferId);
+          report(device, true);
+          return output;
+        } catch (error) {
+          if (classifyCallError(error).kind === 'unreachable') report(device, false);
+          throw error;
+        } finally {
+          subscription.remove();
+        }
+      },
       journal: async (id, limit = 30) => (core?.journal ? core.journal(limit, id) : []),
       sendFile: async (device, capability, input, uri, onProgress) => {
         if (!core?.sendFile) throw new Error('unknown_capability: this build has no streams');

@@ -109,3 +109,35 @@ export function base64Size(base64: string): number {
 export function fitsOneCall(size: number | null): boolean {
   return size === null || size <= MAX_FILE_BYTES;
 }
+
+/** A file another device shares (`file.list`), to get with `file.get`. */
+export type SharedFile = { name: string; size: number | null; modified: number | null };
+
+/** What a device shares, newest first (the desktop's `file.list`: its Passer Space folder). */
+export async function listFilesOf(call: CoreCall, device: string): Promise<SharedFile[]> {
+  let output: string;
+  try {
+    output = await call(device, 'file.list', '{}');
+  } catch (error) {
+    throw classifyCallError(error);
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(output);
+  } catch {
+    throw new CallFailure('failed', 'unreadable answer to file.list');
+  }
+  const files = (parsed as { files?: unknown }).files;
+  if (!Array.isArray(files)) return [];
+  return files.flatMap((file): SharedFile[] => {
+    const entry = file as { name?: unknown; size?: unknown; modified?: unknown };
+    if (typeof entry.name !== 'string' || entry.name.length === 0) return [];
+    return [
+      {
+        name: entry.name,
+        size: typeof entry.size === 'number' ? entry.size : null,
+        modified: typeof entry.modified === 'number' ? entry.modified : null,
+      },
+    ];
+  });
+}

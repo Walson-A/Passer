@@ -45,9 +45,13 @@ and compares the code when a device joins through it.
 | `file.drop` (stream) | Photo, File: originals of any size, with progress across the batch (`sendFile`, `onTransferProgress`) | none on the phone; the PC takes up to 4 GB |
 | `file.receive` | Photo and File for a PC without `file.drop`, a pasted image without the direct connection | 700 KB per file; photos are shrunk to JPEG to fit and the result says so |
 | `clipboard.read` | *Its clipboard*, with the lock *It asks first*: the PC's user approves each read | text only |
+| `file.list` | *What DESKTOP-… shares*, on the device's page: the files of its shared folder (Passer Space on the desktop) | none |
+| `file.get` (stream) | *Get* on one of them: the file lands in Documents › Passer and the share sheet opens (`fetchFile`) | none |
 | `device.info` | Whether a device answers (no live presence in the core), every 30 s for the Send destination while the app is open | none |
 
-The screens only show the commands a member offers (`memberCapabilities`), with the lock when
+There is no shared folder for the whole group: each device shares its own files, reached
+through that device (owner's decision, 2026-11-24, same as the desktop's device page). The
+screens only show the commands a member offers (`memberCapabilities`), with the lock when
 it `needsApproval`; a member on an older core lists nothing, and then every command shows and
 the member decides.
 

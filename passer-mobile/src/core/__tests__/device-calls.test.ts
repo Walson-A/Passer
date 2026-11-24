@@ -5,6 +5,7 @@ import {
   CallFailure,
   classifyCallError,
   fitsOneCall,
+  listFilesOf,
   MAX_FILE_BYTES,
   readClipboardOf,
   sendFileTo,
@@ -96,5 +97,25 @@ describe('sizes', () => {
     expect(fitsOneCall(null)).toBe(true);
     expect(fitsOneCall(MAX_FILE_BYTES)).toBe(true);
     expect(fitsOneCall(MAX_FILE_BYTES + 1)).toBe(false);
+  });
+});
+
+describe('listFilesOf', () => {
+  it('reads the desktop answer and skips what it cannot use', async () => {
+    const call: CoreCall = async (_device, capability) => {
+      expect(capability).toBe('file.list');
+      return JSON.stringify({ files: [{ name: 'a.pdf', size: 12, modified: 1700000000 }, { size: 3 }, { name: 'b.txt' }] });
+    };
+    await expect(listFilesOf(call, 'pc')).resolves.toEqual([
+      { name: 'a.pdf', size: 12, modified: 1700000000 },
+      { name: 'b.txt', size: null, modified: null },
+    ]);
+  });
+
+  it('classifies a refusal', async () => {
+    const call: CoreCall = async () => {
+      throw new Error('unknown_capability: file.list');
+    };
+    await expect(listFilesOf(call, 'pc')).rejects.toMatchObject({ kind: 'not-offered' });
   });
 });

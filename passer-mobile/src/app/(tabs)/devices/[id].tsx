@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DeviceGlyph } from '@/components/device-glyph';
 import { ClipboardDownIcon, FileIcon, SendIcon } from '@/components/icons';
 import { ReachLine } from '@/components/reach-line';
+import { SharedFiles } from '@/components/shared-files';
 import { AppText } from '@/components/ui/app-text';
 import { StatusScrim } from '@/components/ui/status-scrim';
 import { Button } from '@/components/ui/button';
@@ -186,6 +187,8 @@ export default function DeviceScreen() {
             }
           />
         </Group>
+
+        {!isMe ? <SharedFiles member={member} /> : null}
 
         {history.length > 0 ? (
           <Group header={t.device.history} footer={t.device.historyFooter}>
