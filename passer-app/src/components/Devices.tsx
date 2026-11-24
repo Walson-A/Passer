@@ -2,14 +2,16 @@ import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import {
-    Check, ChevronRight, KeyRound, Laptop, Lock, Monitor, QrCode, RefreshCw, ShieldCheck,
+    ArrowDownLeft, ArrowUpRight, Check, ChevronRight, KeyRound, Laptop, Lock, Monitor, QrCode, RefreshCw, ShieldCheck,
     Smartphone, Trash2, WifiOff, X, CircleAlert, Link2,
 } from "lucide-react";
 import { DeviceInvite, InlineError } from "./DeviceInvite";
 import { DeviceRender } from "./DeviceRender";
 import { DeviceStage } from "./DeviceStage";
-import { Action, FOCUS, SasDigits, kindOf, osLabel, screenFor, thisOs, type DevicesStatus, type Joined, type Member } from "./deviceUi";
-import { useMemberInfo } from "../hooks/useMemberInfo";
+import {
+    Action, CAPABILITY_WORDS, FOCUS, SasDigits, isRecent, kindOfMember, osLabel, screenFor, seenLabel, thisOs,
+    type DevicesStatus, type Joined, type JournalLine, type Member,
+} from "./deviceUi";
 
 interface Props {
     /** True while this is the visible view. */
@@ -39,6 +41,7 @@ export function Devices({ active }: Props) {
     const [joinSas, setJoinSas] = useState<string | null>(null);
     const [selected, setSelected] = useState<string | null>(null);
     const [details, setDetails] = useState<{ id: string; confirm: boolean } | null>(null);
+    const [refreshing, setRefreshing] = useState(false);
 
     const refresh = useCallback(async () => {
         try {
@@ -51,6 +54,38 @@ export function Devices({ active }: Props) {
             return null;
         }
     }, []);
+
+    // Ask every member what it is and offers (`devices_refresh`, never an
+    // approval on the other side), then read the updated list.
+    const refreshMembers = useCallback(async () => {
+        setRefreshing(true);
+        try {
+            await invoke<number>("devices_refresh");
+        } catch {
+            // Not running, or nobody answered: the list says what it knows.
+        } finally {
+            await refresh();
+            setRefreshing(false);
+        }
+    }, [refresh]);
+
+    useEffect(() => {
+        if (!active) return;
+        refreshMembers();
+        const t = setInterval(refreshMembers, 60_000);
+        return () => clearInterval(t);
+    }, [active, refreshMembers]);
+
+    // A member answered for the first time after joining.
+    useEffect(() => {
+        let off: (() => void) | undefined;
+        let alive = true;
+        (async () => {
+            const un = await listen("devices-changed", () => { refresh(); });
+            if (alive) off = un; else un();
+        })();
+        return () => { alive = false; off?.(); };
+    }, [refresh]);
 
     // Load on arrival, then keep the state honest while the view is in front.
     useEffect(() => {
@@ -253,12 +288,12 @@ export function Devices({ active }: Props) {
                 {/* Every device, at a glance */}
                 <div role="tablist" aria-label="Your devices" className="flex gap-3 overflow-x-auto custom-scrollbar pb-1 -mb-1">
                     {members.map((m, i) => (
-                        <DeviceCard key={m.id} member={m} index={i} on={m.id === current.id} running={status.running} onSelect={() => setSelected(m.id)} />
+                        <DeviceCard key={m.id} member={m} index={i} on={m.id === current.id} onSelect={() => setSelected(m.id)} />
                     ))}
                 </div>
 
                 {/* The chosen one */}
-                <DeviceStage member={current} running={status.running} />
+                <DeviceStage member={current} running={status.running} onRefresh={refreshMembers} refreshing={refreshing} />
 
                 <div className="flex items-center gap-4 -mt-1">
                     <button
@@ -311,14 +346,9 @@ function listNames(names: string[]) {
     return `${names.slice(0, -1).join(", ")} or ${names[names.length - 1]}`;
 }
 
-function DeviceCard({ member: m, index, on, running, onSelect }: { member: Member; index: number; on: boolean; running: boolean; onSelect: () => void }) {
-    const probe = useMemberInfo(m.id, !m.this_device && running);
-    const os = m.this_device ? thisOs() : probe?.state === "ok" ? probe.info.os : undefined;
-    const kind = kindOf(m.name, os);
-    const reachable = m.this_device ? running : probe?.state === "ok";
-    const label = m.this_device
-        ? "This PC"
-        : probe?.state === "ok" ? "Reachable" : probe?.state === "unreachable" ? "Not reachable" : running ? "Checking…" : "Unknown";
+function DeviceCard({ member: m, index, on, onSelect }: { member: Member; index: number; on: boolean; onSelect: () => void }) {
+    const kind = kindOfMember(m);
+    const recent = m.this_device || isRecent(m.answered_at);
     return (
         <button
             role="tab"
@@ -331,13 +361,13 @@ function DeviceCard({ member: m, index, on, running, onSelect }: { member: Membe
                     : "bg-white/[0.025] border-white/[0.06] hover:bg-white/[0.05] hover:border-white/12"}`}
         >
             <span className="w-11 h-11 shrink-0 rounded-xl bg-black/25 flex items-end justify-center pb-1 overflow-hidden" aria-hidden>
-                <DeviceRender kind={kind} screen={screenFor(m.id)} size={kind === "phone" || kind === "tablet" ? 0.13 : 0.1} dim={!reachable && probe?.state !== "loading"} />
+                <DeviceRender kind={kind} screen={screenFor(m.id)} size={kind === "phone" || kind === "tablet" ? 0.13 : 0.1} dim={!recent} />
             </span>
             <span className="min-w-0">
-                <span className={`block text-[13px] font-semibold truncate ${reachable ? "text-white/90" : "text-white/65"}`} title={m.name}>{m.name}</span>
+                <span className={`block text-[13px] font-semibold truncate ${recent ? "text-white/90" : "text-white/65"}`} title={m.name}>{m.name}</span>
                 <span className="flex items-center gap-1.5 mt-0.5">
-                    <span className={`w-1.5 h-1.5 rounded-full ${reachable ? "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]" : "bg-white/30"}`} aria-hidden />
-                    <span className="text-[12px] text-white/55">{label}</span>
+                    <span className={`w-1.5 h-1.5 rounded-full ${recent ? "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]" : "bg-white/30"}`} aria-hidden />
+                    <span className="text-[12px] text-white/55 truncate">{m.this_device ? "This PC" : seenLabel(m.answered_at)}</span>
                 </span>
             </span>
         </button>
@@ -354,8 +384,14 @@ function DetailsPanel({ member: m, canRemove, confirm, busy, onArm, onDisarm, on
     onRemove: () => void;
     onClose: () => void;
 }) {
-    const probe = useMemberInfo(m.id, false);
-    const info = probe?.state === "ok" ? probe.info : null;
+    const [journal, setJournal] = useState<JournalLine[] | null>(null);
+    useEffect(() => {
+        let alive = true;
+        invoke<JournalLine[]>("devices_journal", m.this_device ? { limit: 30 } : { id: m.id, limit: 30 })
+            .then(l => { if (alive) setJournal(l); })
+            .catch(() => { if (alive) setJournal([]); });
+        return () => { alive = false; };
+    }, [m.id, m.this_device]);
 
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -369,11 +405,11 @@ function DetailsPanel({ member: m, canRemove, confirm, busy, onArm, onDisarm, on
             : "Sends and receives"],
         ["Device ID", <span className="font-mono">{m.short_id}</span>],
     ];
-    if (m.this_device) rows.push(["System", osLabel(thisOs())]);
-    if (info) {
-        rows.push(["System", `${osLabel(info.os)} · ${info.arch}`]);
-        rows.push(["passer-core", info.version]);
-    }
+    const os = m.os ?? (m.this_device ? thisOs() : null);
+    if (os) rows.push(["System", `${osLabel(os)}${m.os_version ? ` ${m.os_version}` : ""}`]);
+    if (m.app_version) rows.push(["Passer", m.app_version]);
+    if (m.core_version) rows.push(["passer-core", m.core_version]);
+    if (!m.this_device) rows.push(["Last answered", seenLabel(m.answered_at).replace(/^Seen /, "")]);
 
     return (
         <div className="absolute inset-0 z-[300] flex justify-end">
@@ -399,7 +435,26 @@ function DetailsPanel({ member: m, canRemove, confirm, busy, onArm, onDisarm, on
                     ))}
                 </dl>
 
-                <div className="mt-auto px-6 pb-6">
+                <div className="flex-1 min-h-0 flex flex-col mt-5">
+                    <h3 className="px-6 text-[11px] font-black uppercase tracking-[0.18em] text-white/50">
+                        {m.this_device ? "Calls on this PC" : "Between it and this PC"}
+                    </h3>
+                    <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-6 pt-2.5 pb-3">
+                        {journal === null ? (
+                            <div className="flex flex-col gap-2" role="status" aria-label="Loading the history">
+                                {[0, 1, 2].map(i => <span key={i} className="skeleton block h-10 rounded-xl" />)}
+                            </div>
+                        ) : journal.length === 0 ? (
+                            <p className="text-[12px] text-white/45 leading-snug">Nothing yet. Every request between your devices shows up here, never what was sent.</p>
+                        ) : (
+                            <ol className="flex flex-col gap-1">
+                                {journal.map(l => <JournalRow key={`${l.seq}-${l.outgoing}`} line={l} showPeer={m.this_device} />)}
+                            </ol>
+                        )}
+                    </div>
+                </div>
+
+                <div className="shrink-0 px-6 pb-6 pt-2">
                     {m.this_device ? (
                         <p className="text-[12px] text-white/50">This is the PC you're on.</p>
                     ) : !canRemove ? (
@@ -426,6 +481,39 @@ function DetailsPanel({ member: m, canRemove, confirm, busy, onArm, onDisarm, on
             </aside>
         </div>
     );
+}
+
+/** One journal line, in words: who, what, and how it ended. Never the content. */
+function JournalRow({ line: l, showPeer }: { line: JournalLine; showPeer: boolean }) {
+    const what = CAPABILITY_WORDS[l.capability] ?? l.capability;
+    const who = l.outgoing
+        ? (showPeer ? `This PC asked ${l.peer_name}` : "This PC asked")
+        : l.agent ? `${l.agent} (on ${l.peer_name}) asked` : `${l.peer_name} asked`;
+    let result: { text: string; tone: string };
+    if (l.decision === "deny") result = { text: "Not allowed", tone: "text-red-200/80" };
+    else if (l.approved === false) result = { text: "Refused", tone: "text-red-200/80" };
+    else if (l.outcome !== "ok") result = { text: l.outcome === "denied" ? "Refused" : "Didn't go through", tone: "text-white/50" };
+    else if (l.approved === true) result = { text: "Allowed once", tone: "text-blue-200/85" };
+    else result = { text: "Done", tone: "text-emerald-300/85" };
+    const Icon = l.outgoing ? ArrowUpRight : ArrowDownLeft;
+    return (
+        <li className="flex items-start gap-2.5 py-2">
+            <Icon className={`w-3.5 h-3.5 mt-0.5 shrink-0 ${l.outgoing ? "text-blue-300/80" : "text-white/50"}`} strokeWidth={2.25} aria-label={l.outgoing ? "Sent" : "Received"} />
+            <div className="min-w-0 flex-1">
+                <p className="text-[13px] text-white/85 leading-snug break-words">
+                    <span className="text-white/55">{who}: </span>{what}
+                </p>
+                <p className="text-[11px] mt-0.5"><span className={`font-semibold ${result.tone}`}>{result.text}</span><span className="text-white/40"> · {timeLabel(l.at)}</span></p>
+            </div>
+        </li>
+    );
+}
+
+function timeLabel(at: number) {
+    const d = new Date(at * 1000);
+    const today = new Date();
+    const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    return d.toDateString() === today.toDateString() ? time : `${d.toLocaleDateString([], { day: "numeric", month: "short" })} ${time}`;
 }
 
 function SasBanner({ title, text, sas, children }: { title: string; text: string; sas: string; children: React.ReactNode }) {

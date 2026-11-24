@@ -14,7 +14,72 @@ export interface Member {
     name: string;
     approver: boolean;
     this_device: boolean;
+    /** What the member last said about itself (passer-core `members()`). */
+    kind: Kind | "unknown";
+    os: string | null;
+    os_version: string | null;
+    app_version: string | null;
+    core_version: string | null;
+    /** When it last answered this PC, Unix seconds. */
+    answered_at: number | null;
 }
+
+/** What a member lets this PC call (`devices_capabilities`). */
+export interface Capability {
+    name: string;
+    title: string;
+    description: string;
+    effect: "read" | "write" | "sensitive";
+    needs_approval: boolean;
+}
+
+/** One line of this PC's journal (`devices_journal`): never the content. */
+export interface JournalLine {
+    seq: number;
+    at: number;
+    outgoing: boolean;
+    peer_id: string;
+    peer_short_id: string;
+    peer_name: string;
+    agent: string | null;
+    capability: string;
+    target: string | null;
+    decision: "allow" | "ask" | "deny" | "none" | string;
+    approved: boolean | null;
+    outcome: string;
+}
+
+/** A member answered recently enough to call it here. */
+export const RECENT_S = 5 * 60;
+
+/** "Seen just now", "Seen 12 min ago"... from `answered_at`. */
+export function seenLabel(answeredAt: number | null, now = Date.now() / 1000): string {
+    if (!answeredAt) return "Not seen yet";
+    const s = Math.max(0, now - answeredAt);
+    if (s < 90) return "Seen just now";
+    if (s < 3600) return `Seen ${Math.round(s / 60)} min ago`;
+    if (s < 86400) return `Seen ${Math.round(s / 3600)} h ago`;
+    const d = Math.round(s / 86400);
+    return d === 1 ? "Seen yesterday" : `Seen ${d} days ago`;
+}
+
+export function isRecent(answeredAt: number | null, now = Date.now() / 1000) {
+    return !!answeredAt && now - answeredAt < RECENT_S;
+}
+
+/** The shape to draw: what the device said, else a guess (see `kindOf`). */
+export function kindOfMember(m: Member): Kind {
+    return m.kind !== "unknown" ? m.kind : kindOf(m.name, m.os ?? (m.this_device ? thisOs() : undefined));
+}
+
+/** Capabilities as people say them, for the journal (which stores only the name). */
+export const CAPABILITY_WORDS: Record<string, string> = {
+    "clipboard.write": "Put text on the clipboard",
+    "clipboard.read": "Read the clipboard",
+    "file.receive": "Send a file",
+    "device.info": "Ask what it is",
+    "capabilities.list": "Ask what it can do",
+};
 
 export interface DevicesStatus {
     device_id: string;
@@ -73,9 +138,10 @@ export function thisOs(): string {
 }
 
 /**
- * The shape to draw. passer-core sends no device type yet (a `kind` field is
- * planned), so: the system decides phone versus computer, the name decides
- * laptop versus tower. Decoration only - the name is always written beside it.
+ * The shape to draw when a device has not said its type (`kind: "unknown"`, or
+ * before it first answered): the system decides phone versus computer, the
+ * name decides laptop versus tower. Decoration only - the name is always
+ * written beside it.
  */
 export function kindOf(name: string, os?: string): Kind {
     const n = name.toLowerCase();
@@ -86,11 +152,6 @@ export function kindOf(name: string, os?: string): Kind {
         if (/ipad|tablet|tablette/.test(n)) return "tablet";
     }
     return /macbook|book|laptop|portable|surface|-hp|thinkpad|xps/.test(n) ? "laptop" : "desktop";
-}
-
-/** Whether a device is a computer running Passer, which answers clipboard and file calls. */
-export function isComputer(os?: string) {
-    return os === "windows" || os === "macos" || os === "linux";
 }
 
 const SCREENS: [string, string][] = [

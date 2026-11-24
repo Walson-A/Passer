@@ -3,8 +3,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { Check, Clipboard, Loader2, Lock, Paperclip, RefreshCw, Send, ShieldCheck } from "lucide-react";
 import { DeviceRender } from "./DeviceRender";
 import { InlineError } from "./DeviceInvite";
-import { FOCUS, isComputer, kindOf, osLabel, screenFor, thisOs, type Member } from "./deviceUi";
-import { probeMember, useMemberInfo } from "../hooks/useMemberInfo";
+import { FOCUS, isRecent, kindOfMember, osLabel, screenFor, seenLabel, thisOs, type Member } from "./deviceUi";
+import { useCapabilities } from "../hooks/useCapabilities";
 
 const MAX_FILE = 700 * 1024;
 
@@ -16,16 +16,24 @@ type CommandState =
 
 /**
  * The chosen device, alone on stage: drawn large, its state and name beside it,
- * and only the commands it really answers to. A computer running Passer takes
- * text and files and can share its clipboard (after its user approves); a phone
- * offers nothing to call yet, so the stage says what it can do instead of
- * showing buttons that would fail.
+ * and only the commands it offers this PC - `devices_capabilities` says which,
+ * and which ask its user first. A device that offers nothing to call (a phone,
+ * today) gets a sentence instead of buttons that would fail.
  */
-export function DeviceStage({ member: m, running }: { member: Member; running: boolean }) {
-    const probe = useMemberInfo(m.id, !m.this_device && running);
-    const os = m.this_device ? thisOs() : probe?.state === "ok" ? probe.info.os : undefined;
-    const kind = kindOf(m.name, os);
-    const reachable = m.this_device ? running : probe?.state === "ok";
+export function DeviceStage({ member: m, running, onRefresh, refreshing }: {
+    member: Member;
+    running: boolean;
+    /** Ask every member again (`devices_refresh`). */
+    onRefresh: () => void;
+    refreshing: boolean;
+}) {
+    const caps = useCapabilities(m.this_device ? null : m.id, m.answered_at);
+    const os = m.os ?? (m.this_device ? thisOs() : undefined);
+    const kind = kindOfMember(m);
+    const reachable = m.this_device ? running : isRecent(m.answered_at);
+    const offers = (name: string) => caps?.caps?.find(c => c.name === name);
+    const getCap = offers("clipboard.read");
+    const anything = !!(offers("file.receive") || offers("clipboard.write") || getCap);
     const [command, setCommand] = useState<CommandState | null>(null);
     const fileRef = useRef<HTMLInputElement>(null);
 
@@ -74,16 +82,16 @@ export function DeviceStage({ member: m, running }: { member: Member; running: b
             <div key={m.id} className="rise absolute inset-0 flex items-center justify-center gap-14 px-8">
                 <div className="relative shrink-0 flex justify-center">
                     <div className="drop-shadow-[0_28px_36px_rgba(0,0,0,0.6)]">
-                        <DeviceRender kind={kind} screen={screenFor(m.id)} size={kind === "phone" ? 1 : 0.95} dim={!reachable && probe?.state !== "loading"} />
+                        <DeviceRender kind={kind} screen={screenFor(m.id)} size={kind === "phone" ? 1 : 0.95} dim={!reachable} />
                     </div>
                     <div className="absolute -bottom-3 w-[160px] h-5 rounded-[50%] bg-black/60 blur-xl" />
                 </div>
 
                 <div className="w-[360px] min-w-0">
-                    <StateChip member={m} running={running} probe={probe} />
+                    <StateChip member={m} running={running} />
                     <h2 className="text-[32px] leading-[1.08] font-bold tracking-tight mt-3 break-words">{m.name}</h2>
                     <div className="flex items-center gap-2 mt-2.5 flex-wrap">
-                        {osLabel(os) && <span className="text-[13px] text-white/60">{osLabel(os)}</span>}
+                        {osLabel(os) && <span className="text-[13px] text-white/60">{osLabel(os)}{m.os_version ? ` ${m.os_version}` : ""}</span>}
                         {m.approver && (
                             <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-400/20 text-[11px] font-bold text-amber-200/90" title="Can add and remove devices">
                                 <ShieldCheck className="w-3 h-3" strokeWidth={2.5} aria-hidden /> Manages devices
@@ -96,32 +104,43 @@ export function DeviceStage({ member: m, running }: { member: Member; running: b
                             <Note>This is the PC you're on. Your other devices send here; choose one above to send to it.</Note>
                         ) : !running ? (
                             <Note>This PC is offline, so it can't reach {m.name}.</Note>
-                        ) : probe?.state === "unreachable" ? (
-                            <div className="flex flex-col items-start gap-3">
-                                <Note>{m.name} isn't reachable right now. It may be asleep or off the network.</Note>
-                                <button
-                                    onClick={() => probeMember(m.id, true)}
-                                    className={`flex items-center gap-1.5 h-9 px-3.5 rounded-xl border border-white/10 bg-white/[0.04] text-[12px] font-semibold text-white/80 hover:text-white hover:border-white/20 transition-all active:scale-[0.98] cursor-pointer ${FOCUS}`}
-                                >
-                                    <RefreshCw className="w-3.5 h-3.5" strokeWidth={2.25} aria-hidden /> Try again
-                                </button>
-                            </div>
-                        ) : probe?.state !== "ok" ? (
+                        ) : caps === undefined ? (
                             <div className="flex gap-5" aria-label="Checking what it can do" role="status">
                                 {[0, 1, 2].map(i => <span key={i} className="skeleton block w-[58px] h-[58px] rounded-full" />)}
                             </div>
-                        ) : !isComputer(os) ? (
-                            <Note>{m.name} can send things to this PC. Sending to a phone from here isn't possible yet.</Note>
+                        ) : !anything ? (
+                            <div className="flex flex-col items-start gap-3">
+                                <Note>
+                                    {m.answered_at === null
+                                        ? `Passer hasn't heard from ${m.name} yet. It may be asleep or off the network.`
+                                        : `${m.name} can send things to this PC, but offers nothing this PC can ask of it yet.`}
+                                </Note>
+                                <button
+                                    onClick={onRefresh}
+                                    disabled={refreshing}
+                                    className={`flex items-center gap-1.5 h-9 px-3.5 rounded-xl border border-white/10 bg-white/[0.04] text-[12px] font-semibold text-white/80 hover:text-white hover:border-white/20 transition-all active:scale-[0.98] cursor-pointer disabled:opacity-50 ${FOCUS}`}
+                                >
+                                    <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} strokeWidth={2.25} aria-hidden /> Check again
+                                </button>
+                            </div>
                         ) : (
                             <>
                                 <div className="flex gap-5">
-                                    <Disk icon={<Paperclip className="w-[21px] h-[21px]" strokeWidth={1.75} aria-hidden />} label="Send a file"
-                                        state={command?.id === "file" ? command.phase : null} onClick={() => fileRef.current?.click()} />
-                                    <Disk icon={<Send className="w-[21px] h-[21px]" strokeWidth={1.75} aria-hidden />} label="Send my clipboard"
-                                        state={command?.id === "send-clipboard" ? command.phase : null} onClick={sendClipboard} />
-                                    <Disk icon={<Clipboard className="w-[21px] h-[21px]" strokeWidth={1.75} aria-hidden />} label="Get its clipboard"
-                                        hint="It asks first" locked
-                                        state={command?.id === "get-clipboard" ? command.phase : null} onClick={getClipboard} />
+                                    {offers("file.receive") && (
+                                        <Disk icon={<Paperclip className="w-[21px] h-[21px]" strokeWidth={1.75} aria-hidden />} label="Send a file"
+                                            locked={offers("file.receive")?.needs_approval} hint={offers("file.receive")?.needs_approval ? "It asks first" : undefined}
+                                            state={command?.id === "file" ? command.phase : null} onClick={() => fileRef.current?.click()} />
+                                    )}
+                                    {offers("clipboard.write") && (
+                                        <Disk icon={<Send className="w-[21px] h-[21px]" strokeWidth={1.75} aria-hidden />} label="Send my clipboard"
+                                            locked={offers("clipboard.write")?.needs_approval} hint={offers("clipboard.write")?.needs_approval ? "It asks first" : undefined}
+                                            state={command?.id === "send-clipboard" ? command.phase : null} onClick={sendClipboard} />
+                                    )}
+                                    {getCap && (
+                                        <Disk icon={<Clipboard className="w-[21px] h-[21px]" strokeWidth={1.75} aria-hidden />} label="Get its clipboard"
+                                            locked={getCap.needs_approval} hint={getCap.needs_approval ? "It asks first" : undefined}
+                                            state={command?.id === "get-clipboard" ? command.phase : null} onClick={getClipboard} />
+                                    )}
                                 </div>
                                 <input
                                     ref={fileRef}
@@ -134,7 +153,7 @@ export function DeviceStage({ member: m, running }: { member: Member; running: b
                                     }}
                                 />
                                 <div className="mt-4 min-h-[22px]" aria-live="polite">
-                                    {command?.phase === "busy" && command.id === "get-clipboard" && (
+                                    {command?.phase === "busy" && command.id === "get-clipboard" && getCap?.needs_approval && (
                                         <p className="text-[12px] text-amber-100/80">Waiting for an answer on {m.name}…</p>
                                     )}
                                     {command?.phase === "done" && (
@@ -153,25 +172,21 @@ export function DeviceStage({ member: m, running }: { member: Member; running: b
     );
 }
 
-function StateChip({ member: m, running, probe }: { member: Member; running: boolean; probe: ReturnType<typeof useMemberInfo> }) {
+function StateChip({ member: m, running }: { member: Member; running: boolean }) {
     let dot = "bg-white/30";
-    let label = "Checking…";
+    let label: string;
     if (m.this_device) {
         dot = running ? "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]" : "bg-red-500";
         label = running ? "This PC · online" : "This PC · offline";
-    } else if (!running) {
-        label = "Unknown while this PC is offline";
-    } else if (probe?.state === "ok") {
-        dot = "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]";
-        label = "Reachable";
-    } else if (probe?.state === "unreachable") {
-        label = "Not reachable right now";
+    } else {
+        // passer-core knows when a member last answered, not whether it is up
+        // this second (that comes with the coordination server): say exactly that.
+        if (isRecent(m.answered_at)) dot = "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]";
+        label = seenLabel(m.answered_at);
     }
     return (
         <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.04] border border-white/[0.08]" role="status">
-            {probe?.state === "loading" && !m.this_device
-                ? <Loader2 className="w-3 h-3 animate-spin text-white/60" strokeWidth={2.5} aria-hidden />
-                : <span className={`w-2 h-2 rounded-full ${dot}`} aria-hidden />}
+            <span className={`w-2 h-2 rounded-full ${dot}`} aria-hidden />
             <span className="text-[12px] font-semibold text-white/75">{label}</span>
         </span>
     );

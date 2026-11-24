@@ -16,13 +16,7 @@ import { ApprovalPrompt } from "../components/ApprovalPrompt";
  * scripted clicks, so they are the states a person really lands in.
  */
 
-interface Member {
-    id: string;
-    short_id: string;
-    name: string;
-    approver: boolean;
-    this_device: boolean;
-}
+import type { Member } from "../components/deviceUi";
 
 interface Status {
     device_id: string;
@@ -48,9 +42,21 @@ export interface Scenario {
     steps?: (ui: Driver) => Promise<void>;
 }
 
-const member = (name: string, seed: string, approver: boolean, thisDevice = false): Member => {
+const NOW = Math.floor(Date.now() / 1000);
+
+const member = (name: string, seed: string, approver: boolean, thisDevice = false, seenAgo: number | null = 20): Member => {
     const id = (seed.repeat(8) + "0123456789abcdef").slice(0, 52);
-    return { id, short_id: id.slice(0, 10), name, approver, this_device: thisDevice };
+    const phone = /iphone|phone/i.test(name);
+    const mac = /mac/i.test(name);
+    return {
+        id, short_id: id.slice(0, 10), name, approver, this_device: thisDevice,
+        kind: phone ? "phone" : mac ? "laptop" : /hp|tour/i.test(name) ? "laptop" : "desktop",
+        os: phone ? "ios" : mac ? "macos" : "windows",
+        os_version: phone ? "26.1" : mac ? "16.0" : "10.0.26300",
+        app_version: "1.0.0",
+        core_version: "0.1.0",
+        answered_at: thisDevice || seenAgo === null ? null : NOW - seenAgo,
+    };
 };
 
 const PC = member("WALSON-TOUR", "7f3a9c", true, true);
@@ -116,7 +122,7 @@ export const SCENARIOS: Scenario[] = [
     },
     { id: "alone", label: "Group of one", status: group([PC]) },
     { id: "group", label: "Group, online", status: group([PC, PHONE, LAPTOP]) },
-    { id: "unreachable", label: "A device not reachable", status: group([PC, PHONE, member("PC du salon", "5a10a5", false)]),
+    { id: "unreachable", label: "A device not seen yet", status: group([PC, PHONE, member("PC du salon", "5a10a5", false, false, null)]),
         steps: async ui => { ui.click(/pc du salon/i); } },
     { id: "send-file", label: "A PC selected", status: group([PC, PHONE, LAPTOP]),
         steps: async ui => { ui.click(/macbook air/i); } },
@@ -239,11 +245,26 @@ function installBackend(scenario: Scenario) {
                 return null;
             case "devices_answer_approval":
                 return true;
-            case "devices_info": {
+            case "devices_refresh":
+                return state?.members.length ?? 0;
+            case "devices_capabilities": {
                 const m = state?.members.find(x => x.id === a.id);
-                if (!m || /salon/i.test(m.name)) return Promise.reject("device unreachable: no route");
-                const os = /iphone|phone/i.test(m.name) ? "ios" : /mac/i.test(m.name) ? "macos" : "windows";
-                return { name: m.name, os, arch: os === "windows" ? "x86_64" : "aarch64", version: "0.1.0" };
+                if (!m || m.os === "ios" || m.answered_at === null) return [];
+                return [
+                    { name: "device.info", title: "Device info", description: "", effect: "read", needs_approval: false },
+                    { name: "clipboard.write", title: "Put text on the PC clipboard", description: "", effect: "write", needs_approval: false },
+                    { name: "clipboard.read", title: "Read the PC clipboard", description: "", effect: "sensitive", needs_approval: true },
+                    { name: "file.receive", title: "Send a file to the PC", description: "", effect: "write", needs_approval: false },
+                ];
+            }
+            case "devices_journal": {
+                const peer = state?.members.find(x => !x.this_device) ?? PHONE;
+                return [
+                    { seq: 5, at: NOW - 300, outgoing: false, peer_id: peer.id, peer_short_id: peer.short_id, peer_name: peer.name, agent: null, capability: "clipboard.read", target: null, decision: "ask", approved: false, outcome: "denied" },
+                    { seq: 4, at: NOW - 1800, outgoing: true, peer_id: peer.id, peer_short_id: peer.short_id, peer_name: peer.name, agent: null, capability: "file.receive", target: null, decision: "allow", approved: null, outcome: "ok" },
+                    { seq: 3, at: NOW - 3600, outgoing: false, peer_id: peer.id, peer_short_id: peer.short_id, peer_name: peer.name, agent: "Claude", capability: "clipboard.read", target: null, decision: "ask", approved: true, outcome: "ok" },
+                    { seq: 2, at: NOW - 7200, outgoing: false, peer_id: peer.id, peer_short_id: peer.short_id, peer_name: peer.name, agent: null, capability: "clipboard.write", target: null, decision: "allow", approved: null, outcome: "ok" },
+                ];
             }
             case "devices_send_clipboard":
             case "devices_send_file":
