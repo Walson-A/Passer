@@ -420,6 +420,73 @@ pub async fn devices_stop_sessions(devices: DevicesState<'_>) -> Result<(), Stri
     devices.device.stop_all_sessions().await.map_err(|e| e.to_string())
 }
 
+// --- Asking another device ------------------------------------------------------------
+// What this PC can ask of the device shown on the Devices stage. Each one is a call
+// through passer-core, so the other device's own rules apply: `clipboard.read` there
+// waits for its user's approval (up to the core's 60 s).
+
+async fn call_member(devices: &Devices, id: String, capability: &str, input: serde_json::Value) -> Result<serde_json::Value, String> {
+    let out = devices
+        .device
+        .call(id, capability.into(), input.to_string())
+        .await
+        .map_err(|e| e.to_string())?;
+    serde_json::from_str(&out).map_err(|e| e.to_string())
+}
+
+/// Name, operating system, architecture and core version of a member (`device.info`,
+/// which every passer-core device answers). The Devices stage uses it for the system
+/// label and to know what it can ask of that device.
+#[tauri::command]
+pub async fn devices_info(devices: DevicesState<'_>, id: String) -> Result<serde_json::Value, String> {
+    call_member(&devices, id, "device.info", json!({})).await
+}
+
+/// Sends the text currently copied on this PC to a member's clipboard.
+#[tauri::command]
+pub async fn devices_send_clipboard(devices: DevicesState<'_>, id: String) -> Result<(), String> {
+    let text = tokio::task::spawn_blocking(|| arboard::Clipboard::new().and_then(|mut c| c.get_text()))
+        .await
+        .map_err(|e| e.to_string())?
+        .unwrap_or_default();
+    if text.trim().is_empty() {
+        return Err("There is no text copied on this PC.".into());
+    }
+    if text.chars().count() > MAX_TEXT {
+        return Err("The copied text is too long to send (200,000 characters at most).".into());
+    }
+    call_member(&devices, id, "clipboard.write", json!({ "text": text })).await?;
+    Ok(())
+}
+
+/// Copies a member's clipboard text onto this PC. Returns how many characters came.
+#[tauri::command]
+pub async fn devices_get_clipboard(devices: DevicesState<'_>, id: String) -> Result<usize, String> {
+    let out = call_member(&devices, id, "clipboard.read", json!({})).await?;
+    let text = out["text"].as_str().unwrap_or_default().to_owned();
+    let count = text.chars().count();
+    tokio::task::spawn_blocking(move || arboard::Clipboard::new().and_then(|mut c| c.set_text(text)))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())?;
+    Ok(count)
+}
+
+/// Sends a small file to a member (base64, 700 KB at most until the core has streams).
+#[tauri::command]
+pub async fn devices_send_file(
+    devices: DevicesState<'_>,
+    id: String,
+    name: String,
+    data_base64: String,
+) -> Result<(), String> {
+    if data_base64.len() > MAX_FILE_BYTES * 4 / 3 + 4 {
+        return Err("This file is too large for now (700 KB at most).".into());
+    }
+    call_member(&devices, id, "file.receive", json!({ "name": name, "data_base64": data_base64 })).await?;
+    Ok(())
+}
+
 #[tauri::command]
 pub fn devices_answer_approval(devices: DevicesState<'_>, id: u64, allow: bool) -> bool {
     devices.answer(id, allow)

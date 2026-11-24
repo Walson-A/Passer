@@ -8,6 +8,12 @@ interface LayoutProps {
     children: ReactNode;
 }
 
+/**
+ * The window: a frameless, transparent Tauri window drawn as one rounded dark
+ * pane, with Passer's own title bar on top. Passer used to be a 390x520 panel
+ * docked by the taskbar; it is a full, resizable window now, so every edge and
+ * corner resizes (the window has no native frame to do it).
+ */
 export function Layout({ children }: LayoutProps) {
     const startResize = async (direction: ResizeDirection) => {
         try {
@@ -17,55 +23,29 @@ export function Layout({ children }: LayoutProps) {
         }
     };
 
+    const edge = "absolute z-[999]";
     return (
         <div className="relative w-screen h-screen overflow-hidden flex flex-col bg-transparent p-0">
-            {/* 
-             Window Frame 
-             The rounded-[32px] creates the modern window shape.
-             Using minimal border instead of heavy shadow to align with window edge.
-            */}
-            <div className="relative w-full h-full rounded-[32px] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)] overflow-hidden bg-[#141414]/94 backdrop-blur-md" >
-
+            <div className="relative w-full h-full rounded-[22px] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.09)] overflow-hidden bg-[#121212]/96 backdrop-blur-md">
                 <div className="flex flex-col h-full">
-                    {/* Draggable TitleBar - z-50 */}
-                    <div className="relative z-50 pt-3 px-4">
+                    <div className="relative z-50 shrink-0">
                         <TitleBar />
                     </div>
-
-                    {/* Main Content Area. Views own their own padding, and the
-                        tab bar owns the bottom edge. */}
-                    <div className="flex-1 flex flex-col relative z-10 min-h-0 overflow-hidden">
+                    {/* Views own their padding. */}
+                    <div className="flex-1 flex relative z-10 min-h-0 overflow-hidden">
                         {children}
                     </div>
                 </div>
 
-                {/* --- Custom Resize Handles (Invisible) --- 
-                    These provide a 40px grab area at each corner for resizing.
-                */}
-
-                {/* Top Left */}
-                <div
-                    className="absolute top-0 left-0 w-10 h-10 z-[999] cursor-nwse-resize rounded-br-2xl"
-                    onMouseDown={() => startResize("NorthWest")}
-                />
-
-                {/* Top Right */}
-                <div
-                    className="absolute top-0 right-0 w-10 h-10 z-[999] cursor-nesw-resize rounded-bl-2xl"
-                    onMouseDown={() => startResize("NorthEast")}
-                />
-
-                {/* Bottom Left */}
-                <div
-                    className="absolute bottom-0 left-0 w-10 h-10 z-[999] cursor-nesw-resize rounded-tr-2xl"
-                    onMouseDown={() => startResize("SouthWest")}
-                />
-
-                {/* Bottom Right */}
-                <div
-                    className="absolute bottom-0 right-0 w-10 h-10 z-[999] cursor-nwse-resize rounded-tl-2xl"
-                    onMouseDown={() => startResize("SouthEast")}
-                />
+                {/* Invisible resize handles: 6px edges, 14px corners. */}
+                <div className={`${edge} top-0 left-[14px] right-[14px] h-1.5 cursor-ns-resize`} onMouseDown={() => startResize("North")} />
+                <div className={`${edge} bottom-0 left-[14px] right-[14px] h-1.5 cursor-ns-resize`} onMouseDown={() => startResize("South")} />
+                <div className={`${edge} left-0 top-[14px] bottom-[14px] w-1.5 cursor-ew-resize`} onMouseDown={() => startResize("West")} />
+                <div className={`${edge} right-0 top-[14px] bottom-[14px] w-1.5 cursor-ew-resize`} onMouseDown={() => startResize("East")} />
+                <div className={`${edge} top-0 left-0 w-3.5 h-3.5 cursor-nwse-resize`} onMouseDown={() => startResize("NorthWest")} />
+                <div className={`${edge} top-0 right-0 w-3.5 h-3.5 cursor-nesw-resize`} onMouseDown={() => startResize("NorthEast")} />
+                <div className={`${edge} bottom-0 left-0 w-3.5 h-3.5 cursor-nesw-resize`} onMouseDown={() => startResize("SouthWest")} />
+                <div className={`${edge} bottom-0 right-0 w-3.5 h-3.5 cursor-nwse-resize`} onMouseDown={() => startResize("SouthEast")} />
             </div>
         </div>
     );

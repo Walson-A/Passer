@@ -3,7 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { Layout } from "./components/Layout";
 import { ServerStatusBar } from "./components/ServerStatusBar";
-import { TabBar, type View } from "./components/TabBar";
+import { Sidebar, type View } from "./components/Sidebar";
 import { Passboard } from "./components/Passboard";
 import { PasserSpace } from "./components/PasserSpace";
 import { Settings } from "./components/Settings";
@@ -133,16 +133,20 @@ function App() {
 
   return (
     <Layout>
-      <div className="flex-1 flex flex-col min-h-0">
+      <Sidebar view={view} onChange={goTo} />
 
-        {/* The body. Layers stay mounted so scroll and state survive a switch. */}
-        <div className="relative flex-1 min-h-0">
-          <div className="view-layer" data-active={view === "passboard"}>
+      {/* The body. Layers stay mounted so scroll and state survive a switch.
+          Passboard, Space and Settings were drawn for the old 390px panel, so
+          they sit in a readable column until they get their own wide layouts;
+          Devices uses the whole width. */}
+      <div className="relative flex-1 min-w-0 min-h-0">
+        <div className="view-layer" data-active={view === "passboard"}>
+          <div className="flex-1 min-h-0 w-full max-w-[640px] mx-auto flex flex-col">
             {/* The server only powers /pull and /push, which is the Passboard
                 flow - Space is a local folder and Settings needs nothing. So
                 this is the Passboard's state, not the app's, and it belongs
                 here rather than above every view. */}
-            <div className="shrink-0 px-4 pt-3">
+            <div className="shrink-0 px-4 pt-4">
               <ServerStatusBar
                 status={isServerOn ? status : "idle"}
                 isReady={isServerOn}
@@ -152,29 +156,33 @@ function App() {
             </div>
             <Passboard />
           </div>
+        </div>
 
-          <div className="view-layer" data-active={view === "space"}>
+        <div className="view-layer" data-active={view === "space"}>
+          <div className="flex-1 min-h-0 w-full max-w-[640px] mx-auto flex flex-col">
             <PasserSpace />
           </div>
+        </div>
 
-          <div className="view-layer" data-active={view === "devices"}>
-            <Devices active={view === "devices"} />
-          </div>
+        <div className="view-layer" data-active={view === "devices"}>
+          <Devices active={view === "devices"} />
+        </div>
 
-          <div className="view-layer" data-active={view === "settings"}>
+        <div className="view-layer" data-active={view === "settings"}>
+          <div className="flex-1 min-h-0 w-full max-w-[560px] mx-auto flex flex-col">
             <Settings
               active={view === "settings"}
               onOpenPair={() => setPairOpen(true)}
             />
           </div>
+        </div>
 
-          {/* One level deeper than Settings, so it pushes in from the right. */}
-          <div className="detail-layer" data-open={pairOpen}>
+        {/* One level deeper than Settings, so it pushes in from the right. */}
+        <div className="detail-layer bg-[#121212]" data-open={pairOpen}>
+          <div className="flex-1 min-h-0 w-full max-w-[560px] mx-auto flex flex-col">
             <PairDevice open={pairOpen} onClose={() => setPairOpen(false)} />
           </div>
         </div>
-
-        <TabBar view={view} onChange={goTo} />
       </div>
 
       <DropZone onDropSuccess={handleDropSuccess} />

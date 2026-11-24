@@ -73,7 +73,7 @@ export function PairDevice({ open, onClose }: Props) {
 
     return (
         // Opaque: this layer slides over the view beneath it.
-        <div className="flex-1 flex flex-col min-h-0 bg-[#141414]">
+        <div className="flex-1 flex flex-col min-h-0 bg-[#121212]">
             {/* Back header - the only way in was from Settings, and this is the
                 way back out. */}
             <div className="shrink-0 flex items-center gap-1 px-3 pt-4 pb-3">

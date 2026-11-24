@@ -23,7 +23,7 @@ interface Queued extends Request {
 
 /**
  * Another device asks this PC for something sensitive (reading the clipboard...).
- * One request at a time, on top of everything, with a countdown: no answer means no.
+ * One request at a time, centred over the whole window, with a countdown: no answer means no.
  *
  * Every string here comes from another device and is shown as plain text - never
  * as markup, never as a link. The layout answers four questions in reading order:
@@ -96,7 +96,7 @@ export function ApprovalPrompt() {
     const headingId = `approval-${current.id}`;
 
     return (
-        <div className="absolute inset-0 z-[500] flex flex-col justify-end">
+        <div className="absolute inset-0 z-[500] flex items-center justify-center p-6">
             <div className="scrim-in absolute inset-0 bg-black/65" aria-hidden />
 
             <div
@@ -105,7 +105,7 @@ export function ApprovalPrompt() {
                 aria-modal="true"
                 aria-labelledby={headingId}
                 aria-describedby={`${headingId}-what`}
-                className="sheet-in relative m-3 p-4 rounded-[26px] bg-[#191919] border border-white/10 shadow-[0_-8px_40px_rgba(0,0,0,0.55)] flex flex-col gap-3.5"
+                className="sheet-in relative w-[440px] max-w-full p-5 rounded-[26px] bg-[#191919] border border-white/10 shadow-[0_24px_70px_rgba(0,0,0,0.6)] flex flex-col gap-4"
             >
                 {/* What this is, and how long it stays */}
                 <div className="flex items-center justify-between gap-3">

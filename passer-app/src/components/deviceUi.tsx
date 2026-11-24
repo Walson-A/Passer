@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Laptop, Monitor, MonitorSmartphone, Smartphone, Tablet, Loader2 } from "lucide-react";
+import type { Kind } from "./DeviceRender";
 
 /**
  * Shapes and small pieces shared by the Devices tab, its invitation panel and
@@ -55,6 +56,53 @@ export function DeviceGlyph({ name, thisDevice, className }: { name: string; thi
                     ? Laptop
                     : MonitorSmartphone;
     return <Icon className={className} strokeWidth={2} aria-hidden />;
+}
+
+// --- How a device looks --------------------------------------------------------------
+
+/** The operating system as people say it. `os` is Rust's `std::env::consts::OS`. */
+export function osLabel(os?: string): string | null {
+    if (!os) return null;
+    return ({ ios: "iOS", macos: "macOS", windows: "Windows", linux: "Linux", android: "Android" } as Record<string, string>)[os] ?? os;
+}
+
+/** This PC's own system, from the webview (it does not call itself). */
+export function thisOs(): string {
+    const ua = navigator.userAgent;
+    return /Windows/.test(ua) ? "windows" : /Mac/.test(ua) ? "macos" : "linux";
+}
+
+/**
+ * The shape to draw. passer-core sends no device type yet (a `kind` field is
+ * planned), so: the system decides phone versus computer, the name decides
+ * laptop versus tower. Decoration only - the name is always written beside it.
+ */
+export function kindOf(name: string, os?: string): Kind {
+    const n = name.toLowerCase();
+    if (os === "ios") return /ipad/.test(n) ? "tablet" : "phone";
+    if (os === "android") return /tab/.test(n) ? "tablet" : "phone";
+    if (!os) {
+        if (/iphone|android|phone|pixel|galaxy|téléphone|mobile/.test(n)) return "phone";
+        if (/ipad|tablet|tablette/.test(n)) return "tablet";
+    }
+    return /macbook|book|laptop|portable|surface|-hp|thinkpad|xps/.test(n) ? "laptop" : "desktop";
+}
+
+/** Whether a device is a computer running Passer, which answers clipboard and file calls. */
+export function isComputer(os?: string) {
+    return os === "windows" || os === "macos" || os === "linux";
+}
+
+const SCREENS: [string, string][] = [
+    ["#3b82f6", "#a855f7"], ["#0ea5e9", "#1e3a8a"], ["#f97316", "#db2777"],
+    ["#10b981", "#0f766e"], ["#eab308", "#dc2626"], ["#6366f1", "#06b6d4"],
+];
+
+/** A wallpaper per device, stable across launches: derived from its id. */
+export function screenFor(id: string): [string, string] {
+    let h = 0;
+    for (const c of id) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+    return SCREENS[h % SCREENS.length];
 }
 
 /** Splits a 6-digit code into two groups of three, the way people read it aloud. */

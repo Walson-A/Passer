@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import { emit } from "@tauri-apps/api/event";
 import { Layout } from "../components/Layout";
-import { TabBar } from "../components/TabBar";
+import { Sidebar } from "../components/Sidebar";
 import { Devices } from "../components/Devices";
 import { ApprovalPrompt } from "../components/ApprovalPrompt";
 
@@ -116,6 +116,10 @@ export const SCENARIOS: Scenario[] = [
     },
     { id: "alone", label: "Group of one", status: group([PC]) },
     { id: "group", label: "Group, online", status: group([PC, PHONE, LAPTOP]) },
+    { id: "unreachable", label: "A device not reachable", status: group([PC, PHONE, member("PC du salon", "5a10a5", false)]),
+        steps: async ui => { ui.click(/pc du salon/i); } },
+    { id: "send-file", label: "A PC selected", status: group([PC, PHONE, LAPTOP]),
+        steps: async ui => { ui.click(/macbook air/i); } },
     { id: "offline", label: "Group, offline", status: group([PC, PHONE, LAPTOP], { running: false }) },
     { id: "member", label: "This PC not an approver", status: group([{ ...PC, approver: false }, PHONE, LAPTOP]) },
     {
@@ -151,7 +155,11 @@ export const SCENARIOS: Scenario[] = [
     {
         id: "remove", label: "Remove, armed", status: group([PC, PHONE, LAPTOP]),
         steps: async ui => {
-            ui.click(/remove/i, 1);
+            ui.click(/macbook air/i);
+            await ui.wait(150);
+            ui.click(/details and removal/i);
+            await ui.wait(250);
+            ui.click(/remove from my devices/i);
         },
     },
     {
@@ -231,6 +239,17 @@ function installBackend(scenario: Scenario) {
                 return null;
             case "devices_answer_approval":
                 return true;
+            case "devices_info": {
+                const m = state?.members.find(x => x.id === a.id);
+                if (!m || /salon/i.test(m.name)) return Promise.reject("device unreachable: no route");
+                const os = /iphone|phone/i.test(m.name) ? "ios" : /mac/i.test(m.name) ? "macos" : "windows";
+                return { name: m.name, os, arch: os === "windows" ? "x86_64" : "aarch64", version: "0.1.0" };
+            }
+            case "devices_send_clipboard":
+            case "devices_send_file":
+                return null;
+            case "devices_get_clipboard":
+                return 42;
             default:
                 return null;
         }
@@ -273,13 +292,11 @@ export function DevicesFrame({ scenario }: { scenario: Scenario }) {
     return (
         <div className="w-screen h-screen bg-[radial-gradient(ellipse_at_30%_20%,#26324a_0%,#10131a_60%,#07080b_100%)]">
             <Layout>
-                <div className="flex-1 flex flex-col min-h-0">
-                    <div className="relative flex-1 min-h-0">
-                        <div className="view-layer" data-active>
-                            <Devices active />
-                        </div>
+                <Sidebar view="devices" onChange={() => { }} />
+                <div className="relative flex-1 min-w-0 min-h-0">
+                    <div className="view-layer" data-active>
+                        <Devices active />
                     </div>
-                    <TabBar view="devices" onChange={() => { }} />
                 </div>
                 <ApprovalPrompt />
             </Layout>
@@ -287,7 +304,7 @@ export function DevicesFrame({ scenario }: { scenario: Scenario }) {
     );
 }
 
-/** Every scenario side by side, each in a frame the size of the real window. */
+/** Every scenario side by side, each in a frame the size of the real window (1180x760). */
 export function DevicesBanc() {
     const [nonce, setNonce] = useState(0);
     return (
@@ -311,8 +328,8 @@ export function DevicesBanc() {
                             key={`${s.id}-${nonce}`}
                             title={s.label}
                             src={`?s=${s.id}`}
-                            width={390}
-                            height={520}
+                            width={1180}
+                            height={760}
                             className="border-0 rounded-[32px]"
                         />
                     </figure>

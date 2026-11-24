@@ -8,7 +8,7 @@ The project is divided into two main parts:
 
 ### 1. `passer-app/` (The Desktop Application)
 - **`src-tauri/`**: Rust backend (Tauri). Handles system-level operations, the local HTTP file/clipboard server, and iOS Shortcut integration via REST API.
-- **`src/`**: React frontend. Built with Vite and TailwindCSS. Features a premium glassmorphic UI that docks at the bottom-right.
+- **`src/`**: React frontend. Built with Vite and TailwindCSS. Features a premium glassmorphic UI in a full, resizable window with a sidebar (it docked at the bottom-right as a small panel until November 2026).
 - **`src/hooks/`**: Custom hooks for managing state and IPC (Inter-Process Communication) with Rust.
 - **`src/components/`**: Modular React components, designed with glassmorphism in mind.
 
@@ -41,7 +41,7 @@ The project is divided into two main parts:
 
 ### 4. Privacy & Performance
 - Everything runs locally. No cloud dependencies.
-- UI must remain ultra-fast and responsive, especially the docking/undocking animations.
+- UI must remain ultra-fast and responsive, especially view transitions and the device stage.
 
 ---
 

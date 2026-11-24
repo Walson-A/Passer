@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { QRCodeSVG } from "qrcode.react";
-import { ArrowLeftRight, Check, ChevronLeft, Clock, Link2, QrCode, RotateCcw, ShieldAlert, ShieldCheck } from "lucide-react";
+import { ArrowLeftRight, Check, Clock, Link2, QrCode, RotateCcw, ShieldAlert, ShieldCheck, X } from "lucide-react";
 import { Action, FOCUS } from "./deviceUi";
 
 /** The backend creates invitations valid this long (`devices.invite(10, …)`). */
@@ -87,23 +87,23 @@ export function DeviceInvite({ open, connected, onClose }: Props) {
     const clock = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`;
 
     return (
-        // Opaque: this layer slides over the list beneath it.
-        <div className="flex-1 flex flex-col min-h-0 bg-[#141414]" role="region" aria-label="Add a device">
-            <div className="shrink-0 flex items-center gap-1 px-3 pt-4 pb-3">
+        // A dialog over the Devices view; opaque so the code reads cleanly.
+        <div className="flex-1 flex flex-col min-h-0 bg-[#161616]">
+            <div className="shrink-0 flex items-center justify-between gap-2 pl-6 pr-3 pt-4 pb-3">
+                <span className="text-[11px] font-black uppercase tracking-[0.2em] text-white/75">
+                    Add a device
+                </span>
                 <button
                     ref={backRef}
                     onClick={onClose}
-                    className={`flex items-center gap-0.5 py-1 pr-2 pl-1 rounded-lg text-white/55 hover:text-white hover:bg-white/[0.06] transition-all duration-200 active:scale-95 cursor-pointer ${FOCUS}`}
+                    aria-label="Close"
+                    className={`p-2 rounded-lg text-white/55 hover:text-white hover:bg-white/[0.06] transition-all duration-200 active:scale-95 cursor-pointer ${FOCUS}`}
                 >
-                    <ChevronLeft className="w-4 h-4" strokeWidth={2.5} aria-hidden />
-                    <span className="text-[11px] font-bold">Devices</span>
+                    <X className="w-4 h-4" strokeWidth={2.25} aria-hidden />
                 </button>
-                <span className="text-[11px] font-black uppercase tracking-[0.2em] text-white/70 ml-1">
-                    Add a device
-                </span>
             </div>
 
-            <div className="flex-1 overflow-y-auto custom-scrollbar px-4 pb-3 flex flex-col gap-2.5 [&>*]:shrink-0">
+            <div className="flex-1 overflow-y-auto custom-scrollbar px-6 pb-6 flex flex-col gap-3 [&>*]:shrink-0">
                 {!link ? (
                     <>
                         <div className="px-1">

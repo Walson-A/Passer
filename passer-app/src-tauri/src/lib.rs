@@ -62,7 +62,11 @@ pub fn run() {
             devices::devices_invite,
             devices::devices_remove,
             devices::devices_stop_sessions,
-            devices::devices_answer_approval
+            devices::devices_answer_approval,
+            devices::devices_info,
+            devices::devices_send_clipboard,
+            devices::devices_get_clipboard,
+            devices::devices_send_file
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
@@ -118,29 +122,12 @@ pub fn run() {
             // Setup System Tray
             tray::setup_tray(app)?;
 
-            // Position Window at Bottom Right (Smart + Margin)
+            // Passer is a full window now, centred by `tauri.conf.json`. It used
+            // to dock in the bottom-right corner of the work area as a 390x520
+            // panel; the device network outgrew that (docs/design_concept.md).
             let window = app.get_webview_window("main").unwrap();
-            let handle = window.clone();
-            
-            tauri::async_runtime::spawn(async move {
-                // Use tokio sleep for better async behavior
-                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-                
-                if let Ok(Some(monitor)) = handle.current_monitor() {
-                     let work_area = monitor.work_area();
-                     if let Ok(window_size) = handle.outer_size() {
-                        let margin = 0; 
-                        
-                        let x = work_area.position.x + work_area.size.width as i32 - window_size.width as i32 - margin;
-                        let y = work_area.position.y + work_area.size.height as i32 - window_size.height as i32 - margin;
-                        
-                        let _ = handle.set_position(tauri::Position::Physical(tauri::PhysicalPosition { x, y }));
-                        // Ensure window is visible and focused after positioning
-                        let _ = handle.show();
-                        let _ = handle.set_focus();
-                     }
-                }
-            });
+            let _ = window.show();
+            let _ = window.set_focus();
 
             Ok(())
         })

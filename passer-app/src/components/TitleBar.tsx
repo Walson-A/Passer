@@ -1,12 +1,13 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useState } from "react";
-import { Pin } from "lucide-react";
+import { Pin, Square } from "lucide-react";
 import { PremiumTooltip } from "./PremiumTooltip";
 
 export function TitleBar() {
     const [isPinned, setIsPinned] = useState(false);
 
     const minimize = () => getCurrentWindow().minimize();
+    const maximize = () => getCurrentWindow().toggleMaximize();
     const close = () => getCurrentWindow().close();
 
     const togglePin = async () => {
@@ -19,10 +20,10 @@ export function TitleBar() {
     };
 
     return (
-        <div data-tauri-drag-region className="h-14 w-full flex items-center justify-between px-6 z-50 relative border-b border-white/5">
+        <div data-tauri-drag-region className="h-12 w-full flex items-center justify-between px-5 z-50 relative border-b border-white/5">
             {/* Branding Text (Left) */}
             <div className="flex items-center shrink-0 pointer-events-none select-none">
-                <span className="text-base font-black tracking-[0.2em] uppercase bg-gradient-to-b from-white to-white/50 bg-clip-text text-transparent drop-shadow-sm">
+                <span className="text-[13px] font-black tracking-[0.24em] uppercase bg-gradient-to-b from-white to-white/50 bg-clip-text text-transparent drop-shadow-sm">
                     Passer
                 </span>
             </div>
@@ -47,6 +48,7 @@ export function TitleBar() {
 
                 <button
                     onClick={minimize}
+                    aria-label="Minimize"
                     className="p-2 rounded-full hover:bg-white/10 transition-colors cursor-pointer group"
                 >
                     <svg className="w-3.5 h-3.5 text-white/50 group-hover:text-white pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
@@ -55,7 +57,16 @@ export function TitleBar() {
                 </button>
 
                 <button
+                    onClick={maximize}
+                    aria-label="Maximize"
+                    className="p-2 rounded-full hover:bg-white/10 transition-colors cursor-pointer group"
+                >
+                    <Square className="w-3 h-3 text-white/50 group-hover:text-white pointer-events-none" strokeWidth={2.25} />
+                </button>
+
+                <button
                     onClick={close}
+                    aria-label="Close"
                     className="p-2 rounded-full hover:bg-red-500/20 transition-colors cursor-pointer group"
                 >
                     <svg className="w-3.5 h-3.5 text-white/50 group-hover:text-red-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">

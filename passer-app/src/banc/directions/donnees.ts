@@ -4,7 +4,8 @@
  * the mockups mark them with ✱ so nobody mistakes the picture for a promise.
  */
 
-export type Kind = "phone" | "laptop" | "desktop" | "tablet";
+export type { Kind } from "../../components/DeviceRender";
+import type { Kind } from "../../components/DeviceRender";
 
 export interface Device {
     id: string;

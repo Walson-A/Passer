@@ -8,7 +8,7 @@ The backend powers the desktop application by providing an interface with the OS
   - `tauri-plugin-single-instance`: **Registered first**, as the plugin requires. A second launch no longer starts a rival process that silently fails to bind port 8000 — it shows, unminimises and focuses the window already running.
   - `tauri-plugin-autostart`: Allows the application to launch silently on boot. Enabled on first run only (via a `.initialized` marker), so a user who later turns it off is not overridden at every launch.
   - `tauri-plugin-opener`: Safe handling of external URLs or files.
-- Positions the window dynamically at the bottom right corner of the primary monitor using `monitor.work_area()` and `window.outer_size()`.
+- Shows and focuses the main window at launch; `tauri.conf.json` centres it (1180×760, resizable). It used to be docked at the bottom right of the work area as a 390×520 panel.
 
 ## 🖥️ Commands & IPC (`commands.rs`)
 The IPC (Inter-Process Communication) gateway between the React frontend and Rust system access.
@@ -52,6 +52,7 @@ The new way devices talk to this PC, built on [passer-core](https://github.com/W
 - **Joins**: when a device joins through an invitation of this PC, `device-joined` carries its name and the 6-digit code to compare.
 - **Network**: n0's development relays for now (`NetworkKind::N0Dev`), shown as a preview in the UI. Production needs Passer's own relay and coordination server.
 - **Commands**: `devices_status`, `devices_create_group`, `devices_join`, `devices_invite` (one-time link, 10 min, optionally as approver), `devices_remove`, `devices_stop_sessions` (the stop button), `devices_answer_approval`.
+- **Asking another device** (the Devices stage), each a passer-core call, so the other device's own rules apply: `devices_info` (`device.info`: name, OS, arch, core version; also the reachability probe), `devices_send_clipboard` (this PC's clipboard text to its `clipboard.write`), `devices_get_clipboard` (its `clipboard.read`, approved by its user, then onto this PC's clipboard; returns the character count), `devices_send_file` (`file.receive`, base64, 700 KB at most until the core has streams).
 
 ## ✂️ Core Utilities
 - **`clipboard.rs`**: Safe reading and writing to the system clipboard (Text, HTML, Image, file lists) for iOS push/pull integrations.

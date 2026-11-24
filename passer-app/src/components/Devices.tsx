@@ -1,12 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import {
-    Check, ChevronRight, KeyRound, Laptop, Lock, Monitor, OctagonX, QrCode, RefreshCw, ShieldCheck,
-    Smartphone, Trash2, WifiOff, X, CircleAlert, Link2, Loader2,
+    Check, ChevronRight, KeyRound, Laptop, Lock, Monitor, QrCode, RefreshCw, ShieldCheck,
+    Smartphone, Trash2, WifiOff, X, CircleAlert, Link2,
 } from "lucide-react";
 import { DeviceInvite, InlineError } from "./DeviceInvite";
-import { Action, DeviceGlyph, FOCUS, SasDigits, type DevicesStatus, type Joined, type Member } from "./deviceUi";
+import { DeviceRender } from "./DeviceRender";
+import { DeviceStage } from "./DeviceStage";
+import { Action, FOCUS, SasDigits, kindOf, osLabel, screenFor, thisOs, type DevicesStatus, type Joined, type Member } from "./deviceUi";
+import { useMemberInfo } from "../hooks/useMemberInfo";
 
 interface Props {
     /** True while this is the visible view. */
@@ -19,10 +22,11 @@ interface Failure {
 }
 
 /**
- * The user's devices: the group this PC belongs to, inviting a new device by QR
- * code, removing one, and the stop button for anything another device is doing
- * here. Every name on this screen was chosen by some device, possibly another
- * one, and is rendered as plain text.
+ * The Devices space - "Showroom", the direction Walson chose (A3 in
+ * /directions.html): every device in one horizontal strip, the chosen one alone
+ * on stage with what it can do, its details and removal in a side panel. Adding
+ * a device opens the invitation as a dialog. Every name on this screen was
+ * chosen by some device, possibly another one, and is rendered as plain text.
  */
 export function Devices({ active }: Props) {
     const [status, setStatus] = useState<DevicesStatus | null>(null);
@@ -33,9 +37,8 @@ export function Devices({ active }: Props) {
     const [inviteOpen, setInviteOpen] = useState(false);
     const [joined, setJoined] = useState<Joined | null>(null);
     const [joinSas, setJoinSas] = useState<string | null>(null);
-    const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
-    const [stopped, setStopped] = useState(false);
-    const listRef = useRef<HTMLUListElement>(null);
+    const [selected, setSelected] = useState<string | null>(null);
+    const [details, setDetails] = useState<{ id: string; confirm: boolean } | null>(null);
 
     const refresh = useCallback(async () => {
         try {
@@ -49,13 +52,13 @@ export function Devices({ active }: Props) {
         }
     }, []);
 
-    // Load on arrival, then keep "Connected" honest while the tab is in view.
+    // Load on arrival, then keep the state honest while the view is in front.
     useEffect(() => {
         if (!active) {
             // Never leave a secret code, or an armed removal, behind a view the
             // user navigated away from.
             setInviteOpen(false);
-            setConfirmRemove(null);
+            setDetails(null);
             return;
         }
         refresh();
@@ -63,15 +66,18 @@ export function Devices({ active }: Props) {
         return () => clearInterval(t);
     }, [active, refresh]);
 
-    // A device joined through our invitation: show the code to compare.
+    // A device joined through our invitation: show the code to compare, and put
+    // the newcomer on stage.
     useEffect(() => {
         let off: (() => void) | undefined;
         let alive = true;
         (async () => {
-            const un = await listen<Joined>("device-joined", (e) => {
+            const un = await listen<Joined>("device-joined", async (e) => {
                 setInviteOpen(false);
                 setJoined(e.payload);
-                refresh();
+                const next = await refresh();
+                const m = next?.members.find(x => x.short_id === e.payload.id);
+                if (m) setSelected(m.id);
             });
             if (alive) off = un; else un();
         })();
@@ -104,113 +110,127 @@ export function Devices({ active }: Props) {
 
     const remove = (m: Member) => run(`remove:${m.id}`, `${m.name} couldn't be removed.`, async () => {
         await invoke("devices_remove", { id: m.id });
-        setConfirmRemove(null);
+        setDetails(null);
         await refresh();
     });
 
-    const stopAll = () => run("stop", "Passer couldn't stop what other devices are doing.", async () => {
-        await invoke("devices_stop_sessions");
-        setStopped(true);
-        setTimeout(() => setStopped(false), 2500);
-    });
-
-    // "The codes don't match": arm the removal of the device that just joined.
+    // "The codes don't match": open that device's details with the removal armed.
     const mismatch = async (j: Joined) => {
         setJoined(null);
         const list = (await refresh())?.members ?? status?.members ?? [];
         const m = list.find(x => x.short_id === j.id);
         if (!m) return;
-        setConfirmRemove(m.id);
-        requestAnimationFrame(() => {
-            listRef.current?.querySelector(`[data-member="${CSS.escape(m.id)}"]`)
-                ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-        });
+        setSelected(m.id);
+        setDetails({ id: m.id, confirm: true });
     };
 
     const closeInvite = useCallback(() => setInviteOpen(false), []);
+    const closeDetails = useCallback(() => setDetails(null), []);
 
-    // --- States without a group -------------------------------------------------
+    // --- Without a group, or before one is known -----------------------------------
 
-    let body: React.ReactNode;
-    if (!status && loadError) {
-        body = <LoadFailed detail={loadError} retrying={retrying} onRetry={retry} />;
-    } else if (!status) {
-        body = <Skeleton />;
-    } else if (!status.group) {
-        body = (
-            <Welcome
-                busy={busy}
-                failure={failure}
-                onStart={createGroup}
-                onJoined={async (sas) => {
-                    setJoinSas(sas);
-                    await refresh();
-                }}
-            />
+    if (!status || !status.group) {
+        return (
+            <div className="flex-1 overflow-y-auto custom-scrollbar">
+                <div className="w-full max-w-[440px] mx-auto px-4 pt-12 pb-8 flex flex-col gap-3 [&>*]:shrink-0" aria-busy={!status && !loadError}>
+                    {!status && loadError ? (
+                        <LoadFailed detail={loadError} retrying={retrying} onRetry={retry} />
+                    ) : !status ? (
+                        <Skeleton />
+                    ) : (
+                        <Welcome
+                            busy={busy}
+                            failure={failure}
+                            onStart={createGroup}
+                            onJoined={async (sas) => {
+                                setJoinSas(sas);
+                                await refresh();
+                            }}
+                        />
+                    )}
+                </div>
+            </div>
         );
-    } else {
-        const me = status.members.find(m => m.this_device);
-        const canManage = !!me?.approver;
-        const approvers = status.members.filter(m => m.approver && !m.this_device);
-        const others = status.members.length - 1;
+    }
 
-        body = (
-            <>
+    // --- In a group ------------------------------------------------------------------
+
+    const members = sortMembers(status.members);
+    const me = members.find(m => m.this_device);
+    const canManage = !!me?.approver;
+    const others = members.length - 1;
+    const current = members.find(m => m.id === selected) ?? members.find(m => !m.this_device) ?? members[0];
+    const inDetails = details ? members.find(m => m.id === details.id) ?? null : null;
+    const approvers = members.filter(m => m.approver && !m.this_device);
+
+    return (
+        // `overflow-clip`, not `hidden`: an overflow-hidden box can still be
+        // scrolled by scrollIntoView, which slid the whole view sideways once.
+        <div className="relative flex-1 flex flex-col min-h-0 overflow-clip">
+            <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar flex flex-col gap-5 px-8 pt-6 pb-5 [&>*]:shrink-0">
+                {/* Header */}
+                <div className="flex items-end justify-between gap-4">
+                    <div className="min-w-0">
+                        <h1 className="text-[12px] font-black uppercase tracking-[0.22em] text-white/75 truncate">{status.group}</h1>
+                        <p className="text-[13px] text-white/55 mt-1.5">
+                            {others === 0 ? "Only this PC so far" : `This PC and ${others} other device${others > 1 ? "s" : ""}`}
+                        </p>
+                    </div>
+                    {canManage ? (
+                        <button
+                            onClick={() => setInviteOpen(true)}
+                            disabled={!status.running}
+                            title={status.running ? undefined : "This PC needs to be online to invite a device"}
+                            className={`shrink-0 flex items-center gap-2 h-9 px-4 rounded-xl border border-blue-400/40 bg-blue-500/20 text-[12px] font-semibold text-blue-50 hover:bg-blue-500/30 hover:border-blue-400/60 transition-all active:scale-[0.98] cursor-pointer disabled:opacity-45 disabled:cursor-not-allowed ${FOCUS}`}
+                        >
+                            <QrCode className="w-4 h-4" strokeWidth={2} aria-hidden /> Add a device
+                        </button>
+                    ) : (
+                        <p className="shrink-0 flex items-center gap-1.5 text-[12px] text-white/55 max-w-[320px] text-right">
+                            <KeyRound className="w-3.5 h-3.5 shrink-0" strokeWidth={2} aria-hidden />
+                            {approvers.length > 0 ? <>To add a device, use {listNames(approvers.map(a => a.name))}.</> : "This PC can't add devices."}
+                        </p>
+                    )}
+                </div>
+
+                {/* Codes to compare after a join */}
                 {joinSas && (
-                    <SasCard
+                    <SasBanner
                         title={`This PC joined ${status.group}`}
                         text="The device that invited this PC shows a code too. If it's not this one, remove this PC from that device."
                         sas={joinSas}
                     >
-                        <Action tone="success" className="w-full" onClick={() => setJoinSas(null)}
+                        <Action tone="success" className="w-[150px]" onClick={() => setJoinSas(null)}
                             icon={<Check className="w-3 h-3" strokeWidth={2.5} aria-hidden />}>
                             Done
                         </Action>
-                    </SasCard>
+                    </SasBanner>
                 )}
                 {joined && (
-                    <SasCard
+                    <SasBanner
                         title={`${joined.name} joined`}
                         text={`Check that ${joined.name} shows this same code. That proves it's really your device.`}
                         sas={joined.sas}
                     >
-                        <div className="flex gap-2">
-                            <Action className="flex-1" onClick={() => mismatch(joined)}>It's different</Action>
-                            <Action tone="success" className="flex-1" onClick={() => setJoined(null)}
-                                icon={<Check className="w-3 h-3" strokeWidth={2.5} aria-hidden />}>
-                                It matches
-                            </Action>
-                        </div>
-                    </SasCard>
+                        <Action className="w-[150px]" onClick={() => mismatch(joined)}>It's different</Action>
+                        <Action tone="success" className="w-[150px]" onClick={() => setJoined(null)}
+                            icon={<Check className="w-3 h-3" strokeWidth={2.5} aria-hidden />}>
+                            It matches
+                        </Action>
+                    </SasBanner>
                 )}
 
-                {/* Group header: name, count, and whether this PC is reachable */}
-                <div className="flex items-end justify-between gap-3 px-1">
-                    <div className="min-w-0">
-                        <h2 className="text-[11px] font-black uppercase tracking-[0.2em] text-white/75 truncate">{status.group}</h2>
-                        <p className="text-[10.5px] text-white/50 leading-tight mt-1">
-                            {others === 0 ? "Only this PC so far" : `This PC and ${others} other device${others > 1 ? "s" : ""}`}
-                        </p>
-                    </div>
-                    <ConnectionPill running={status.running} />
-                </div>
-
                 {!status.running && (
-                    <div className="rise flex items-start gap-2.5 p-3 rounded-2xl bg-amber-500/[0.06] border border-amber-400/15" role="status">
-                        <WifiOff className="w-4 h-4 text-amber-300/90 shrink-0 mt-px" strokeWidth={2} aria-hidden />
-                        <div className="min-w-0 flex-1">
-                            <p className="text-[11.5px] font-bold text-amber-100/90 leading-tight">This PC is offline</p>
-                            <p className="text-[10.5px] text-amber-100/65 leading-snug mt-1">
-                                Your other devices can't reach it until it reconnects.
-                            </p>
-                        </div>
+                    <div className="rise flex items-center gap-3 px-4 py-3 rounded-2xl bg-amber-500/[0.06] border border-amber-400/15" role="status">
+                        <WifiOff className="w-4 h-4 text-amber-300/90 shrink-0" strokeWidth={2} aria-hidden />
+                        <p className="flex-1 text-[13px] text-amber-100/85">
+                            <span className="font-bold">This PC is offline.</span> Your other devices can't reach it until it reconnects.
+                        </p>
                         <button
                             onClick={retry}
-                            aria-label="Check again"
-                            title="Check again"
-                            className={`shrink-0 p-1.5 rounded-lg text-amber-200/70 hover:text-amber-100 hover:bg-amber-400/10 transition-all active:scale-90 cursor-pointer ${FOCUS}`}
+                            className={`shrink-0 flex items-center gap-1.5 h-8 px-3 rounded-lg text-[12px] font-semibold text-amber-100/85 hover:bg-amber-400/10 transition-all cursor-pointer ${FOCUS}`}
                         >
-                            <RefreshCw className={`w-3.5 h-3.5 ${retrying ? "animate-spin" : ""}`} strokeWidth={2.25} aria-hidden />
+                            <RefreshCw className={`w-3.5 h-3.5 ${retrying ? "animate-spin" : ""}`} strokeWidth={2.25} aria-hidden /> Check again
                         </button>
                     </div>
                 )}
@@ -230,106 +250,58 @@ export function Devices({ active }: Props) {
                     />
                 )}
 
-                {/* The devices */}
-                <ul ref={listRef} className="rounded-2xl bg-white/[0.03] border border-white/[0.06] divide-y divide-white/[0.05] overflow-hidden">
-                    {sortMembers(status.members).map((m, i) => (
-                        <MemberRow
-                            key={m.id}
-                            member={m}
-                            index={i}
-                            canRemove={canManage && !m.this_device}
-                            confirming={confirmRemove === m.id}
-                            busy={busy === `remove:${m.id}`}
-                            onAsk={() => setConfirmRemove(m.id)}
-                            onCancel={() => setConfirmRemove(null)}
-                            onConfirm={() => remove(m)}
-                        />
+                {/* Every device, at a glance */}
+                <div role="tablist" aria-label="Your devices" className="flex gap-3 overflow-x-auto custom-scrollbar pb-1 -mb-1">
+                    {members.map((m, i) => (
+                        <DeviceCard key={m.id} member={m} index={i} on={m.id === current.id} running={status.running} onSelect={() => setSelected(m.id)} />
                     ))}
-                </ul>
+                </div>
 
-                {/* Add a device - pushes one level deeper */}
-                {canManage ? (
+                {/* The chosen one */}
+                <DeviceStage member={current} running={status.running} />
+
+                <div className="flex items-center gap-4 -mt-1">
                     <button
-                        onClick={() => setInviteOpen(true)}
-                        disabled={!status.running}
-                        className={`flex items-center gap-3 p-3 rounded-2xl bg-blue-500/10 border border-blue-400/25 hover:bg-blue-500/20 hover:border-blue-400/40 transition-all duration-200 active:scale-[0.99] text-left cursor-pointer disabled:opacity-45 disabled:cursor-not-allowed disabled:hover:bg-blue-500/10 disabled:active:scale-100 ${FOCUS}`}
+                        onClick={() => setDetails({ id: current.id, confirm: false })}
+                        className={`shrink-0 flex items-center gap-1 text-[12px] font-semibold text-white/60 hover:text-white transition-colors cursor-pointer rounded ${FOCUS}`}
                     >
-                        <div className="shrink-0 w-8 h-8 rounded-xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center">
-                            <QrCode className="w-4 h-4 text-blue-300" strokeWidth={2} aria-hidden />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                            <p className="text-[12px] font-bold text-white/90 leading-tight">Add a device</p>
-                            <p className="text-[10.5px] text-white/55 leading-tight mt-0.5">
-                                {status.running ? "Show a code to scan on your phone or computer" : "Needs this PC to be online"}
-                            </p>
-                        </div>
-                        <ChevronRight className="w-4 h-4 text-white/35 shrink-0" strokeWidth={2} aria-hidden />
+                        Details{canManage && !current.this_device ? " and removal" : ""} <ChevronRight className="w-3.5 h-3.5" strokeWidth={2.25} aria-hidden />
                     </button>
-                ) : (
-                    <div className="flex items-start gap-2.5 p-3 rounded-2xl bg-white/[0.02] border border-white/[0.06]">
-                        <KeyRound className="w-4 h-4 text-white/45 shrink-0 mt-px" strokeWidth={2} aria-hidden />
-                        <p className="text-[10.5px] text-white/60 leading-snug">
-                            {approvers.length > 0
-                                ? <>To add or remove a device, use {listNames(approvers.map(a => a.name))}.</>
-                                : "This PC can't add or remove devices."}
-                        </p>
-                    </div>
-                )}
-
-                {/* The way out: end whatever other devices are doing here.
-                    Pointless, so absent, while this PC is alone. */}
-                {others > 0 && <div className="flex items-center gap-3 p-3 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
-                    <div className="shrink-0 w-8 h-8 rounded-xl bg-red-500/10 border border-red-400/20 flex items-center justify-center">
-                        <OctagonX className="w-4 h-4 text-red-300" strokeWidth={2} aria-hidden />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                        <p className="text-[12px] font-bold text-white/90 leading-tight">Stop remote activity</p>
-                        <p className="text-[10.5px] text-white/55 leading-tight mt-0.5">Ends everything other devices are doing here</p>
-                    </div>
-                    <button
-                        onClick={stopAll}
-                        disabled={!!busy || !status.running}
-                        aria-live="polite"
-                        className={`shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-[10px] font-black uppercase tracking-[0.12em] transition-all duration-200 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer ${FOCUS}
-                            ${stopped
-                                ? "bg-emerald-500/15 border-emerald-400/30 text-emerald-300"
-                                : "bg-red-500/10 border-red-400/30 text-red-200 hover:bg-red-500/20 hover:border-red-400/50"}`}
-                    >
-                        {busy === "stop"
-                            ? <Loader2 className="w-3 h-3 animate-spin" strokeWidth={2.5} aria-hidden />
-                            : stopped && <Check className="w-3 h-3" strokeWidth={2.5} aria-hidden />}
-                        {stopped ? "Stopped" : "Stop"}
-                    </button>
-                </div>}
-
-                <Footnote preview={status.development_network} />
-            </>
-        );
-    }
-
-    return (
-        // `overflow-clip`, not `hidden`: the parked invite layer sits at
-        // translateX(100%), and an overflow-hidden box is still scrollable by
-        // scrollIntoView - which slid the whole tab sideways. Clip can't scroll.
-        <div className="relative flex-1 flex flex-col min-h-0 overflow-clip">
-            {/* Children never shrink: in a scrolling column they would be
-                squashed (and the list clipped) instead of scrolling. */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar px-4 pt-5 pb-3 flex flex-col gap-3 [&>*]:shrink-0" aria-busy={!status && !loadError}>
-                {body}
+                    <div className="ml-auto max-w-[520px]"><Footnote preview={status.development_network} /></div>
+                </div>
             </div>
 
-            {/* One level deeper than the list, so it pushes in from the right. */}
-            <div className="detail-layer" data-open={inviteOpen}>
-                <DeviceInvite open={inviteOpen} connected={!!status?.running} onClose={closeInvite} />
-            </div>
+            {/* Details, sliding in from the right */}
+            {inDetails && (
+                <DetailsPanel
+                    member={inDetails}
+                    canRemove={canManage && !inDetails.this_device}
+                    confirm={!!details?.confirm}
+                    busy={busy === `remove:${inDetails.id}`}
+                    onArm={() => setDetails(d => (d ? { ...d, confirm: true } : d))}
+                    onDisarm={() => setDetails(d => (d ? { ...d, confirm: false } : d))}
+                    onRemove={() => remove(inDetails)}
+                    onClose={closeDetails}
+                />
+            )}
+
+            {/* Adding a device: a dialog over the view */}
+            {inviteOpen && (
+                <div className="absolute inset-0 z-[400] flex items-center justify-center p-6">
+                    <div className="scrim-in absolute inset-0 bg-black/60" onClick={closeInvite} aria-hidden />
+                    <div className="sheet-in relative w-[440px] max-h-full h-[600px] flex flex-col rounded-3xl overflow-hidden border border-white/10 shadow-[0_24px_70px_rgba(0,0,0,0.6)]" role="dialog" aria-modal="true" aria-label="Add a device">
+                        <DeviceInvite open={inviteOpen} connected={status.running} onClose={closeInvite} />
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
 
-/** This PC first, then the devices that can manage the group, then the rest. */
+/** Other devices first (the ones that manage the group, then by name), this PC last. */
 function sortMembers(members: Member[]) {
     return [...members].sort((a, b) =>
-        Number(b.this_device) - Number(a.this_device)
+        Number(a.this_device) - Number(b.this_device)
         || Number(b.approver) - Number(a.approver)
         || a.name.localeCompare(b.name));
 }
@@ -339,98 +311,135 @@ function listNames(names: string[]) {
     return `${names.slice(0, -1).join(", ")} or ${names[names.length - 1]}`;
 }
 
-function ConnectionPill({ running }: { running: boolean }) {
+function DeviceCard({ member: m, index, on, running, onSelect }: { member: Member; index: number; on: boolean; running: boolean; onSelect: () => void }) {
+    const probe = useMemberInfo(m.id, !m.this_device && running);
+    const os = m.this_device ? thisOs() : probe?.state === "ok" ? probe.info.os : undefined;
+    const kind = kindOf(m.name, os);
+    const reachable = m.this_device ? running : probe?.state === "ok";
+    const label = m.this_device
+        ? "This PC"
+        : probe?.state === "ok" ? "Reachable" : probe?.state === "unreachable" ? "Not reachable" : running ? "Checking…" : "Unknown";
     return (
-        <div className="shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-white/[0.06] bg-white/[0.02]" role="status">
-            <span className={`w-1.5 h-1.5 rounded-full ${running
-                ? "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.5)]"
-                : "bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.3)]"}`} aria-hidden />
-            <span className={`text-[9.5px] font-black uppercase tracking-[0.18em] ${running ? "text-white/70" : "text-red-300/90"}`}>
-                {running ? "Online" : "Offline"}
+        <button
+            role="tab"
+            aria-selected={on}
+            onClick={onSelect}
+            style={{ ["--i" as string]: index }}
+            className={`rise w-[210px] shrink-0 flex items-center gap-3 p-2.5 rounded-2xl border text-left transition-all duration-200 cursor-pointer active:scale-[0.99] ${FOCUS}
+                ${on
+                    ? "bg-white/[0.07] border-blue-400/40 shadow-[0_0_0_1px_rgba(96,165,250,0.15),0_8px_24px_rgba(59,130,246,0.12)]"
+                    : "bg-white/[0.025] border-white/[0.06] hover:bg-white/[0.05] hover:border-white/12"}`}
+        >
+            <span className="w-11 h-11 shrink-0 rounded-xl bg-black/25 flex items-end justify-center pb-1 overflow-hidden" aria-hidden>
+                <DeviceRender kind={kind} screen={screenFor(m.id)} size={kind === "phone" || kind === "tablet" ? 0.13 : 0.1} dim={!reachable && probe?.state !== "loading"} />
             </span>
+            <span className="min-w-0">
+                <span className={`block text-[13px] font-semibold truncate ${reachable ? "text-white/90" : "text-white/65"}`} title={m.name}>{m.name}</span>
+                <span className="flex items-center gap-1.5 mt-0.5">
+                    <span className={`w-1.5 h-1.5 rounded-full ${reachable ? "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]" : "bg-white/30"}`} aria-hidden />
+                    <span className="text-[12px] text-white/55">{label}</span>
+                </span>
+            </span>
+        </button>
+    );
+}
+
+function DetailsPanel({ member: m, canRemove, confirm, busy, onArm, onDisarm, onRemove, onClose }: {
+    member: Member;
+    canRemove: boolean;
+    confirm: boolean;
+    busy: boolean;
+    onArm: () => void;
+    onDisarm: () => void;
+    onRemove: () => void;
+    onClose: () => void;
+}) {
+    const probe = useMemberInfo(m.id, false);
+    const info = probe?.state === "ok" ? probe.info : null;
+
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    }, [onClose]);
+
+    const rows: [string, React.ReactNode][] = [
+        ["Role", m.approver
+            ? <span className="inline-flex items-center gap-1 text-amber-200/90"><ShieldCheck className="w-3.5 h-3.5" strokeWidth={2.25} aria-hidden />Manages devices</span>
+            : "Sends and receives"],
+        ["Device ID", <span className="font-mono">{m.short_id}</span>],
+    ];
+    if (m.this_device) rows.push(["System", osLabel(thisOs())]);
+    if (info) {
+        rows.push(["System", `${osLabel(info.os)} · ${info.arch}`]);
+        rows.push(["passer-core", info.version]);
+    }
+
+    return (
+        <div className="absolute inset-0 z-[300] flex justify-end">
+            <div className="scrim-in absolute inset-0 bg-black/45" onClick={onClose} aria-hidden />
+            <aside className="sheet-in relative w-[380px] h-full bg-[#161616] border-l border-white/[0.08] shadow-[-20px_0_60px_rgba(0,0,0,0.5)] flex flex-col" role="dialog" aria-modal="true" aria-label={`${m.name}, details`}>
+                <div className="flex items-start gap-3 px-6 pt-6 pb-4">
+                    <div className="min-w-0 flex-1">
+                        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-white/50">Details</p>
+                        <h2 className="text-[20px] font-bold leading-tight mt-1.5 break-words">{m.name}</h2>
+                    </div>
+                    <button onClick={onClose} aria-label="Close" autoFocus
+                        className={`shrink-0 p-2 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-all cursor-pointer ${FOCUS}`}>
+                        <X className="w-4 h-4" strokeWidth={2.25} aria-hidden />
+                    </button>
+                </div>
+
+                <dl className="mx-6 rounded-2xl bg-white/[0.03] border border-white/[0.06] divide-y divide-white/[0.05]">
+                    {rows.map(([k, v]) => (
+                        <div key={k} className="flex items-center justify-between gap-4 px-4 py-3">
+                            <dt className="text-[12px] text-white/55">{k}</dt>
+                            <dd className="text-[13px] font-semibold text-white/85 text-right min-w-0 break-words">{v}</dd>
+                        </div>
+                    ))}
+                </dl>
+
+                <div className="mt-auto px-6 pb-6">
+                    {m.this_device ? (
+                        <p className="text-[12px] text-white/50">This is the PC you're on.</p>
+                    ) : !canRemove ? (
+                        <p className="text-[12px] text-white/50">Only a device that manages your devices can remove it.</p>
+                    ) : confirm ? (
+                        <div className="rise p-3.5 rounded-2xl bg-red-500/[0.08] border border-red-400/20 flex flex-col gap-3" role="alertdialog" aria-label={`Remove ${m.name}?`}>
+                            <p className="text-[13px] text-red-100/85 leading-snug">
+                                <span className="font-bold text-red-100">Remove {m.name}?</span> It loses access to your devices right away. You can add it back later.
+                            </p>
+                            <div className="flex gap-2">
+                                <Action className="flex-1" onClick={onDisarm} autoFocus>Cancel</Action>
+                                <Action className="flex-1" tone="danger" busy={busy} onClick={onRemove}
+                                    icon={<Trash2 className="w-3 h-3" strokeWidth={2.5} aria-hidden />}>
+                                    Remove
+                                </Action>
+                            </div>
+                        </div>
+                    ) : (
+                        <Action className="w-full" onClick={onArm} icon={<Trash2 className="w-3.5 h-3.5" strokeWidth={2.25} aria-hidden />}>
+                            Remove from my devices
+                        </Action>
+                    )}
+                </div>
+            </aside>
         </div>
     );
 }
 
-function MemberRow({ member: m, index, canRemove, confirming, busy, onAsk, onCancel, onConfirm }: {
-    member: Member;
-    index: number;
-    canRemove: boolean;
-    confirming: boolean;
-    busy: boolean;
-    onAsk: () => void;
-    onCancel: () => void;
-    onConfirm: () => void;
-}) {
+function SasBanner({ title, text, sas, children }: { title: string; text: string; sas: string; children: React.ReactNode }) {
     return (
-        <li data-member={m.id} className="rise" style={{ ["--i" as string]: index }}>
-            <div className="flex items-center gap-3 px-3 py-2.5">
-                <div className={`shrink-0 w-8 h-8 rounded-xl border flex items-center justify-center
-                    ${m.this_device ? "bg-blue-500/15 border-blue-400/25" : "bg-white/[0.05] border-white/10"}`}>
-                    <DeviceGlyph name={m.name} thisDevice={m.this_device}
-                        className={`w-4 h-4 ${m.this_device ? "text-blue-300" : "text-white/70"}`} />
-                </div>
-                <div className="min-w-0 flex-1">
-                    <p className="text-[12px] font-bold text-white/90 leading-tight truncate" title={m.name}>{m.name}</p>
-                    <div className="flex items-center gap-1.5 mt-1 min-w-0">
-                        {m.this_device
-                            ? <span className="text-[10px] font-bold text-blue-300/90 leading-none">This PC</span>
-                            : <span className="text-[10px] font-mono text-white/50 leading-none" title="Device ID">{m.short_id}</span>}
-                        {m.approver && (
-                            <span
-                                className="flex items-center gap-0.5 px-1.5 py-[3px] rounded-full bg-amber-500/10 border border-amber-400/20 text-[9px] font-bold text-amber-200/85 leading-none whitespace-nowrap"
-                                title="Can add and remove devices"
-                            >
-                                <ShieldCheck className="w-2.5 h-2.5" strokeWidth={2.5} aria-hidden />
-                                Manages devices
-                            </span>
-                        )}
-                    </div>
-                </div>
-                {canRemove && !confirming && (
-                    <button
-                        onClick={onAsk}
-                        aria-label={`Remove ${m.name}`}
-                        title="Remove"
-                        className={`shrink-0 p-2 rounded-lg text-white/40 hover:text-red-300 hover:bg-red-500/10 transition-all duration-200 active:scale-90 cursor-pointer ${FOCUS}`}
-                    >
-                        <Trash2 className="w-3.5 h-3.5" strokeWidth={2} aria-hidden />
-                    </button>
-                )}
+        <section className="rise flex items-center gap-6 px-5 py-4 rounded-2xl bg-emerald-500/[0.06] border border-emerald-400/20" aria-label={title}>
+            <div className="shrink-0 w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-400/25 flex items-center justify-center">
+                <ShieldCheck className="w-5 h-5 text-emerald-300" strokeWidth={2} aria-hidden />
             </div>
-
-            {confirming && (
-                <div className="rise mx-2 mb-2 p-2.5 rounded-xl bg-red-500/[0.08] border border-red-400/20 flex flex-col gap-2" role="alertdialog" aria-label={`Remove ${m.name}?`}>
-                    <p className="text-[11px] text-red-100/85 leading-snug">
-                        <span className="font-bold text-red-100">Remove {m.name}?</span> It loses access to your devices right away. You can add it back later.
-                    </p>
-                    <div className="flex gap-2">
-                        <Action className="flex-1 !py-2" onClick={onCancel} autoFocus>Cancel</Action>
-                        <Action className="flex-1 !py-2" tone="danger" busy={busy} onClick={onConfirm}
-                            icon={<Trash2 className="w-3 h-3" strokeWidth={2.5} aria-hidden />}>
-                            Remove
-                        </Action>
-                    </div>
-                </div>
-            )}
-        </li>
-    );
-}
-
-function SasCard({ title, text, sas, children }: { title: string; text: string; sas: string; children: React.ReactNode }) {
-    return (
-        <section className="rise p-3.5 rounded-2xl bg-emerald-500/[0.06] border border-emerald-400/20 flex flex-col gap-3" aria-label={title}>
-            <div className="flex items-start gap-2.5">
-                <div className="shrink-0 w-8 h-8 rounded-xl bg-emerald-500/15 border border-emerald-400/25 flex items-center justify-center">
-                    <ShieldCheck className="w-4 h-4 text-emerald-300" strokeWidth={2} aria-hidden />
-                </div>
-                <div className="min-w-0">
-                    <p className="text-[12px] font-bold text-white/90 leading-tight break-words">{title}</p>
-                    <p className="text-[10.5px] text-white/60 leading-snug mt-1 break-words">{text}</p>
-                </div>
+            <div className="min-w-0 flex-1">
+                <p className="text-[14px] font-bold text-white/90 leading-tight break-words">{title}</p>
+                <p className="text-[12px] text-white/60 leading-snug mt-1 break-words">{text}</p>
             </div>
             <SasDigits sas={sas} />
-            {children}
+            <div className="shrink-0 flex gap-2">{children}</div>
         </section>
     );
 }

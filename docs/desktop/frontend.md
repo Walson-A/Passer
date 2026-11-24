@@ -43,38 +43,43 @@ The corner notification, rendered into its own always-on-top window (see `backen
 
 > ⚠️ **It polls; it is not pushed to.** Events emitted from Rust never arrive in this window's webview. That was verified three times — a broadcast `emit`, a `WebviewWindow::emit` immediately after `show()`, and the same 250 ms later; the last two reported success and neither was ever received, while `invoke` *from* that webview worked throughout. So the HUD asks `get_last_transfer` every 400 ms and compares a sequence number, which needs nothing delivered inwards. Do not "simplify" this back into a listener.
 
-### `Devices.tsx`
-The **Devices** tab. It talks to the backend only through the `devices_*` commands and the `device-joined` event (see "Device network" in `backend.md`), and renders every device name as plain text — names are chosen by the devices themselves.
+### The window: `Layout.tsx`, `TitleBar.tsx`, `Sidebar.tsx`
+Passer is a full, resizable window (1180×760 by default, 940×620 at least, centred), no longer the 390×520 panel docked by the taskbar: the device network outgrew it. The window stays frameless and transparent, drawn as one rounded dark pane; `Layout.tsx` gives every edge and corner a resize handle, since there is no native frame. `TitleBar.tsx` carries the wordmark, pin, minimise, maximise and close.
+
+`Sidebar.tsx` replaced the bottom tab bar: Passboard, Space, Devices, and Settings at the foot. Below it, once this PC is in a group, a card says whether the device network is up (*Ready* / *Offline*) and holds **Stop remote activity**, which ends everything other devices are doing here. It lives there, not on one device, because it concerns the whole PC.
+
+Passboard, Space and Settings were drawn for the old panel; until they get wide layouts they sit in a centred column (560–640px). Devices uses the whole width.
+
+### `Devices.tsx` and `DeviceStage.tsx`
+The **Devices** space, in the direction Walson chose after the mockups (*A3*, see Benches): every device in one horizontal strip, the chosen one alone on stage. It talks to the backend only through the `devices_*` commands and the `device-joined` event (see "Device network" in `backend.md`), and renders every device name as plain text — names are chosen by the devices themselves.
+
+- **The strip** shows every member at once (other devices first, the ones that manage the group before the rest, this PC last), each with its drawing and whether it is reachable. Horizontal on purpose: it does not compete with the vertical sidebar.
+- **The stage** (`DeviceStage.tsx`) draws the chosen device large (`DeviceRender.tsx`), says whether it is reachable, its system, and *Manages devices* when it does, then **only the commands it really answers to**. A computer running Passer gets *Send a file* (700 KB at most for now), *Send my clipboard* and *Get its clipboard* (with a lock: its user approves each time, and the stage says it is waiting for that answer). A phone offers nothing to call yet, so the stage says so instead of showing buttons that would fail. Unreachable: a sentence and *Try again*.
+- **Reachability is a probe.** passer-core gives no per-member presence yet, so `useMemberInfo` asks each device for `device.info` (cached one minute, shared by the strip, the stage and the panel): a device that answers now is reachable now. The answer also gives the real system, which decides phone versus computer; the name only decides laptop versus tower, and the drawing is decoration since the name is always written beside it.
+- **Details and removal** open a side panel: role, device ID, system and core version, and *Remove from my devices* with its confirmation (approvers only).
+- **Adding a device** opens `DeviceInvite.tsx` as a dialog over the view.
 
 | State | What the user sees |
 | ----- | ----- |
-| Loading | Skeleton rows in the shape of the list, never an empty pane |
+| Loading | Skeleton rows in a centred column, never an empty pane |
 | Status failed | "Your devices didn't load", the raw error underneath, **Try again** |
-| No group yet | A short explanation, **Start with this PC** (with when to choose it) or **I have an invitation** (with where to get one). The link form folds the illustration away so it and its error stay in view |
-| Joined with a link | The 6-digit code to compare, in two groups of three |
-| In a group | Group name, "This PC and N other devices", an **Online / Offline** pill; one list with this PC first, then the devices that manage the group, then the rest |
-| Offline | An amber note saying other devices can't reach this PC, with a re-check button. *Add a device* says it needs the PC online |
-| Not an approver | Instead of *Add a device*: which devices can add or remove one |
-| A device joined | The code with **It matches** / **It's different**; the latter arms the removal of that device |
-| Remove | An inline confirmation in the row, saying what removing does; Cancel has the focus |
-| Action failed | An error card next to the list, plain sentence first, raw detail below |
+| No group yet | A short explanation, **Start with this PC** (with when to choose it) or **I have an invitation** (with where to get one) |
+| Joined with a link | A banner with the 6-digit code to compare, in two groups of three |
+| A device joined | The banner with **It matches** / **It's different**; the newcomer goes on stage, and *It's different* opens its details with the removal armed. `App.tsx` switches to Devices on `device-joined`, so the code is never shown on a hidden view |
+| Offline | An amber banner with *Check again*; *Add a device* is disabled with a reason |
+| Not an approver | Instead of *Add a device*: which devices can add one |
+| Action failed | An error next to the action, plain sentence first, raw detail below |
 
-Per-device presence is not shown: `devices_status` reports whether *this PC's* network runs (`running`), not whether each member is reachable. The pill is therefore the PC's, not the members'.
-
-*Stop remote activity* ends every session other devices have open here (`devices_stop_sessions`); it is hidden while the PC is alone in its group. The footnote is one line, *End-to-end encrypted*; while `development_network` is true it carries a **Preview** toggle that unfolds what the preview network means for the user (test servers that see when devices connect, never what they send). It does not name n0 — that is in `backend.md`, for developers.
-
-The device glyph is guessed from the name (phone, tablet, laptop): the backend sends no device type, and the name is always shown next to it, so a wrong guess costs nothing.
+The footnote is one line, *End-to-end encrypted*; while `development_network` is true it carries a **Preview** toggle that unfolds what the preview network means for the user. It does not name n0 — that is in `backend.md`, for developers.
 
 ### `DeviceInvite.tsx`
-*Add a device*, one level below the tab: it pushes in from the right like *Pair a device* under Settings, and Escape or the back button returns. Two steps, because the role is baked into the invitation: first **what the new device can do** (send and receive, or also add and remove devices — `approver`), then the one-time QR code with its link, a live **expires in m:ss** (the backend's 10 minutes) and an **Expired → New code** state, the "don't share it" warning, and *Copy link* with a *Copied* confirmation. Leaving the tab or the panel drops the code.
+*Add a device*, as a dialog. Two steps, because the role is baked into the invitation: first **what the new device can do** (send and receive, or also add and remove devices — `approver`), then the one-time QR code with its link, a live **m:ss left** (the backend's 10 minutes) and an **Expired → New code** state, the "don't share it" warning, and *Copy link* with a *Copied* confirmation. Closing the dialog, or leaving the view, drops the code.
 
 ### `ApprovalPrompt.tsx`
-Mounted above everything in `App.tsx`. Listens to `approval-request` / `approval-closed` and shows one request at a time as a sheet rising from the bottom, answering in reading order: **who** (the device, or the AI agent and the device it runs on, with the short id), **what** (the capability's title), **on what**, **how far a yes goes**, and **how long you have** (a ring that empties and turns amber, then red). The countdown runs from the moment each request *arrived*, because the backend times every request from when it asks — a request waiting behind another keeps its real remaining time instead of restarting at 55 s. A yes covers *this request only*: `minutes` is the lease of that one call (how long it may run before Stop or the lease cuts it), not a window of access — the next request asks again — so the card says "This request only" and the button says **Allow once**. Deny has the focus, so a stray Enter never grants anything; Escape denies, like letting the clock run out. A line counts the requests still waiting. Every string in it comes from another device and is rendered as plain text, wrapped rather than truncated so nothing can hide off-screen.
+Mounted above everything in `App.tsx`, centred over the window. Listens to `approval-request` / `approval-closed` and shows one request at a time, answering in reading order: **who** (the device, or the AI agent and the device it runs on, with the short id), **what** (the capability's title), **on what**, **how far a yes goes**, and **how long you have** (a ring that empties and turns amber, then red). The countdown runs from the moment each request *arrived*, because the backend times every request from when it asks — a request waiting behind another keeps its real remaining time instead of restarting at 55 s. A yes covers *this request only*: `minutes` is the lease of that one call (how long it may run before Stop or the lease cuts it), not a window of access — the next request asks again — so the card says "This request only" and the button says **Allow once**. Deny has the focus, so a stray Enter never grants anything; Escape denies, like letting the clock run out. A line counts the requests still waiting. Every string in it comes from another device and is rendered as plain text, wrapped rather than truncated so nothing can hide off-screen.
 
 ### `deviceUi.tsx`
-What the three share: the types mirroring `devices.rs`, the button (`Action`), the code digits (`SasDigits`), the device glyph, and `FOCUS`, the keyboard ring used throughout (the tab bar uses the same one). It is deliberately soft, and nothing is focused on the user's behalf except the safe choice (Deny, Cancel): the code card leaves both answers unselected.
-
-These screens sit one size step above the rest of the app (body 10–11px, titles 12px, button capitals at 10px with 0.12em tracking instead of `tracking-widest`), for a non-technical audience. Settings, Passboard and Space still use the older, smaller scale.
+What the device screens share: the types mirroring `devices.rs`, the button (`Action`), the code digits (`SasDigits`), the glyph, how a device looks (`osLabel`, `kindOf`, `screenFor` — a wallpaper per device derived from its id) and `FOCUS`, the keyboard ring used throughout (the sidebar uses the same one). It is deliberately soft, and nothing is focused on the user's behalf except the safe choice (Deny, Cancel).
 
 ### Motion
 Defined once in `App.css` under "Devices and approvals": rows rise 6px with a 40ms stagger, the approval sheet rises over a fading scrim, skeletons breathe, the countdown ring empties linearly. With `prefers-reduced-motion`, everything fades in place and nothing pulses.
