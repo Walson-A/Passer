@@ -9,6 +9,8 @@ export interface TransferPayload {
     name?: string | null;
     path?: string | null;
     size?: number | null;
+    /** The device it came from or went to; absent for the iOS Shortcuts (HTTP) path. */
+    device?: string | null;
 }
 
 export function formatBytes(bytes: number) {
@@ -87,9 +89,11 @@ export function HudCard({ payload, exiting, onClick, style }: Props) {
                     {label}
                 </p>
                 <p className="text-[9px] text-white/35 leading-tight mt-px">
-                    {payload.size != null
-                        ? formatBytes(payload.size)
-                        : (payload.target === "clipboard" ? "To clipboard" : "To Passboard")}
+                    {payload.device
+                        ? `${incoming ? "From" : "To"} ${payload.device}`
+                        : payload.size != null
+                            ? formatBytes(payload.size)
+                            : (payload.target === "clipboard" ? "To clipboard" : "To Passboard")}
                 </p>
             </div>
         </div>

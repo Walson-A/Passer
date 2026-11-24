@@ -25,6 +25,14 @@ interface Props {
     onDelete?: (id: string) => void;
 }
 
+/** Where it came from or went: a device of the group, or the iOS Shortcuts (HTTP), which cannot say which phone. */
+function Peer({ item }: { item: HistoryItem }) {
+    const label = item.device
+        ? `${item.direction === "incoming" ? "From" : "To"} ${item.device}`
+        : "Via iOS Shortcuts";
+    return <p className="text-[10.5px] font-semibold text-white/50 mt-0.5 truncate">{label}</p>;
+}
+
 export function HistoryItemRow({ item, isLatest = false, onDelete }: Props) {
     const [isHovered, setIsHovered] = useState(false);
 
@@ -49,9 +57,10 @@ export function HistoryItemRow({ item, isLatest = false, onDelete }: Props) {
                 {item.type === 'text' ? (
                     /* TEXT: Natural flow - line-clamp-3 for max visibility in fixed 76px */
                     <div className="flex-1 min-w-0">
-                        <p className="text-[11.5px] font-normal text-white/85 line-clamp-3 leading-relaxed break-words overflow-hidden">
+                        <p className="text-[12px] font-normal text-white/85 line-clamp-2 leading-relaxed break-words overflow-hidden">
                             {item.name}
                         </p>
+                        <Peer item={item} />
                     </div>
                 ) : (
                     /* IMAGE/FILE: Visual anchor + info */
@@ -68,10 +77,11 @@ export function HistoryItemRow({ item, isLatest = false, onDelete }: Props) {
                                     </h3>
                                 )}
                                 {item.fileSize && (
-                                    <p className="text-[9.5px] font-medium text-white/35 mt-0.5">
+                                    <p className="text-[10px] font-medium text-white/45 mt-0.5">
                                         {item.fileSize}
                                     </p>
                                 )}
+                                <Peer item={item} />
                             </div>
                         )}
                     </div>

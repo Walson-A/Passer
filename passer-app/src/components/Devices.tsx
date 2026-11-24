@@ -8,6 +8,7 @@ import {
 import { DeviceInvite, InlineError } from "./DeviceInvite";
 import { DeviceRender } from "./DeviceRender";
 import { DeviceStage } from "./DeviceStage";
+import type { HistoryItem } from "../hooks/useHistory";
 import {
     Action, CAPABILITY_WORDS, FOCUS, SasDigits, isRecent, kindOfMember, osLabel, screenFor, seenLabel, thisOs,
     type DevicesStatus, type Joined, type JournalLine, type Member,
@@ -16,6 +17,10 @@ import {
 interface Props {
     /** True while this is the visible view. */
     active: boolean;
+    /** Everything that passed between devices and this PC, newest first. */
+    history: HistoryItem[];
+    /** Shows the Passboard filtered on one device. */
+    onOpenPassboard: (deviceId: string) => void;
 }
 
 interface Failure {
@@ -30,7 +35,7 @@ interface Failure {
  * a device opens the invitation as a dialog. Every name on this screen was
  * chosen by some device, possibly another one, and is rendered as plain text.
  */
-export function Devices({ active }: Props) {
+export function Devices({ active, history, onOpenPassboard }: Props) {
     const [status, setStatus] = useState<DevicesStatus | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [retrying, setRetrying] = useState(false);
@@ -293,7 +298,8 @@ export function Devices({ active }: Props) {
                 </div>
 
                 {/* The chosen one */}
-                <DeviceStage member={current} running={status.running} onRefresh={refreshMembers} refreshing={refreshing} />
+                <DeviceStage member={current} running={status.running} onRefresh={refreshMembers} refreshing={refreshing}
+                    last={history.find(h => h.deviceId === current.id)} onOpenPassboard={() => onOpenPassboard(current.id)} />
 
                 <div className="flex items-center gap-4 -mt-1">
                     <button

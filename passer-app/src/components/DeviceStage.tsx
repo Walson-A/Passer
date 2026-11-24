@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Check, Clipboard, Loader2, Lock, Paperclip, RefreshCw, Send, ShieldCheck } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Check, ChevronRight, Clipboard, Loader2, Lock, Paperclip, RefreshCw, Send, ShieldCheck } from "lucide-react";
 import { DeviceRender } from "./DeviceRender";
 import { InlineError } from "./DeviceInvite";
 import { FOCUS, isRecent, kindOfMember, osLabel, screenFor, seenLabel, thisOs, type Member } from "./deviceUi";
 import { useCapabilities } from "../hooks/useCapabilities";
+import type { HistoryItem } from "../hooks/useHistory";
 
 const MAX_FILE = 700 * 1024;
 
@@ -20,12 +21,15 @@ type CommandState =
  * and which ask its user first. A device that offers nothing to call (a phone,
  * today) gets a sentence instead of buttons that would fail.
  */
-export function DeviceStage({ member: m, running, onRefresh, refreshing }: {
+export function DeviceStage({ member: m, running, onRefresh, refreshing, last, onOpenPassboard }: {
     member: Member;
     running: boolean;
     /** Ask every member again (`devices_refresh`). */
     onRefresh: () => void;
     refreshing: boolean;
+    /** The latest thing that went between it and this PC, if any since launch. */
+    last?: HistoryItem;
+    onOpenPassboard: () => void;
 }) {
     const caps = useCapabilities(m.this_device ? null : m.id, m.answered_at);
     const os = m.os ?? (m.this_device ? thisOs() : undefined);
@@ -166,6 +170,23 @@ export function DeviceStage({ member: m, running, onRefresh, refreshing }: {
                             </>
                         )}
                     </div>
+
+                    {/* What passed between them last: one line, the rest in the Passboard. */}
+                    {last && !m.this_device && (
+                        <button
+                            onClick={onOpenPassboard}
+                            className={`group mt-6 max-w-full flex items-center gap-2 text-left text-[12px] text-white/60 hover:text-white transition-colors cursor-pointer rounded ${FOCUS}`}
+                        >
+                            {last.direction === "incoming"
+                                ? <ArrowDownLeft className="w-3.5 h-3.5 shrink-0 text-white/50" strokeWidth={2.25} aria-hidden />
+                                : <ArrowUpRight className="w-3.5 h-3.5 shrink-0 text-blue-300/80" strokeWidth={2.25} aria-hidden />}
+                            <span className="truncate">
+                                <span className="text-white/45">{last.direction === "incoming" ? "Last from it: " : "Last sent to it: "}</span>
+                                <span className="font-semibold text-white/80">{last.name || (last.type === "image" ? "an image" : "a file")}</span>
+                            </span>
+                            <span className="shrink-0 flex items-center gap-0.5 text-white/45 group-hover:text-white/80">· Passboard <ChevronRight className="w-3.5 h-3.5" strokeWidth={2.25} aria-hidden /></span>
+                        </button>
+                    )}
                 </div>
             </div>
         </section>

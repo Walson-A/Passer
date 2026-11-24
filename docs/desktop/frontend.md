@@ -9,46 +9,33 @@ The app uses TailwindCSS 4 and pure CSS `backdrop-filter` to enforce the "glassm
 
 ## 🧩 Key Components
 
-### `App.tsx` The State Machine
-`App.tsx` directly listens to Tauri IPC events (`log` queue). When the backend processes `PUSH` or `PULL` events, `App.tsx` updates its state (`idle` -> `pushing` -> `success`), which trickles down to orchestrate smooth UI animations.
+### `App.tsx`
+Holds what several views share: the current view (Devices first), the Passboard filter, the Shortcuts server state (seeded from `get_server_status`, then kept by `server-started` / `server-stopped`, so it reflects whether the socket is really bound), and the one transfer history (`useHistory`), which the Passboard lists and each device's stage reads for its "last from it" line. It also goes to Devices on `device-joined`, so the code to compare is never shown on a hidden view.
 
-### `ServerStatusBar.tsx`
-A pill-shaped indicator living in the Passboard view, doubling as the server toggle. Every label is written from this PC's point of view:
-
-| State | Label |
-| ----- | ----- |
-| Listener bound, idle | `Ready` |
-| Server stopped | `Paused` |
-| A device is sending to this PC | `Receiving...` |
-| A device is fetching from this PC | `Sending...` |
-| Just completed | `Done!` |
-| Mid toggle | `Starting...` / `Stopping...` |
-
-It says `Ready` at rest rather than `Receiving`, which would claim an action that is not happening; `Receiving...` is reserved for when a transfer really is in flight. Its on/off state follows `server-started` / `server-stopped` and is seeded from `get_server_status`, so it reflects whether the socket is genuinely bound rather than assuming it is.
-
-> ⚠️ **`backdrop-filter` renders dark in this window.** The app runs with `"transparent": true`, so a backdrop filter samples semi-transparent pixels and composites them *darker* rather than producing frosted glass. A `backdrop-blur-[2px]` on the status pill turned it into a near-black bar even though its fill was white at 0.5% opacity — the blur was making it opaque, not glassy. Blur is applied once, on the window shell in `Layout.tsx`; nested elements should get their glass from fill and border alone. Check this before adding `backdrop-blur` to any small element.
+> ⚠️ **`backdrop-filter` renders dark in this window.** The app runs with `"transparent": true`, so a backdrop filter samples semi-transparent pixels and composites them *darker* rather than producing frosted glass. A `backdrop-blur-[2px]` on the old status pill turned it into a near-black bar even though its fill was white at 0.5% opacity — the blur was making it opaque, not glassy. Blur is applied once, on the window shell in `Layout.tsx`; nested elements should get their glass from fill and border alone. Check this before adding `backdrop-blur` to any small element.
 
 ### `Passboard.tsx`
-The primary feed component representing the history of transfers. Instead of a database, this is an ephemeral runtime history, bringing the latest items to the top seamlessly.
-- **`HistoryItemRow.tsx`**: A granular row component with deep interactions (click to copy, click to open native file).
+Everything that passed between your devices and this PC — texts, photos, files — newest first, as a wide grid of `HistoryItemRow`s (click to copy, open, show in folder). Each row says where it came from or went: **From iPhone de Walson**, **To MacBook Air**, or **Via iOS Shortcuts** for the legacy HTTP path, which shares one token between every phone and so cannot say which. Chips filter by device (or Shortcuts); a device's stage opens the Passboard already filtered on it. *Open the folder* opens the Passboard folder, where received files are saved. The history is in memory, for the session.
 
 ### `DropZone.tsx`
-A graceful full-screen absolute layover that captures dragging events. Highly optimized to prevent unwanted browser default behaviours.
+Files dropped on the window go to a device you choose: while dragging, *Drop to send*; on drop, a dialog lists your devices, and only those that accept files (`file.receive` in `devices_capabilities`) can be picked — the others say *Doesn't accept files from here yet*. Sending goes through `devices_send_paths` (700 KB per file until passer-core streams land here). Not in a group yet: a pointer to Devices. Dropped files used to be copied into the Passer Space folder.
 
 ### `Settings.tsx`
-A glass modal opened from the footer gear. Reads and writes real preferences over IPC: a **Launch on startup** toggle (`get_autostart` / `set_autostart`), a copyable server address, and the app version (`get_app_version`).
+In sections, for the wide window. **General**: *Launch on startup* (`get_autostart` / `set_autostart`). **iOS Shortcuts**, presented as what it is — the legacy local HTTP server the Shortcuts app talks to, which linked devices do not need: the server switch (it replaced the status pill that sat above the old Passboard), its address, the pairing token (reveal, copy, make a new one with a confirmation that says every Shortcut stops working until updated), and *Set up Shortcuts on an iPhone*, which opens `PairDevice.tsx`. **About**: the version.
+
+### Space (folded away)
+*Passer Space* was a local folder (`Desktop/Passer/Passer Space`) plus an `smb://` address that only worked once the user shared the folder in Windows themselves. Not what a non-technical audience expects, so it left the sidebar (November 2026). It comes back when passer-core can stream files of any size: a folder your devices can browse and fetch from, under the same Allow / Ask / Never rules, with no OS setup.
 
 ### `Hud.tsx`
-The corner notification, rendered into its own always-on-top window (see `backend.md`). It reports a transfer while the main window is out of sight, then retires after four seconds. Clicking it brings Passer back.
+The corner notification, rendered into its own always-on-top window (see `backend.md`). It reports a transfer while the main window is out of sight - with the device's name when it came through the device network - then retires after four seconds. Clicking it brings Passer back.
 
 > ⚠️ **It polls; it is not pushed to.** Events emitted from Rust never arrive in this window's webview. That was verified three times — a broadcast `emit`, a `WebviewWindow::emit` immediately after `show()`, and the same 250 ms later; the last two reported success and neither was ever received, while `invoke` *from* that webview worked throughout. So the HUD asks `get_last_transfer` every 400 ms and compares a sequence number, which needs nothing delivered inwards. Do not "simplify" this back into a listener.
 
 ### The window: `Layout.tsx`, `TitleBar.tsx`, `Sidebar.tsx`
 Passer is a full, resizable window (1180×760 by default, 940×620 at least, centred), no longer the 390×520 panel docked by the taskbar: the device network outgrew it. The window stays frameless and transparent, drawn as one rounded dark pane; `Layout.tsx` gives every edge and corner a resize handle, since there is no native frame. `TitleBar.tsx` carries the wordmark, pin, minimise, maximise and close.
 
-`Sidebar.tsx` replaced the bottom tab bar: Passboard, Space, Devices, and Settings at the foot. Below it, once this PC is in a group, a card says whether the device network is up (*Ready* / *Offline*) and holds **Stop remote activity**, which ends everything other devices are doing here. It lives there, not on one device, because it concerns the whole PC.
+`Sidebar.tsx` replaced the bottom tab bar: Devices, Passboard, and Settings at the foot. Below it, once this PC is in a group, a card says whether the device network is up (*Ready* / *Offline*) and holds **Stop remote activity**, which ends everything other devices are doing here. It lives there, not on one device, because it concerns the whole PC.
 
-Passboard, Space and Settings were drawn for the old panel; until they get wide layouts they sit in a centred column (560–640px). Devices uses the whole width.
 
 ### `Devices.tsx` and `DeviceStage.tsx`
 The **Devices** space, in the direction Walson chose after the mockups (*A3*, see Benches): every device in one horizontal strip, the chosen one alone on stage. It talks to the backend only through the `devices_*` commands and the `device-joined` event (see "Device network" in `backend.md`), and renders every device name as plain text — names are chosen by the devices themselves.

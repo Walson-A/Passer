@@ -66,6 +66,7 @@ pub fn run() {
             devices::devices_send_clipboard,
             devices::devices_get_clipboard,
             devices::devices_send_file,
+            devices::devices_send_paths,
             devices::devices_refresh,
             devices::devices_capabilities,
             devices::devices_journal

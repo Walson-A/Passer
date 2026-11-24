@@ -88,6 +88,12 @@ const APPROVAL = {
     expires_in_secs: 55,
 };
 
+/** What the stage's "last from it" line reads in the bench. */
+const BENCH_HISTORY = [
+    { id: "h1", type: "image" as const, direction: "incoming" as const, target: "folder" as const, name: "IMG_2041.HEIC", status: "success" as const, timestamp: Date.now() - 120_000, device: "iPhone de Walson", deviceId: PHONE.id },
+    { id: "h2", type: "file" as const, direction: "outgoing" as const, target: "folder" as const, name: "rapport-final.pdf", status: "success" as const, timestamp: Date.now() - 600_000, device: "MacBook Air", deviceId: LAPTOP.id },
+];
+
 export const SCENARIOS: Scenario[] = [
     { id: "loading", label: "Loading", status: "loading" },
     { id: "error", label: "Status failed", status: "error" },
@@ -316,7 +322,7 @@ export function DevicesFrame({ scenario }: { scenario: Scenario }) {
                 <Sidebar view="devices" onChange={() => { }} />
                 <div className="relative flex-1 min-w-0 min-h-0">
                     <div className="view-layer" data-active>
-                        <Devices active />
+                        <Devices active history={BENCH_HISTORY} onOpenPassboard={() => { }} />
                     </div>
                 </div>
                 <ApprovalPrompt />

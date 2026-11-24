@@ -22,7 +22,7 @@ The IPC (Inter-Process Communication) gateway between the React frontend and Rus
 - **`get_pairing_info`**: Everything a device needs to pair, including the token and the stable device id (see `api.md`).
 - **`get_autostart` / `set_autostart`**: Read and write the launch-on-login preference.
 - **`get_pairing_token` / `regenerate_pairing_token`**: Read the pairing secret, or rotate it and invalidate every paired device.
-- **`handle_file_drop`**: Copies files dragged onto the window into the `Passer Space` folder, renaming to avoid collisions.
+- **`handle_file_drop`**: Copies files into the `Passer Space` folder, renaming to avoid collisions. No longer called: dropped files now go to a device (`devices_send_paths`) while Space is folded away.
 - **`set_window_on_top`**: Toggles the always-on-top ("pin") window flag.
 - **`delete_cache_file`**: Deletes a cached preview image, validated to stay inside the `.cache` directory.
 
@@ -48,12 +48,13 @@ The new way devices talk to this PC, built on [passer-core](https://github.com/W
   | `clipboard.read` | sensitive | **asks** | returns the clipboard text after the user approves |
   | `file.receive` | write | allowed | saves a file (≤ 700 KB until the core has streams) into the Passboard folder, base name only |
 
+- **Transfers name their device**: `TransferEvent` carries `device` and `device_id` when it went through the device network (who called, or whom this PC called). The HTTP path leaves them empty: the Shortcuts share one token, so the PC cannot tell which phone.
 - **Approvals**: `WindowPrompter` brings the main window forward and emits `approval-request`; the frontend answers with `devices_answer_approval`. No answer within 55 s means no (the core's own limit is 60 s). `approval-closed` removes the card.
 - **Joins**: when a device joins through an invitation of this PC, `device-joined` carries its name and the 6-digit code to compare. The PC then asks the newcomer what it is and offers, and emits `devices-changed` when it has answered.
 - **What the other members are and offer**: after start, on a join, and on `devices_refresh`, the core asks each member for `bus.capabilities` and, only where it runs without approval, `device.info`. Answers are cached in `devices\members.json` for display only: every call is still decided by the target. A refresh never makes another device ask its user anything.
 - **Network**: n0's development relays for now (`NetworkKind::N0Dev`), shown as a preview in the UI. Production needs Passer's own relay and coordination server.
 - **Commands**: `devices_status` (members with kind, OS, versions and when they last answered), `devices_create_group`, `devices_join`, `devices_invite` (one-time link, 10 min, optionally as approver), `devices_remove`, `devices_stop_sessions` (the stop button), `devices_answer_approval`, `devices_refresh`, `devices_capabilities` (what a member lets this PC call, and what needs approval), `devices_journal` (calls made and received, newest first, never their content; optionally with one member).
-- **Asking another device** (the Devices stage), each a passer-core call, so the other device's own rules apply: `devices_send_clipboard` (this PC's clipboard text to its `clipboard.write`), `devices_get_clipboard` (its `clipboard.read`, approved by its user, then onto this PC's clipboard; returns the character count), `devices_send_file` (`file.receive`, base64, 700 KB at most until the core has streams). The stage only offers the ones `devices_capabilities` lists for that member.
+- **Asking another device** (the Devices stage), each a passer-core call, so the other device's own rules apply: `devices_send_clipboard` (this PC's clipboard text to its `clipboard.write`), `devices_get_clipboard` (its `clipboard.read`, approved by its user, then onto this PC's clipboard; returns the character count), `devices_send_file` (`file.receive`, base64, 700 KB at most until the core has streams), `devices_send_paths` (files dropped on the window, read here, sent one by one). Each of these also emits a `transfer` event, so the Passboard lists what this PC sent and fetched. The stage only offers the ones `devices_capabilities` lists for that member.
 
 ## ✂️ Core Utilities
 - **`clipboard.rs`**: Safe reading and writing to the system clipboard (Text, HTML, Image, file lists) for iOS push/pull integrations.

@@ -39,9 +39,10 @@ base64 = "0.21"
 headers = "0.3" 
 open = "5.0" # For auth headers handling if needed
 # The device network: identity, groups, encrypted connections, permissions.
-# TEMPORARY while passer-core changes are local: switch back to the git rev before pushing.
-# Absolute so it resolves from every worktree of this repo.
-passer-ffi = { path = "C:/Users/Walson/Documents/passer-core/crates/passer-ffi" }
+# TEMPORARY while passer-core changes are local: switch back to the GitHub rev before pushing.
+# The local repository at a fixed commit (fa88722, members' details, capabilities and
+# journal), not its working tree, so passer-core's work in progress cannot break this build.
+passer-ffi = { git = "file:///C:/Users/Walson/Documents/passer-core", rev = "fa88722c1dec39b2eed0fd14d8c8fa9a4d03d1fd" }
 async-trait = "0.1"
 tauri-plugin-autostart = "2.5.1"
 tauri-plugin-single-instance = "2"

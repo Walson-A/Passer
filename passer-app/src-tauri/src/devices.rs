@@ -206,6 +206,8 @@ impl CapabilityHandler for PcCapabilities {
                         name: Some(shown),
                         path: None,
                         size: None,
+                        device: Some(caller.device_name.clone()),
+                        device_id: Some(caller.device_id.clone()),
                     });
                 }
                 Ok(json!({ "ok": true }).to_string())
@@ -224,6 +226,8 @@ impl CapabilityHandler for PcCapabilities {
                     name: Some(format!("Read by {}", caller.device_name)),
                     path: None,
                     size: Some(text.len() as u64),
+                    device: Some(caller.device_name.clone()),
+                    device_id: Some(caller.device_id.clone()),
                 });
                 Ok(json!({ "text": text }).to_string())
             }
@@ -258,6 +262,8 @@ impl CapabilityHandler for PcCapabilities {
                     name: Some(name),
                     path: Some(path.to_string_lossy().into_owned()),
                     size: Some(size),
+                    device: Some(caller.device_name.clone()),
+                    device_id: Some(caller.device_id.clone()),
                 });
                 Ok(json!({ "saved": true, "size": size }).to_string())
             }
@@ -550,6 +556,19 @@ async fn call_member(devices: &Devices, id: String, capability: &str, input: ser
     serde_json::from_str(&out).map_err(|e| e.to_string())
 }
 
+/// Tells the Passboard about a transfer this PC made to (or got from) a member.
+fn record_with(devices: &Devices, id: &str, ev: TransferEvent) {
+    let name = devices
+        .device
+        .members()
+        .ok()
+        .and_then(|list| list.into_iter().find(|m| m.id == id).map(|m| m.name));
+    let _ = devices.app.emit(
+        "transfer",
+        TransferEvent { device: name, device_id: Some(id.to_owned()), ..ev },
+    );
+}
+
 /// Sends the text currently copied on this PC to a member's clipboard.
 #[tauri::command]
 pub async fn devices_send_clipboard(devices: DevicesState<'_>, id: String) -> Result<(), String> {
@@ -563,16 +582,32 @@ pub async fn devices_send_clipboard(devices: DevicesState<'_>, id: String) -> Re
     if text.chars().count() > MAX_TEXT {
         return Err("The copied text is too long to send (200,000 characters at most).".into());
     }
-    call_member(&devices, id, "clipboard.write", json!({ "text": text })).await?;
+    call_member(&devices, id.clone(), "clipboard.write", json!({ "text": text.clone() })).await?;
+    record_with(&devices, &id, TransferEvent {
+        kind: "text".into(),
+        direction: "outgoing".into(),
+        target: "clipboard".into(),
+        name: Some(text),
+        ..Default::default()
+    });
     Ok(())
 }
 
 /// Copies a member's clipboard text onto this PC. Returns how many characters came.
 #[tauri::command]
 pub async fn devices_get_clipboard(devices: DevicesState<'_>, id: String) -> Result<usize, String> {
-    let out = call_member(&devices, id, "clipboard.read", json!({})).await?;
+    let out = call_member(&devices, id.clone(), "clipboard.read", json!({})).await?;
     let text = out["text"].as_str().unwrap_or_default().to_owned();
     let count = text.chars().count();
+    if count > 0 {
+        record_with(&devices, &id, TransferEvent {
+            kind: "text".into(),
+            direction: "incoming".into(),
+            target: "clipboard".into(),
+            name: Some(text.clone()),
+            ..Default::default()
+        });
+    }
     tokio::task::spawn_blocking(move || arboard::Clipboard::new().and_then(|mut c| c.set_text(text)))
         .await
         .map_err(|e| e.to_string())?
@@ -591,8 +626,56 @@ pub async fn devices_send_file(
     if data_base64.len() > MAX_FILE_BYTES * 4 / 3 + 4 {
         return Err("This file is too large for now (700 KB at most).".into());
     }
-    call_member(&devices, id, "file.receive", json!({ "name": name, "data_base64": data_base64 })).await?;
+    let size = (data_base64.len() * 3 / 4) as u64;
+    call_member(&devices, id.clone(), "file.receive", json!({ "name": name.clone(), "data_base64": data_base64 })).await?;
+    record_with(&devices, &id, TransferEvent {
+        kind: "file".into(),
+        direction: "outgoing".into(),
+        target: "folder".into(),
+        name: Some(name),
+        size: Some(size),
+        ..Default::default()
+    });
     Ok(())
+}
+
+/// Sends files dropped on the window to a member, one by one. Stops at the first
+/// that fails and says which; the ones before it went through.
+#[tauri::command]
+pub async fn devices_send_paths(devices: DevicesState<'_>, id: String, paths: Vec<String>) -> Result<u32, String> {
+    let mut sent = 0;
+    for p in paths {
+        let path = std::path::PathBuf::from(&p);
+        let name = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .ok_or_else(|| format!("{p} is not a file"))?
+            .to_owned();
+        let read_path = path.clone();
+        let bytes = tokio::task::spawn_blocking(move || std::fs::read(read_path))
+            .await
+            .map_err(|e| e.to_string())?
+            .map_err(|e| format!("{name}: {e}"))?;
+        if bytes.len() > MAX_FILE_BYTES {
+            return Err(format!("{name} is too large for now (700 KB at most)."));
+        }
+        let size = bytes.len() as u64;
+        let data = base64::engine::general_purpose::STANDARD.encode(&bytes);
+        call_member(&devices, id.clone(), "file.receive", json!({ "name": name.clone(), "data_base64": data }))
+            .await
+            .map_err(|e| format!("{name}: {e}"))?;
+        record_with(&devices, &id, TransferEvent {
+            kind: "file".into(),
+            direction: "outgoing".into(),
+            target: "folder".into(),
+            name: Some(name),
+            path: Some(p),
+            size: Some(size),
+            ..Default::default()
+        });
+        sent += 1;
+    }
+    Ok(sent)
 }
 
 #[tauri::command]

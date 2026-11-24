@@ -177,6 +177,7 @@ pub async fn push_clipboard(
                     name: Some(payload.text),
                     path: None,
                     size: None,
+                    ..Default::default()
                 };
                 let _ = state.app_handle.emit("transfer", ev.clone());
                 crate::hud::notify(&state.app_handle, &state, &ev);
@@ -263,6 +264,7 @@ pub async fn push_image(
                 name: None,
                 path: Some(cache_path.to_string_lossy().to_string()),
                 size: Some(image_len),
+                ..Default::default()
             };
             let _ = state.app_handle.emit("transfer", ev.clone());
             crate::hud::notify(&state.app_handle, &state, &ev);

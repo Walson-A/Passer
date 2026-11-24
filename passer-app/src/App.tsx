@@ -2,37 +2,41 @@ import { useState, useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { Layout } from "./components/Layout";
-import { ServerStatusBar } from "./components/ServerStatusBar";
 import { Sidebar, type View } from "./components/Sidebar";
-import { Passboard } from "./components/Passboard";
-import { PasserSpace } from "./components/PasserSpace";
+import { Passboard, type PassboardFilter } from "./components/Passboard";
 import { Settings } from "./components/Settings";
 import { PairDevice } from "./components/PairDevice";
 import { DropZone } from "./components/DropZone";
 import { Devices } from "./components/Devices";
 import { ApprovalPrompt } from "./components/ApprovalPrompt";
+import { useHistory } from "./hooks/useHistory";
 import "./App.css";
 
-interface LogEntry {
-  message: string;
-  kind: string;
-}
-
 function App() {
-  const [status, setStatus] = useState<"idle" | "pushing" | "pulling" | "success" | "sync-success">("idle");
   // Seeded from the backend on mount, never assumed. This used to start as
   // `true`, so a failed bind - port already taken - still showed as receiving.
   const [isServerOn, setIsServerOn] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
 
-  const [view, setView] = useState<View>("passboard");
+  // Devices first: it is what Passer is about now.
+  const [view, setView] = useState<View>("devices");
   const [pairOpen, setPairOpen] = useState(false);
+  const [filter, setFilter] = useState<PassboardFilter>({ kind: "all" });
 
-  // Switching destination always leaves the detail view, so a tab tap can never
+  // One history for the whole app: the Passboard lists it, and each device's
+  // stage shows the latest thing that came from it.
+  const { history, clearHistory, deleteHistoryItem } = useHistory();
+
+  // Switching destination always leaves the detail view, so a tap can never
   // land the user on a screen they cannot account for.
   const goTo = (next: View) => {
     setPairOpen(false);
     setView(next);
+  };
+
+  const openPassboardFor = (deviceId: string) => {
+    setFilter({ kind: "device", id: deviceId });
+    goTo("passboard");
   };
 
   const toggleServer = async () => {
@@ -50,14 +54,10 @@ function App() {
     }
   };
 
-  const handleDropSuccess = () => {
-    setStatus("sync-success");
-    setTimeout(() => setStatus("idle"), 400);
-  };
-
-  // Track whether the listener is actually bound. Seeded by a command because
-  // the server can bind before the webview attaches these listeners, then kept
-  // current by the events the backend emits when it really starts or stops.
+  // Track whether the Shortcuts server is actually bound. Seeded by a command
+  // because the server can bind before the webview attaches these listeners,
+  // then kept current by the events the backend emits when it really starts or
+  // stops.
   useEffect(() => {
     let unStarted: (() => void) | undefined;
     let unStopped: (() => void) | undefined;
@@ -86,8 +86,8 @@ function App() {
   }, []);
 
   // A device joined through an invitation of this PC: the code to compare is
-  // on the Devices tab, so go there. The invitation stays valid after the user
-  // leaves that tab, so the join can land while another view is showing.
+  // on the Devices view, so go there. The invitation stays valid after the user
+  // leaves that view, so the join can land while another view is showing.
   useEffect(() => {
     let off: (() => void) | undefined;
     let alive = true;
@@ -98,83 +98,32 @@ function App() {
     return () => { alive = false; off?.(); };
   }, []);
 
-  // Listen for backend logs
-  useEffect(() => {
-    let unlisten: () => void;
-
-    async function setup() {
-      unlisten = await listen<LogEntry>("log", (event) => {
-        const msg = event.payload.message;
-        const kind = event.payload.kind;
-        console.log(`LOG [${kind}]:`, msg);
-
-        if (msg.includes("PUSH")) {
-          setStatus("pushing");
-          setTimeout(() => {
-            setStatus("success");
-            setTimeout(() => setStatus("idle"), 700);
-          }, 800);
-        }
-        else if (msg.includes("PULL")) {
-          setStatus("pulling");
-          setTimeout(() => {
-            setStatus("success");
-            setTimeout(() => setStatus("idle"), 700);
-          }, 800);
-        }
-      });
-    }
-
-    setup();
-    return () => {
-      if (unlisten) unlisten();
-    };
-  }, []);
-
   return (
     <Layout>
       <Sidebar view={view} onChange={goTo} />
 
-      {/* The body. Layers stay mounted so scroll and state survive a switch.
-          Passboard, Space and Settings were drawn for the old 390px panel, so
-          they sit in a readable column until they get their own wide layouts;
-          Devices uses the whole width. */}
+      {/* The body. Layers stay mounted so scroll and state survive a switch. */}
       <div className="relative flex-1 min-w-0 min-h-0">
-        <div className="view-layer" data-active={view === "passboard"}>
-          <div className="flex-1 min-h-0 w-full max-w-[640px] mx-auto flex flex-col">
-            {/* The server only powers /pull and /push, which is the Passboard
-                flow - Space is a local folder and Settings needs nothing. So
-                this is the Passboard's state, not the app's, and it belongs
-                here rather than above every view. */}
-            <div className="shrink-0 px-4 pt-4">
-              <ServerStatusBar
-                status={isServerOn ? status : "idle"}
-                isReady={isServerOn}
-                onClick={toggleServer}
-                isTransitioning={isTransitioning}
-              />
-            </div>
-            <Passboard />
-          </div>
-        </div>
-
-        <div className="view-layer" data-active={view === "space"}>
-          <div className="flex-1 min-h-0 w-full max-w-[640px] mx-auto flex flex-col">
-            <PasserSpace />
-          </div>
-        </div>
-
         <div className="view-layer" data-active={view === "devices"}>
-          <Devices active={view === "devices"} />
+          <Devices active={view === "devices"} history={history} onOpenPassboard={openPassboardFor} />
+        </div>
+
+        <div className="view-layer" data-active={view === "passboard"}>
+          <Passboard
+            history={history}
+            filter={filter}
+            onFilter={setFilter}
+            onClear={clearHistory}
+            onDelete={deleteHistoryItem}
+          />
         </div>
 
         <div className="view-layer" data-active={view === "settings"}>
-          <div className="flex-1 min-h-0 w-full max-w-[560px] mx-auto flex flex-col">
-            <Settings
-              active={view === "settings"}
-              onOpenPair={() => setPairOpen(true)}
-            />
-          </div>
+          <Settings
+            active={view === "settings"}
+            onOpenPair={() => setPairOpen(true)}
+            server={{ isReady: isServerOn, isTransitioning, onToggle: toggleServer }}
+          />
         </div>
 
         {/* One level deeper than Settings, so it pushes in from the right. */}
@@ -185,7 +134,8 @@ function App() {
         </div>
       </div>
 
-      <DropZone onDropSuccess={handleDropSuccess} />
+      {/* Files dropped on the window go to a device you choose. */}
+      <DropZone onOpenDevices={() => goTo("devices")} />
       {/* Above everything: another device asks for something sensitive. */}
       <ApprovalPrompt />
     </Layout>

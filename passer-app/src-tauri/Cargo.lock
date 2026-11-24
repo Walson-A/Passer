@@ -1515,7 +1515,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c54e03a951783e8b327515db3f2a2fd0e3bed362a96b066f341ce66ed49b4ead"
 dependencies = [
  "data-encoding",
- "syn 1.0.109",
+ "syn 3.0.10",
 ]
 
 [[package]]
@@ -3010,7 +3010,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.61.2",
+ "windows-core 0.62.2",
 ]
 
 [[package]]
@@ -4695,7 +4695,7 @@ version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "680998035259dcfcafe653688bf2aa6d3e2dc05e98be6ab46afb089dc84f1df8"
 dependencies = [
- "proc-macro-crate 1.3.1",
+ "proc-macro-crate 3.5.0",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
@@ -5111,6 +5111,7 @@ dependencies = [
 [[package]]
 name = "passer-bus"
 version = "0.1.0"
+source = "git+file:///C:/Users/Walson/Documents/passer-core?rev=fa88722c1dec39b2eed0fd14d8c8fa9a4d03d1fd#fa88722c1dec39b2eed0fd14d8c8fa9a4d03d1fd"
 dependencies = [
  "async-trait",
  "blake3",
@@ -5127,6 +5128,7 @@ dependencies = [
 [[package]]
 name = "passer-coord"
 version = "0.1.0"
+source = "git+file:///C:/Users/Walson/Documents/passer-core?rev=fa88722c1dec39b2eed0fd14d8c8fa9a4d03d1fd#fa88722c1dec39b2eed0fd14d8c8fa9a4d03d1fd"
 dependencies = [
  "anyhow",
  "clap",
@@ -5143,6 +5145,7 @@ dependencies = [
 [[package]]
 name = "passer-device-info"
 version = "0.1.0"
+source = "git+file:///C:/Users/Walson/Documents/passer-core?rev=fa88722c1dec39b2eed0fd14d8c8fa9a4d03d1fd#fa88722c1dec39b2eed0fd14d8c8fa9a4d03d1fd"
 dependencies = [
  "async-trait",
  "passer-bus",
@@ -5152,6 +5155,7 @@ dependencies = [
 [[package]]
 name = "passer-ffi"
 version = "0.1.0"
+source = "git+file:///C:/Users/Walson/Documents/passer-core?rev=fa88722c1dec39b2eed0fd14d8c8fa9a4d03d1fd#fa88722c1dec39b2eed0fd14d8c8fa9a4d03d1fd"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5173,6 +5177,7 @@ dependencies = [
 [[package]]
 name = "passer-identity"
 version = "0.1.0"
+source = "git+file:///C:/Users/Walson/Documents/passer-core?rev=fa88722c1dec39b2eed0fd14d8c8fa9a4d03d1fd#fa88722c1dec39b2eed0fd14d8c8fa9a4d03d1fd"
 dependencies = [
  "hex",
  "iroh-base",
@@ -5185,6 +5190,7 @@ dependencies = [
 [[package]]
 name = "passer-membership"
 version = "0.1.0"
+source = "git+file:///C:/Users/Walson/Documents/passer-core?rev=fa88722c1dec39b2eed0fd14d8c8fa9a4d03d1fd#fa88722c1dec39b2eed0fd14d8c8fa9a4d03d1fd"
 dependencies = [
  "blake3",
  "hex",
@@ -5198,6 +5204,7 @@ dependencies = [
 [[package]]
 name = "passer-node"
 version = "0.1.0"
+source = "git+file:///C:/Users/Walson/Documents/passer-core?rev=fa88722c1dec39b2eed0fd14d8c8fa9a4d03d1fd#fa88722c1dec39b2eed0fd14d8c8fa9a4d03d1fd"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -6933,7 +6940,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "72b64191b275b66ffe2469e8af2c1cfe3bafa67b529ead792a6d0160888b4237"
 dependencies = [
  "proc-macro2",
- "quote",
  "unicode-ident",
 ]
 
@@ -8996,8 +9002,8 @@ dependencies = [
  "log",
  "serde",
  "thiserror 2.0.21",
- "windows 0.61.3",
- "windows-core 0.61.2",
+ "windows 0.62.2",
+ "windows-core 0.62.2",
 ]
 
 [[package]]

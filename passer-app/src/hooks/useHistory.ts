@@ -12,6 +12,9 @@ export interface HistoryItem {
     status: 'pending' | 'success' | 'error';
     timestamp: number;
     rawPath?: string; // For opening file/thumbnail
+    /** The device it came from or went to; absent for the legacy HTTP path (iOS Shortcuts). */
+    device?: string;
+    deviceId?: string;
 }
 
 // Coarse type sent by the backend, refined below.
@@ -22,6 +25,8 @@ interface TransferPayload {
     name?: string | null;
     path?: string | null;
     size?: number | null;
+    device?: string | null;
+    device_id?: string | null;
 }
 
 const genId = () => Math.random().toString(36).slice(2, 11);
@@ -80,6 +85,8 @@ export function useHistory() {
                 name: p.name ?? (type === 'image' ? '' : 'File'),
                 fileSize: p.size != null ? formatBytes(p.size) : undefined,
                 rawPath: p.path ?? undefined,
+                device: p.device ?? undefined,
+                deviceId: p.device_id ?? undefined,
                 status: 'success',
                 timestamp: Date.now(),
             });

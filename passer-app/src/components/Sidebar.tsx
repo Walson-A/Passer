@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Check, Inbox, Layers, Loader2, MonitorSmartphone, OctagonX, Settings as SettingsIcon } from "lucide-react";
+import { Check, Inbox, Loader2, MonitorSmartphone, OctagonX, Settings as SettingsIcon } from "lucide-react";
 import { FOCUS, type DevicesStatus } from "./deviceUi";
 
-export type View = "passboard" | "space" | "devices" | "settings";
+export type View = "devices" | "passboard" | "settings";
 
+// Devices first: it is what Passer is about now. Space - a folder shared at
+// the OS level - is folded away until passer-core can stream files of any size.
 const MAIN = [
-    { id: "passboard" as const, label: "Passboard", Icon: Inbox },
-    { id: "space" as const, label: "Space", Icon: Layers },
     { id: "devices" as const, label: "Devices", Icon: MonitorSmartphone },
+    { id: "passboard" as const, label: "Passboard", Icon: Inbox },
 ];
 
 interface Props {

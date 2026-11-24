@@ -61,6 +61,7 @@ pub async fn push_file(
                                 name: Some(filename.clone()),
                                 path: Some(target_path.to_string_lossy().to_string()),
                                 size: Some(bytes.len() as u64),
+                                ..Default::default()
                             };
                             let _ = state.app_handle.emit("transfer", ev.clone());
                             crate::hud::notify(&state.app_handle, &state, &ev);
