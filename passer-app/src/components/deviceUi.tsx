@@ -30,8 +30,13 @@ export interface Joined {
     sas: string;
 }
 
-/** Keyboard focus, visible only to keyboard users, the same everywhere. */
-export const FOCUS = "outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70";
+/**
+ * Keyboard focus, visible only to keyboard users, the same everywhere. Kept
+ * soft: at full strength it sat on top of tinted borders as a second, heavier
+ * outline. Nothing here is focused on the user's behalf except the safe choice
+ * (Deny, Cancel), so the ring means "you got here with the keyboard".
+ */
+export const FOCUS = "outline-none focus-visible:ring-2 focus-visible:ring-blue-300/50";
 
 /**
  * A glyph for a device. The backend sends no device type, only the name the
@@ -107,7 +112,7 @@ export function Action({ children, onClick, tone = "neutral", disabled, busy, ic
             disabled={disabled || busy}
             autoFocus={autoFocus}
             aria-busy={busy || undefined}
-            className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl border text-[9px] font-black uppercase tracking-widest
+            className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl border text-[10px] font-black uppercase tracking-[0.12em]
                 transition-all duration-200 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 cursor-pointer
                 ${TONES[tone]} ${FOCUS} ${className}`}
         >

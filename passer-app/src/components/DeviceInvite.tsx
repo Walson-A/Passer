@@ -96,9 +96,9 @@ export function DeviceInvite({ open, connected, onClose }: Props) {
                     className={`flex items-center gap-0.5 py-1 pr-2 pl-1 rounded-lg text-white/55 hover:text-white hover:bg-white/[0.06] transition-all duration-200 active:scale-95 cursor-pointer ${FOCUS}`}
                 >
                     <ChevronLeft className="w-4 h-4" strokeWidth={2.5} aria-hidden />
-                    <span className="text-[10px] font-bold">Devices</span>
+                    <span className="text-[11px] font-bold">Devices</span>
                 </button>
-                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/70 ml-1">
+                <span className="text-[11px] font-black uppercase tracking-[0.2em] text-white/70 ml-1">
                     Add a device
                 </span>
             </div>
@@ -107,8 +107,8 @@ export function DeviceInvite({ open, connected, onClose }: Props) {
                 {!link ? (
                     <>
                         <div className="px-1">
-                            <p className="text-[12px] font-bold text-white/90 leading-tight">What can the new device do?</p>
-                            <p className="text-[10px] text-white/55 leading-snug mt-1">
+                            <p className="text-[13px] font-bold text-white/90 leading-tight">What can the new device do?</p>
+                            <p className="text-[11px] text-white/55 leading-snug mt-1">
                                 It will be able to send things to this PC either way.
                             </p>
                         </div>
@@ -134,7 +134,7 @@ export function DeviceInvite({ open, connected, onClose }: Props) {
 
                         {error && <InlineError text="The invitation couldn't be created." detail={error} />}
                         {!connected && !error && (
-                            <p className="text-[10px] text-amber-200/80 leading-snug px-1" role="status">
+                            <p className="text-[11px] text-amber-200/80 leading-snug px-1" role="status">
                                 This PC isn't connected right now, so it can't invite anyone.
                             </p>
                         )}
@@ -159,11 +159,11 @@ export function DeviceInvite({ open, connected, onClose }: Props) {
                             </div>
                             {expired && (
                                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-2.5">
-                                    <p className="text-[11px] font-black uppercase tracking-widest text-black/70">Expired</p>
+                                    <p className="text-[12px] font-black uppercase tracking-[0.12em] text-black/70">Expired</p>
                                     <button
                                         onClick={create}
                                         disabled={busy}
-                                        className={`flex items-center gap-1.5 px-3 py-2 rounded-xl bg-black text-white text-[9px] font-black uppercase tracking-widest active:scale-[0.98] cursor-pointer disabled:opacity-40 ${FOCUS}`}
+                                        className={`flex items-center gap-1.5 px-3 py-2 rounded-xl bg-black text-white text-[10px] font-black uppercase tracking-[0.12em] active:scale-[0.98] cursor-pointer disabled:opacity-40 ${FOCUS}`}
                                     >
                                         <RotateCcw className="w-3 h-3" strokeWidth={2.5} aria-hidden />
                                         New code
@@ -173,10 +173,10 @@ export function DeviceInvite({ open, connected, onClose }: Props) {
                         </div>
 
                         <div className="text-center px-2">
-                            <p className="text-[10px] text-white/70 leading-snug">
+                            <p className="text-[11px] text-white/70 leading-snug">
                                 Scan it with Passer on the new device, or paste the link there.
                             </p>
-                            <p className={`flex items-center justify-center gap-1 text-[9px] font-semibold mt-1.5 tabular-nums ${expired ? "text-red-300/90" : "text-white/55"}`}>
+                            <p className={`flex items-center justify-center gap-1 text-[10px] font-semibold mt-1.5 tabular-nums ${expired ? "text-red-300/90" : "text-white/55"}`}>
                                 <Clock className="w-3 h-3" strokeWidth={2} aria-hidden />
                                 {expired ? "This code has expired" : `Works once · ${clock} left`}
                                 {role === "approver" && !expired && (
@@ -190,7 +190,7 @@ export function DeviceInvite({ open, connected, onClose }: Props) {
 
                         <div className="flex items-center gap-2 px-2.5 py-2 rounded-xl bg-amber-500/[0.07] border border-amber-400/15">
                             <ShieldAlert className="w-3.5 h-3.5 text-amber-400/90 shrink-0" strokeWidth={2} aria-hidden />
-                            <p className="text-[9.5px] text-amber-100/80 leading-snug">
+                            <p className="text-[10.5px] text-amber-100/80 leading-snug">
                                 Anyone who scans it joins your devices. Don't share it.
                             </p>
                         </div>
@@ -236,8 +236,8 @@ function RoleOption({ checked, onSelect, icon, tint, title, text }: {
         >
             <div className={`shrink-0 w-8 h-8 rounded-xl border flex items-center justify-center ${tint}`}>{icon}</div>
             <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-bold text-white/90 leading-tight">{title}</p>
-                <p className="text-[9.5px] text-white/55 leading-snug mt-0.5">{text}</p>
+                <p className="text-[12px] font-bold text-white/90 leading-tight">{title}</p>
+                <p className="text-[10.5px] text-white/55 leading-snug mt-0.5">{text}</p>
             </div>
             <span
                 aria-hidden
@@ -254,9 +254,9 @@ function RoleOption({ checked, onSelect, icon, tint, title, text }: {
 export function InlineError({ text, detail, action }: { text: string; detail?: string; action?: React.ReactNode }) {
     return (
         <div role="alert" className="rise flex flex-col gap-1.5 p-2.5 rounded-xl bg-red-500/[0.08] border border-red-400/20">
-            <p className="text-[10px] font-bold text-red-200 leading-snug">{text}</p>
+            <p className="text-[11px] font-bold text-red-200 leading-snug">{text}</p>
             {detail && (
-                <p className="text-[9px] font-mono text-red-100/60 leading-relaxed break-words select-text">{detail}</p>
+                <p className="text-[10px] font-mono text-red-100/60 leading-relaxed break-words select-text">{detail}</p>
             )}
             {action}
         </div>

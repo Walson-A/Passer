@@ -162,7 +162,7 @@ export function Devices({ active }: Props) {
                         text="The device that invited this PC shows a code too. If it's not this one, remove this PC from that device."
                         sas={joinSas}
                     >
-                        <Action tone="success" autoFocus className="w-full" onClick={() => setJoinSas(null)}
+                        <Action tone="success" className="w-full" onClick={() => setJoinSas(null)}
                             icon={<Check className="w-3 h-3" strokeWidth={2.5} aria-hidden />}>
                             Done
                         </Action>
@@ -176,7 +176,7 @@ export function Devices({ active }: Props) {
                     >
                         <div className="flex gap-2">
                             <Action className="flex-1" onClick={() => mismatch(joined)}>It's different</Action>
-                            <Action tone="success" autoFocus className="flex-1" onClick={() => setJoined(null)}
+                            <Action tone="success" className="flex-1" onClick={() => setJoined(null)}
                                 icon={<Check className="w-3 h-3" strokeWidth={2.5} aria-hidden />}>
                                 It matches
                             </Action>
@@ -187,8 +187,8 @@ export function Devices({ active }: Props) {
                 {/* Group header: name, count, and whether this PC is reachable */}
                 <div className="flex items-end justify-between gap-3 px-1">
                     <div className="min-w-0">
-                        <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/75 truncate">{status.group}</h2>
-                        <p className="text-[9.5px] text-white/50 leading-tight mt-1">
+                        <h2 className="text-[11px] font-black uppercase tracking-[0.2em] text-white/75 truncate">{status.group}</h2>
+                        <p className="text-[10.5px] text-white/50 leading-tight mt-1">
                             {others === 0 ? "Only this PC so far" : `This PC and ${others} other device${others > 1 ? "s" : ""}`}
                         </p>
                     </div>
@@ -199,8 +199,8 @@ export function Devices({ active }: Props) {
                     <div className="rise flex items-start gap-2.5 p-3 rounded-2xl bg-amber-500/[0.06] border border-amber-400/15" role="status">
                         <WifiOff className="w-4 h-4 text-amber-300/90 shrink-0 mt-px" strokeWidth={2} aria-hidden />
                         <div className="min-w-0 flex-1">
-                            <p className="text-[10.5px] font-bold text-amber-100/90 leading-tight">This PC is offline</p>
-                            <p className="text-[9.5px] text-amber-100/65 leading-snug mt-1">
+                            <p className="text-[11.5px] font-bold text-amber-100/90 leading-tight">This PC is offline</p>
+                            <p className="text-[10.5px] text-amber-100/65 leading-snug mt-1">
                                 Your other devices can't reach it until it reconnects.
                             </p>
                         </div>
@@ -222,7 +222,7 @@ export function Devices({ active }: Props) {
                         action={
                             <button
                                 onClick={() => setFailure(null)}
-                                className={`self-start text-[9px] font-black uppercase tracking-widest text-red-200/70 hover:text-red-100 cursor-pointer rounded ${FOCUS}`}
+                                className={`self-start text-[10px] font-black uppercase tracking-[0.12em] text-red-200/70 hover:text-red-100 cursor-pointer rounded ${FOCUS}`}
                             >
                                 Dismiss
                             </button>
@@ -258,8 +258,8 @@ export function Devices({ active }: Props) {
                             <QrCode className="w-4 h-4 text-blue-300" strokeWidth={2} aria-hidden />
                         </div>
                         <div className="min-w-0 flex-1">
-                            <p className="text-[11px] font-bold text-white/90 leading-tight">Add a device</p>
-                            <p className="text-[9.5px] text-white/55 leading-tight mt-0.5">
+                            <p className="text-[12px] font-bold text-white/90 leading-tight">Add a device</p>
+                            <p className="text-[10.5px] text-white/55 leading-tight mt-0.5">
                                 {status.running ? "Show a code to scan on your phone or computer" : "Needs this PC to be online"}
                             </p>
                         </div>
@@ -268,7 +268,7 @@ export function Devices({ active }: Props) {
                 ) : (
                     <div className="flex items-start gap-2.5 p-3 rounded-2xl bg-white/[0.02] border border-white/[0.06]">
                         <KeyRound className="w-4 h-4 text-white/45 shrink-0 mt-px" strokeWidth={2} aria-hidden />
-                        <p className="text-[9.5px] text-white/60 leading-snug">
+                        <p className="text-[10.5px] text-white/60 leading-snug">
                             {approvers.length > 0
                                 ? <>To add or remove a device, use {listNames(approvers.map(a => a.name))}.</>
                                 : "This PC can't add or remove devices."}
@@ -283,14 +283,14 @@ export function Devices({ active }: Props) {
                         <OctagonX className="w-4 h-4 text-red-300" strokeWidth={2} aria-hidden />
                     </div>
                     <div className="min-w-0 flex-1">
-                        <p className="text-[11px] font-bold text-white/90 leading-tight">Stop remote activity</p>
-                        <p className="text-[9.5px] text-white/55 leading-tight mt-0.5">Ends everything other devices are doing here</p>
+                        <p className="text-[12px] font-bold text-white/90 leading-tight">Stop remote activity</p>
+                        <p className="text-[10.5px] text-white/55 leading-tight mt-0.5">Ends everything other devices are doing here</p>
                     </div>
                     <button
                         onClick={stopAll}
                         disabled={!!busy || !status.running}
                         aria-live="polite"
-                        className={`shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-[9px] font-black uppercase tracking-widest transition-all duration-200 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer ${FOCUS}
+                        className={`shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-[10px] font-black uppercase tracking-[0.12em] transition-all duration-200 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer ${FOCUS}
                             ${stopped
                                 ? "bg-emerald-500/15 border-emerald-400/30 text-emerald-300"
                                 : "bg-red-500/10 border-red-400/30 text-red-200 hover:bg-red-500/20 hover:border-red-400/50"}`}
@@ -308,7 +308,10 @@ export function Devices({ active }: Props) {
     }
 
     return (
-        <div className="relative flex-1 flex flex-col min-h-0">
+        // `overflow-clip`, not `hidden`: the parked invite layer sits at
+        // translateX(100%), and an overflow-hidden box is still scrollable by
+        // scrollIntoView - which slid the whole tab sideways. Clip can't scroll.
+        <div className="relative flex-1 flex flex-col min-h-0 overflow-clip">
             {/* Children never shrink: in a scrolling column they would be
                 squashed (and the list clipped) instead of scrolling. */}
             <div className="flex-1 overflow-y-auto custom-scrollbar px-4 pt-5 pb-3 flex flex-col gap-3 [&>*]:shrink-0" aria-busy={!status && !loadError}>
@@ -342,7 +345,7 @@ function ConnectionPill({ running }: { running: boolean }) {
             <span className={`w-1.5 h-1.5 rounded-full ${running
                 ? "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.5)]"
                 : "bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.3)]"}`} aria-hidden />
-            <span className={`text-[8.5px] font-black uppercase tracking-[0.18em] ${running ? "text-white/70" : "text-red-300/90"}`}>
+            <span className={`text-[9.5px] font-black uppercase tracking-[0.18em] ${running ? "text-white/70" : "text-red-300/90"}`}>
                 {running ? "Online" : "Offline"}
             </span>
         </div>
@@ -368,14 +371,14 @@ function MemberRow({ member: m, index, canRemove, confirming, busy, onAsk, onCan
                         className={`w-4 h-4 ${m.this_device ? "text-blue-300" : "text-white/70"}`} />
                 </div>
                 <div className="min-w-0 flex-1">
-                    <p className="text-[11px] font-bold text-white/90 leading-tight truncate" title={m.name}>{m.name}</p>
+                    <p className="text-[12px] font-bold text-white/90 leading-tight truncate" title={m.name}>{m.name}</p>
                     <div className="flex items-center gap-1.5 mt-1 min-w-0">
                         {m.this_device
-                            ? <span className="text-[9px] font-bold text-blue-300/90 leading-none">This PC</span>
-                            : <span className="text-[9px] font-mono text-white/50 leading-none" title="Device ID">{m.short_id}</span>}
+                            ? <span className="text-[10px] font-bold text-blue-300/90 leading-none">This PC</span>
+                            : <span className="text-[10px] font-mono text-white/50 leading-none" title="Device ID">{m.short_id}</span>}
                         {m.approver && (
                             <span
-                                className="flex items-center gap-0.5 px-1.5 py-[3px] rounded-full bg-amber-500/10 border border-amber-400/20 text-[8px] font-bold text-amber-200/85 leading-none whitespace-nowrap"
+                                className="flex items-center gap-0.5 px-1.5 py-[3px] rounded-full bg-amber-500/10 border border-amber-400/20 text-[9px] font-bold text-amber-200/85 leading-none whitespace-nowrap"
                                 title="Can add and remove devices"
                             >
                                 <ShieldCheck className="w-2.5 h-2.5" strokeWidth={2.5} aria-hidden />
@@ -398,7 +401,7 @@ function MemberRow({ member: m, index, canRemove, confirming, busy, onAsk, onCan
 
             {confirming && (
                 <div className="rise mx-2 mb-2 p-2.5 rounded-xl bg-red-500/[0.08] border border-red-400/20 flex flex-col gap-2" role="alertdialog" aria-label={`Remove ${m.name}?`}>
-                    <p className="text-[10px] text-red-100/85 leading-snug">
+                    <p className="text-[11px] text-red-100/85 leading-snug">
                         <span className="font-bold text-red-100">Remove {m.name}?</span> It loses access to your devices right away. You can add it back later.
                     </p>
                     <div className="flex gap-2">
@@ -422,8 +425,8 @@ function SasCard({ title, text, sas, children }: { title: string; text: string; 
                     <ShieldCheck className="w-4 h-4 text-emerald-300" strokeWidth={2} aria-hidden />
                 </div>
                 <div className="min-w-0">
-                    <p className="text-[11px] font-bold text-white/90 leading-tight break-words">{title}</p>
-                    <p className="text-[9.5px] text-white/60 leading-snug mt-1 break-words">{text}</p>
+                    <p className="text-[12px] font-bold text-white/90 leading-tight break-words">{title}</p>
+                    <p className="text-[10.5px] text-white/60 leading-snug mt-1 break-words">{text}</p>
                 </div>
             </div>
             <SasDigits sas={sas} />
@@ -433,19 +436,31 @@ function SasCard({ title, text, sas, children }: { title: string; text: string; 
 }
 
 function Footnote({ preview }: { preview: boolean }) {
+    const [open, setOpen] = useState(false);
     return (
-        <div className="flex items-start gap-2 px-1 pt-1 pb-1">
-            <Lock className="w-3 h-3 text-white/40 shrink-0 mt-px" strokeWidth={2} aria-hidden />
-            <p className="text-[9px] text-white/50 leading-relaxed">
-                Everything between your devices is end-to-end encrypted.
+        <div className="flex flex-col gap-1.5 px-1 pt-1 pb-1">
+            <div className="flex items-center gap-2">
+                <Lock className="w-3 h-3 text-white/45 shrink-0" strokeWidth={2} aria-hidden />
+                <p className="flex-1 text-[11px] text-white/55 leading-snug">End-to-end encrypted</p>
                 {preview && (
-                    <>
-                        {" "}<span className="font-bold text-white/60">Preview network:</span> for now, devices
-                        meet through test servers run by n0. They can't read what you send, only see when your
-                        devices connect.
-                    </>
+                    <button
+                        onClick={() => setOpen(o => !o)}
+                        aria-expanded={open}
+                        className={`shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-full border border-white/10 bg-white/[0.03] text-[10px] font-bold text-white/60 hover:text-white/85 hover:border-white/20 transition-all cursor-pointer ${FOCUS}`}
+                    >
+                        Preview
+                        <ChevronRight className={`w-2.5 h-2.5 transition-transform duration-200 ${open ? "rotate-90" : ""}`} strokeWidth={2.5} aria-hidden />
+                    </button>
                 )}
-            </p>
+            </div>
+            {/* The relays are n0's development ones (backend.md, "Network");
+                the user needs what that means for them, not whose they are. */}
+            {preview && open && (
+                <p className="rise text-[11px] text-white/55 leading-snug pl-5">
+                    During the preview, your devices find each other through test servers. Those servers can see when
+                    your devices connect, but never what they send.
+                </p>
+            )}
         </div>
     );
 }
@@ -486,8 +501,8 @@ function Welcome({ busy, failure, onStart, onJoined }: {
                 {/* Folded away while the link form is open, so the form and its
                     error stay above the fold. */}
                 {!joinOpen && <Constellation />}
-                <h2 className={`text-[13px] font-bold text-white/95 leading-tight ${joinOpen ? "" : "mt-3"}`}>Your devices, together</h2>
-                <p className="text-[10px] text-white/60 leading-snug mt-1.5 max-w-[280px]">
+                <h2 className={`text-[14px] font-bold text-white/95 leading-tight ${joinOpen ? "" : "mt-3"}`}>Your devices, together</h2>
+                <p className="text-[11px] text-white/60 leading-snug mt-1.5 max-w-[280px]">
                     Link your phone and computers so they can pass things to each other directly, encrypted end to end.
                 </p>
             </div>
@@ -504,13 +519,13 @@ function Welcome({ busy, failure, onStart, onJoined }: {
                     >
                         Start with this PC
                     </Action>
-                    <p className="text-[9.5px] text-white/50 text-center leading-snug px-4">
+                    <p className="text-[10.5px] text-white/50 text-center leading-snug px-4">
                         Choose this if Passer isn't set up on any of your other devices yet.
                     </p>
 
                     <div className="flex items-center gap-2 py-1" aria-hidden>
                         <span className="flex-1 h-px bg-white/[0.07]" />
-                        <span className="text-[8.5px] font-black uppercase tracking-[0.2em] text-white/35">or</span>
+                        <span className="text-[9.5px] font-black uppercase tracking-[0.2em] text-white/35">or</span>
                         <span className="flex-1 h-px bg-white/[0.07]" />
                     </div>
 
@@ -520,14 +535,14 @@ function Welcome({ busy, failure, onStart, onJoined }: {
                     >
                         I have an invitation
                     </Action>
-                    <p className="text-[9.5px] text-white/50 text-center leading-snug px-4">
+                    <p className="text-[10.5px] text-white/50 text-center leading-snug px-4">
                         On a device that already uses Passer, open Devices, then Add a device.
                     </p>
                 </div>
             ) : (
                 <form onSubmit={join} className="rise flex flex-col gap-2 p-3 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
                     <div className="flex items-center justify-between">
-                        <label htmlFor="invite-link" className="text-[11px] font-bold text-white/90">Invitation link</label>
+                        <label htmlFor="invite-link" className="text-[12px] font-bold text-white/90">Invitation link</label>
                         <button
                             type="button"
                             onClick={() => { setJoinOpen(false); setJoinError(null); }}
@@ -537,7 +552,7 @@ function Welcome({ busy, failure, onStart, onJoined }: {
                             <X className="w-3.5 h-3.5" strokeWidth={2.5} aria-hidden />
                         </button>
                     </div>
-                    <p className="text-[9.5px] text-white/55 leading-snug -mt-1">
+                    <p className="text-[10.5px] text-white/55 leading-snug -mt-1">
                         Copy it from the other device's Add a device screen, then paste it here.
                     </p>
                     <input
@@ -549,7 +564,7 @@ function Welcome({ busy, failure, onStart, onJoined }: {
                         spellCheck={false}
                         autoComplete="off"
                         aria-invalid={!!joinError}
-                        className={`px-2.5 py-2 rounded-xl bg-black/50 border text-[10px] font-mono text-white/85 placeholder:text-white/35 placeholder:font-sans outline-none transition-colors
+                        className={`px-2.5 py-2 rounded-xl bg-black/50 border text-[11px] font-mono text-white/85 placeholder:text-white/35 placeholder:font-sans outline-none transition-colors
                             ${joinError ? "border-red-400/40" : "border-white/10 focus:border-blue-400/50"}`}
                     />
                     {joinError && (
@@ -638,12 +653,12 @@ function LoadFailed({ detail, retrying, onRetry }: { detail: string; retrying: b
                 <CircleAlert className="w-5 h-5 text-red-300" strokeWidth={2} aria-hidden />
             </div>
             <div>
-                <p className="text-[12px] font-bold text-white/90 leading-tight">Your devices didn't load</p>
-                <p className="text-[10px] text-white/55 leading-snug mt-1.5">
+                <p className="text-[13px] font-bold text-white/90 leading-tight">Your devices didn't load</p>
+                <p className="text-[11px] text-white/55 leading-snug mt-1.5">
                     Passer couldn't read this PC's device settings. Try again, or restart Passer if it keeps happening.
                 </p>
             </div>
-            <p className="w-full px-2.5 py-2 rounded-xl bg-black/40 border border-white/[0.06] text-[9px] font-mono text-white/50 break-words select-text text-left">
+            <p className="w-full px-2.5 py-2 rounded-xl bg-black/40 border border-white/[0.06] text-[10px] font-mono text-white/50 break-words select-text text-left">
                 {detail}
             </p>
             <Action onClick={onRetry} busy={retrying} className="w-full"
