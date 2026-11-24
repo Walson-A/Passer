@@ -175,6 +175,16 @@ export const SCENARIOS: Scenario[] = [
         },
     },
     {
+        id: "files-all", label: "A PC's files, all", status: group([PC, PHONE, LAPTOP]),
+        steps: async ui => {
+            ui.click(/macbook air/i);
+            await ui.wait(600);
+            ui.click(/see all/i);
+            await ui.wait(200);
+            ui.type(/search by name/i, "img");
+        },
+    },
+    {
         id: "invite-fail", label: "Action failed", status: group([PC, PHONE]),
         fail: { devices_invite: "the device network is not running" },
         steps: async ui => {
@@ -283,6 +293,8 @@ function installBackend(scenario: Scenario) {
                     { name: "Rapport annuel 2026.pdf", size: 4_820_113, modified: NOW - 3600 },
                     { name: "Photos vacances.zip", size: 812_400_000, modified: NOW - 86400 * 2 },
                     { name: "budget.xlsx", size: 48_200, modified: NOW - 86400 * 9 },
+                    ...["IMG_2041.HEIC", "IMG_2042.HEIC", "IMG_2050.HEIC", "anniversaire-léa.mp4", "facture-edf-octobre.pdf", "notes-réunion.txt",
+                        "plan-appartement.png", "sauvegarde-contacts.zip", "CV-2026.docx"].map((name, i) => ({ name, size: 120_000 * (i + 3), modified: NOW - 3600 * (i + 3) })),
                 ];
             case "space_files":
                 return [{ name: "plan-week-end.txt", size: 17, modified: NOW - 600 }];
@@ -333,7 +345,7 @@ export function DevicesFrame({ scenario }: { scenario: Scenario }) {
                 <Sidebar view="devices" onChange={() => { }} />
                 <div className="relative flex-1 min-w-0 min-h-0">
                     <div className="view-layer" data-active>
-                        <Devices active history={BENCH_HISTORY} onOpenPassboard={() => { }} />
+                        <Devices active history={BENCH_HISTORY} onOpenPassboard={() => { }} onStage={() => { }} />
                     </div>
                 </div>
                 <ApprovalPrompt />

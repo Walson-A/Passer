@@ -23,6 +23,8 @@ interface Props {
     history: HistoryItem[];
     /** Shows the Passboard filtered on one device. */
     onOpenPassboard: (deviceId: string) => void;
+    /** The device on stage, so a drop on the window can go straight to it. */
+    onStage: (member: Member | null) => void;
 }
 
 interface Failure {
@@ -37,7 +39,7 @@ interface Failure {
  * a device opens the invitation as a dialog. Every name on this screen was
  * chosen by some device, possibly another one, and is rendered as plain text.
  */
-export function Devices({ active, history, onOpenPassboard }: Props) {
+export function Devices({ active, history, onOpenPassboard, onStage }: Props) {
     const [status, setStatus] = useState<DevicesStatus | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [retrying, setRetrying] = useState(false);
@@ -167,6 +169,16 @@ export function Devices({ active, history, onOpenPassboard }: Props) {
     };
 
     const closeInvite = useCallback(() => setInviteOpen(false), []);
+
+    // Which device is on stage, for the drop zone: only while this view is in front
+    // and a group exists. Worked out here, before the early returns below.
+    const stageMember = active && status?.group
+        ? (status.members.find(m => m.id === selected)
+            ?? sortMembers(status.members).find(m => !m.this_device)
+            ?? status.members[0] ?? null)
+        : null;
+    const stageKey = stageMember ? `${stageMember.id}:${stageMember.answered_at}` : "";
+    useEffect(() => { onStage(stageMember); }, [stageKey]); // eslint-disable-line react-hooks/exhaustive-deps
     const closeDetails = useCallback(() => setDetails(null), []);
 
     // --- Without a group, or before one is known -----------------------------------
@@ -202,6 +214,7 @@ export function Devices({ active, history, onOpenPassboard }: Props) {
     const canManage = !!me?.approver;
     const others = members.length - 1;
     const current = members.find(m => m.id === selected) ?? members.find(m => !m.this_device) ?? members[0];
+
     const inDetails = details ? members.find(m => m.id === details.id) ?? null : null;
     const approvers = members.filter(m => m.approver && !m.this_device);
 

@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { Archive, Check, Download, File, FileText, FolderOpen, Image as ImageIcon, Loader2, Plus, RefreshCw, Video, X } from "lucide-react";
+import { Archive, Check, ChevronDown, ChevronUp, Download, File, FileText, FolderOpen, Image as ImageIcon, Loader2, Plus, RefreshCw, Search, Video, X } from "lucide-react";
 import { InlineError } from "./DeviceInvite";
 import { FOCUS, ProgressLine, formatSize, type Member, type SendProgress } from "./deviceUi";
 
@@ -13,6 +13,9 @@ interface SharedFile {
 }
 
 const SHOWN = 8;
+
+/** Fired on `window` when this PC's shared files change elsewhere in the window (a drop, the Passboard). */
+export const SPACE_CHANGED = "passer:space-changed";
 
 /**
  * Files, per device - there is no single shared folder: each device shares its own.
@@ -78,7 +81,7 @@ function TheirFiles({ member: m }: { member: Member }) {
             ) : files.length === 0 ? (
                 <Empty>{m.name} isn't sharing any files right now.</Empty>
             ) : (
-                <FileGrid files={files} all={all} onAll={() => setAll(true)} render={f => (
+                <FileGrid files={files} all={all} onAll={setAll} render={f => (
                     <button
                         onClick={() => get(f)}
                         disabled={!!getting}
@@ -120,7 +123,11 @@ function ThisPcFiles() {
         }
     }, []);
 
-    useEffect(() => { load(); }, [load]);
+    useEffect(() => {
+        load();
+        window.addEventListener(SPACE_CHANGED, load);
+        return () => window.removeEventListener(SPACE_CHANGED, load);
+    }, [load]);
 
     const add = async () => {
         if (adding) return;
@@ -175,7 +182,7 @@ function ThisPcFiles() {
             ) : files.length === 0 ? (
                 <Empty>Nothing shared yet. Share files here, or drop them on the window and choose "Share from this PC".</Empty>
             ) : (
-                <FileGrid files={files} all={all} onAll={() => setAll(true)} render={f => confirm === f.name ? (
+                <FileGrid files={files} all={all} onAll={setAll} render={f => confirm === f.name ? (
                     <span className="shrink-0 flex items-center gap-1.5">
                         <button onClick={() => stop(f.name)} autoFocus
                             className={`h-8 px-3 rounded-lg border border-red-400/40 bg-red-500/15 text-[12px] font-semibold text-red-100 hover:bg-red-500/25 transition-all cursor-pointer ${FOCUS}`}>
@@ -237,27 +244,106 @@ function Panel({ title, note, actions, children }: { title: string; note: string
     );
 }
 
-function FileGrid({ files, all, onAll, render }: { files: SharedFile[]; all: boolean; onAll: () => void; render: (f: SharedFile) => React.ReactNode }) {
-    const shown = all ? files : files.slice(0, SHOWN);
+type Sort = "newest" | "name" | "size";
+type Kind = "all" | "images" | "videos" | "documents" | "archives" | "other";
+
+const KINDS: { id: Kind; label: string; ext: string[] }[] = [
+    { id: "images", label: "Images", ext: ["png", "jpg", "jpeg", "webp", "heic", "gif", "bmp"] },
+    { id: "videos", label: "Videos", ext: ["mp4", "mov", "avi", "mkv"] },
+    { id: "documents", label: "Documents", ext: ["pdf", "txt", "md", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "csv"] },
+    { id: "archives", label: "Archives", ext: ["zip", "rar", "7z", "tar", "gz"] },
+];
+
+function kindOfFile(name: string): Kind {
+    const ext = name.split(".").pop()?.toLowerCase() ?? "";
+    return KINDS.find(k => k.ext.includes(ext))?.id ?? "other";
+}
+
+/**
+ * The files of one device. A few at first; *See all* opens it in place into a
+ * browser - search by name, sort (newest, name, size), filter by kind - so a
+ * device sharing hundreds of files stays usable.
+ */
+function FileGrid({ files, all, onAll, render }: { files: SharedFile[]; all: boolean; onAll: (open: boolean) => void; render: (f: SharedFile) => React.ReactNode }) {
+    const [query, setQuery] = useState("");
+    const [sort, setSort] = useState<Sort>("newest");
+    const [kind, setKind] = useState<Kind>("all");
+
+    const shown = useMemo(() => {
+        if (!all) return files.slice(0, SHOWN);
+        const q = query.trim().toLowerCase();
+        const list = files.filter(f => (!q || f.name.toLowerCase().includes(q)) && (kind === "all" || kindOfFile(f.name) === kind));
+        return [...list].sort((a, b) =>
+            sort === "name" ? a.name.localeCompare(b.name) : sort === "size" ? b.size - a.size : b.modified - a.modified);
+    }, [files, all, query, sort, kind]);
+
+    const present = KINDS.filter(k => files.some(f => kindOfFile(f.name) === k.id));
+    const hasOther = files.some(f => kindOfFile(f.name) === "other");
+
     return (
         <>
-            <ul className="grid gap-1.5 grid-cols-[repeat(auto-fill,minmax(340px,1fr))]">
-                {shown.map(f => (
-                    <li key={f.name} className="flex items-center gap-3 p-2 pl-2.5 rounded-xl bg-white/[0.03] border border-white/[0.05]">
-                        <span className="w-8 h-8 shrink-0 rounded-lg bg-white/[0.05] flex items-center justify-center" aria-hidden><FileGlyph name={f.name} /></span>
-                        <span className="min-w-0 flex-1">
-                            <span className="block text-[13px] font-semibold text-white/90 truncate" title={f.name}>{f.name}</span>
-                            <span className="block text-[11px] text-white/45">{formatSize(f.size)} · {dateLabel(f.modified)}</span>
-                        </span>
-                        {render(f)}
-                    </li>
-                ))}
-            </ul>
-            {!all && files.length > SHOWN && (
-                <button onClick={onAll} className={`mt-2 text-[12px] font-semibold text-white/55 hover:text-white cursor-pointer rounded ${FOCUS}`}>
-                    Show all {files.length}
-                </button>
+            {all && (
+                <div className="flex flex-wrap items-center gap-2 mb-3">
+                    <label className="flex items-center gap-2 h-9 px-3 rounded-xl bg-black/30 border border-white/10 focus-within:border-blue-400/50 min-w-[240px] flex-1 max-w-[380px]">
+                        <Search className="w-3.5 h-3.5 text-white/45 shrink-0" strokeWidth={2.25} aria-hidden />
+                        <input
+                            autoFocus
+                            value={query}
+                            onChange={e => setQuery(e.target.value)}
+                            placeholder="Search by name"
+                            aria-label="Search by name"
+                            spellCheck={false}
+                            className="flex-1 min-w-0 bg-transparent outline-none text-[13px] text-white/90 placeholder:text-white/35"
+                        />
+                        {query && (
+                            <button onClick={() => setQuery("")} aria-label="Clear the search" className={`p-0.5 rounded text-white/45 hover:text-white cursor-pointer ${FOCUS}`}>
+                                <X className="w-3.5 h-3.5" strokeWidth={2.25} aria-hidden />
+                            </button>
+                        )}
+                    </label>
+                    <div className="flex items-center gap-1" role="group" aria-label="Kind">
+                        {[{ id: "all" as Kind, label: "All" }, ...present, ...(hasOther ? [{ id: "other" as Kind, label: "Other" }] : [])].map(k => (
+                            <button key={k.id} onClick={() => setKind(k.id)} aria-pressed={kind === k.id}
+                                className={`h-8 px-3 rounded-full border text-[12px] font-semibold transition-all cursor-pointer ${FOCUS}
+                                    ${kind === k.id ? "bg-white/[0.09] border-white/20 text-white" : "bg-transparent border-white/[0.07] text-white/55 hover:text-white/85"}`}>
+                                {k.label}
+                            </button>
+                        ))}
+                    </div>
+                    <label className="ml-auto flex items-center gap-2 text-[12px] text-white/55">
+                        Sort
+                        <select value={sort} onChange={e => setSort(e.target.value as Sort)}
+                            className={`h-8 px-2 rounded-lg bg-black/30 border border-white/10 text-[12px] text-white/85 cursor-pointer ${FOCUS}`}>
+                            <option value="newest">Newest</option>
+                            <option value="name">Name</option>
+                            <option value="size">Size</option>
+                        </select>
+                    </label>
+                </div>
             )}
+            {shown.length === 0 ? (
+                <p className="text-[13px] text-white/55">No file matches.</p>
+            ) : (
+                <ul className={`grid gap-1.5 grid-cols-[repeat(auto-fill,minmax(340px,1fr))] ${all ? "max-h-[420px] overflow-y-auto custom-scrollbar pr-1" : ""}`}>
+                    {shown.map(f => (
+                        <li key={f.name} className="flex items-center gap-3 p-2 pl-2.5 rounded-xl bg-white/[0.03] border border-white/[0.05]">
+                            <span className="w-8 h-8 shrink-0 rounded-lg bg-white/[0.05] flex items-center justify-center" aria-hidden><FileGlyph name={f.name} /></span>
+                            <span className="min-w-0 flex-1">
+                                <span className="block text-[13px] font-semibold text-white/90 truncate" title={f.name}>{f.name}</span>
+                                <span className="block text-[11px] text-white/45">{formatSize(f.size)} · {dateLabel(f.modified)}</span>
+                            </span>
+                            {render(f)}
+                        </li>
+                    ))}
+                </ul>
+            )}
+            {files.length > SHOWN || all ? (
+                <button onClick={() => onAll(!all)} className={`mt-2.5 flex items-center gap-1 text-[12px] font-semibold text-white/60 hover:text-white cursor-pointer rounded ${FOCUS}`}>
+                    {all
+                        ? <>Show fewer <ChevronUp className="w-3.5 h-3.5" strokeWidth={2.25} aria-hidden /></>
+                        : <>See all {files.length}, search and sort <ChevronDown className="w-3.5 h-3.5" strokeWidth={2.25} aria-hidden /></>}
+                </button>
+            ) : null}
         </>
     );
 }

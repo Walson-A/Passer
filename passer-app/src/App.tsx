@@ -10,6 +10,7 @@ import { DropZone } from "./components/DropZone";
 import { Devices } from "./components/Devices";
 import { ApprovalPrompt } from "./components/ApprovalPrompt";
 import { useHistory } from "./hooks/useHistory";
+import type { Member } from "./components/deviceUi";
 import "./App.css";
 
 function App() {
@@ -22,6 +23,8 @@ function App() {
   const [view, setView] = useState<View>("devices");
   const [pairOpen, setPairOpen] = useState(false);
   const [filter, setFilter] = useState<PassboardFilter>({ kind: "all" });
+  // The device on the Devices stage: a drop on the window goes straight to it.
+  const [stage, setStage] = useState<Member | null>(null);
 
   // One history for the whole app: the Passboard lists it, and each device's
   // stage shows the latest thing that came from it.
@@ -105,7 +108,7 @@ function App() {
       {/* The body. Layers stay mounted so scroll and state survive a switch. */}
       <div className="relative flex-1 min-w-0 min-h-0">
         <div className="view-layer" data-active={view === "devices"}>
-          <Devices active={view === "devices"} history={history} onOpenPassboard={openPassboardFor} />
+          <Devices active={view === "devices"} history={history} onOpenPassboard={openPassboardFor} onStage={setStage} />
         </div>
 
         <div className="view-layer" data-active={view === "passboard"}>
@@ -135,7 +138,7 @@ function App() {
       </div>
 
       {/* Files dropped on the window go to a device you choose. */}
-      <DropZone onOpenDevices={() => goTo("devices")} />
+      <DropZone target={view === "devices" ? stage : null} onOpenDevices={() => goTo("devices")} />
       {/* Above everything: another device asks for something sensitive. */}
       <ApprovalPrompt />
     </Layout>
