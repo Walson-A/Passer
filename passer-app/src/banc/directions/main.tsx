@@ -3,6 +3,7 @@ import { Showroom } from "./Showroom";
 import { Controle } from "./Controle";
 import { Flux } from "./Flux";
 import { Synthese } from "./Synthese";
+import { Vitrine } from "./Vitrine";
 import "../../App.css";
 
 /**
@@ -15,7 +16,8 @@ const DIRS = [
     { id: "a", label: "A · Showroom", View: Showroom },
     { id: "b", label: "B · Control center", View: Controle },
     { id: "c", label: "C · Feed", View: Flux },
-    { id: "a2", label: "A2 · Showroom, all devices + feed", View: Synthese },
+    { id: "a2", label: "A2 · + feed", View: Synthese },
+    { id: "a3", label: "A3 · Showroom, all devices", View: Vitrine },
 ];
 
 document.body.style.overflow = "auto";
