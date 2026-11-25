@@ -576,7 +576,7 @@ function ScreenSwitches({ member: m }: { member: Member }) {
                 ) : <span className="skeleton block h-24 rounded-2xl" />}
             </div>
             <p className="mt-2 text-[11.5px] text-white/45 leading-snug">
-                Keep these for your own devices, to reach this PC when you are away. The screen always shows who is there, and Escape on this PC stops it. Changing them restarts the connection for a few seconds.
+                Keep these for your own devices, to reach this PC when you are away. The screen always shows who is there, and Escape on this PC stops it. Switching one off also ends any session in progress.
             </p>
             {error && <p className="mt-2 text-[11.5px] text-red-200/80 break-words" role="alert">{error}</p>}
         </section>
