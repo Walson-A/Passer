@@ -12,6 +12,7 @@ mod mdns;
 mod commands;
 mod tray;
 mod devices;
+mod screen;
 
 pub use types::*;
 pub use paths::*;
@@ -76,7 +77,9 @@ pub fn run() {
             devices::space_files,
             devices::space_pick_and_add,
             devices::space_add_paths,
-            devices::space_remove
+            devices::space_remove,
+            devices::devices_screen_sessions,
+            devices::devices_screen_status
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {

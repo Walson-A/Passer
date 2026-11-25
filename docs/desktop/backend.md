@@ -60,6 +60,15 @@ The new way devices talk to this PC, built on [passer-core](https://github.com/W
 - **What this PC shares** (the Passer Space folder, offered as `file.list` / `file.get`): `space_files`, `space_pick_and_add` (native picker, copies in), `space_add_paths` (dropped files, *Share from this PC*), `space_remove` (deletes one file from that folder - only directly inside it).
 - **Asking another device** (the Devices stage), each a passer-core call, so the other device's own rules apply: `devices_send_clipboard` (this PC's clipboard text to its `clipboard.write`), `devices_get_clipboard` (its `clipboard.read`, approved by its user, then onto this PC's clipboard; returns the character count), `devices_pick_and_send` (*Send a file*: a native file picker - `tauri-plugin-dialog`, used from Rust only - then the file goes by path), `devices_send_paths` (files dropped on the window, one by one). Both send through `file.drop` when the member offers it - streamed, any size up to the core's 4 GB - and fall back to the older `file.receive` (base64, 700 KB) for members that only have that; progress comes as `transfer-progress` { transfer, name, done, total }, at most every 120 ms - the same event for fetching. Each of these also emits a `transfer` event, so the Passboard lists what this PC sent and fetched. The stage only offers the ones `devices_capabilities` lists for that member.
 
+## 🖥️ Screen (`screen.rs`)
+Other devices of the group can see this PC's screen (`screen.view`) and take control (`screen.control`), when Vasistas is installed (`PASSER_VASISTAS`, or `vasistas.exe` on the PATH; `devices_screen_status` says which).
+
+- **How**: passer-core's `passer-exec` runs `vasistas share --lang fr --viewer <caller> [--control]` and wires its stdio to the stream; Vasistas captures, encodes, applies the viewer's input and shows its own sign on screen.
+- **Who**: the group's own devices, without a confirmation on this PC (a rule added once to `devices\policy.json`), as Walson decided; AI agents get nothing. Effect `sensitive`, so a session lasts at most 15 minutes; the viewer reconnects after.
+- **Stopping**: Escape on this PC (Vasistas), the stop button (`devices_stop_sessions`), or removing the device; the process is killed when its session ends.
+- **Indicator**: passer-core refuses these capabilities without one. `WindowIndicator` records live sessions (`devices_screen_sessions`) and emits `screen-session-started` / `screen-session-ended` for the window.
+- **Not covered**: a locked PC or UAC prompts (Vasistas cannot see the secure desktop).
+
 ## ✂️ Core Utilities
 - **`clipboard.rs`**: Safe reading and writing to the system clipboard (Text, HTML, Image, file lists) for iOS push/pull integrations.
 - **`paths.rs`**: Resolves core application directories under `Desktop/Passer/` (`Passboard/` for Push/Pull, `Passer Space/` for the shared folder, `.cache/` for previews) and guarantees collision-free filenames.

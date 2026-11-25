@@ -5241,6 +5241,7 @@ dependencies = [
  "local-ip-address",
  "mdns-sd",
  "open",
+ "passer-exec",
  "passer-ffi",
  "rand 0.8.8",
  "serde",
@@ -5261,7 +5262,7 @@ dependencies = [
 [[package]]
 name = "passer-bus"
 version = "0.1.0"
-source = "git+https://github.com/Walson-A/passer-core?rev=94e25977401691233ae5538d291df2c5f561003e#94e25977401691233ae5538d291df2c5f561003e"
+source = "git+https://github.com/Walson-A/passer-core?rev=1496f147707a3e39ea6f85de572151d917ba5717#1496f147707a3e39ea6f85de572151d917ba5717"
 dependencies = [
  "async-trait",
  "blake3",
@@ -5278,7 +5279,7 @@ dependencies = [
 [[package]]
 name = "passer-coord"
 version = "0.1.0"
-source = "git+https://github.com/Walson-A/passer-core?rev=94e25977401691233ae5538d291df2c5f561003e#94e25977401691233ae5538d291df2c5f561003e"
+source = "git+https://github.com/Walson-A/passer-core?rev=1496f147707a3e39ea6f85de572151d917ba5717#1496f147707a3e39ea6f85de572151d917ba5717"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5296,7 +5297,7 @@ dependencies = [
 [[package]]
 name = "passer-device-info"
 version = "0.1.0"
-source = "git+https://github.com/Walson-A/passer-core?rev=94e25977401691233ae5538d291df2c5f561003e#94e25977401691233ae5538d291df2c5f561003e"
+source = "git+https://github.com/Walson-A/passer-core?rev=1496f147707a3e39ea6f85de572151d917ba5717#1496f147707a3e39ea6f85de572151d917ba5717"
 dependencies = [
  "async-trait",
  "passer-bus",
@@ -5304,9 +5305,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "passer-exec"
+version = "0.1.0"
+source = "git+https://github.com/Walson-A/passer-core?rev=1496f147707a3e39ea6f85de572151d917ba5717#1496f147707a3e39ea6f85de572151d917ba5717"
+dependencies = [
+ "async-trait",
+ "passer-bus",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "passer-ffi"
 version = "0.1.0"
-source = "git+https://github.com/Walson-A/passer-core?rev=94e25977401691233ae5538d291df2c5f561003e#94e25977401691233ae5538d291df2c5f561003e"
+source = "git+https://github.com/Walson-A/passer-core?rev=1496f147707a3e39ea6f85de572151d917ba5717#1496f147707a3e39ea6f85de572151d917ba5717"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5328,7 +5340,7 @@ dependencies = [
 [[package]]
 name = "passer-identity"
 version = "0.1.0"
-source = "git+https://github.com/Walson-A/passer-core?rev=94e25977401691233ae5538d291df2c5f561003e#94e25977401691233ae5538d291df2c5f561003e"
+source = "git+https://github.com/Walson-A/passer-core?rev=1496f147707a3e39ea6f85de572151d917ba5717#1496f147707a3e39ea6f85de572151d917ba5717"
 dependencies = [
  "hex",
  "iroh-base",
@@ -5342,7 +5354,7 @@ dependencies = [
 [[package]]
 name = "passer-membership"
 version = "0.1.0"
-source = "git+https://github.com/Walson-A/passer-core?rev=94e25977401691233ae5538d291df2c5f561003e#94e25977401691233ae5538d291df2c5f561003e"
+source = "git+https://github.com/Walson-A/passer-core?rev=1496f147707a3e39ea6f85de572151d917ba5717#1496f147707a3e39ea6f85de572151d917ba5717"
 dependencies = [
  "blake3",
  "hex",
@@ -5356,7 +5368,7 @@ dependencies = [
 [[package]]
 name = "passer-node"
 version = "0.1.0"
-source = "git+https://github.com/Walson-A/passer-core?rev=94e25977401691233ae5538d291df2c5f561003e#94e25977401691233ae5538d291df2c5f561003e"
+source = "git+https://github.com/Walson-A/passer-core?rev=1496f147707a3e39ea6f85de572151d917ba5717#1496f147707a3e39ea6f85de572151d917ba5717"
 dependencies = [
  "anyhow",
  "async-trait",
