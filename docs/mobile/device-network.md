@@ -90,7 +90,7 @@ are read in window coordinates and turned back (`windowToStage`), so they land r
 platform reports for a rotated view.
 
 **The stream** is passer-core's `PasserDevice.connectStream(device, capability, inputJson, sink)`
-(passer-core b8f07ab, to be published as mobile-v0.4.0). It returns once the PC has accepted, or
+(mobile-v0.4.0, pinned in `passer-core.json`). It returns once the PC has accepted, or
 throws its refusal (`denied`, `approval_timeout`, `no_indicator`, `not_member`). What arrives goes
 to `ScreenSink` (`onData`, in pieces that don't line up with Vasistas's frames, then
 `onClosed`); the viewer's input goes through `StreamHandle.send`, one message after the other.
@@ -98,10 +98,10 @@ Leaving ends this side (`close`), then everything 3 s later (`cancel`). When the
 `result()` says why: `interrupted` when the PC's user stopped it or the session reached the core's
 15-minute limit for sensitive capabilities; the viewer then says to open it again.
 
-**Before a build:** `passer-core.json` still pins mobile-v0.3.0, whose bindings have no
-`connectStream`, so the iOS module doesn't compile against it. Once mobile-v0.4.0 is published,
-set its tag and checksums there and run `npm install` (it fetches the bindings). On Android
-`screenAvailable()` is false: the MediaCodec decoder isn't written, so the commands don't show.
+Against v0.3.0, mobile-v0.4.0 only adds `connectStream`, `StreamSink`, `StreamHandle` and
+`reloadPolicy`; everything else the module uses is unchanged. None of it has been compiled yet:
+the next iOS build is the check. On Android `screenAvailable()` is false: the MediaCodec decoder
+isn't written, so the commands don't show.
 
 ## What the phone offers
 
@@ -154,7 +154,7 @@ long that one call may run, not a window of access.
 - It uses n0's development relays (`N0Dev`), not Passer's own (Devices › *Preview network* says so).
 - A JavaScript update reaching a binary built before this module sees `available: false`, and
   Send asks for an app update instead of crashing.
-- Seeing a screen needs mobile-v0.4.0 pinned (above), then a build; Android has no decoder yet.
+- Seeing a screen needs an iOS build with mobile-v0.4.0 (pinned); Android has no decoder yet.
 - Streams to the PC need a desktop offering `file.drop` (on `dev`, not yet released); against
   an older one the app falls back to one call per file, 700 KB at most.
 - The module compiled in the iOS preview builds of 2026-11-24 (`ef8af9d` with mobile-v0.1.0,
