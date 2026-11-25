@@ -1053,8 +1053,9 @@ pub fn devices_screen_rules(id: String) -> Result<crate::screen::ScreenRules, St
 }
 
 /// Lets one device view or control this PC's screen without asking, or takes it back.
-/// The core reads its rules when the network starts, so the network restarts here (a
-/// few seconds; sessions in progress end).
+/// The core applies the new rules at once (`reload_policy`). Taking a permission back
+/// also ends every session other devices have open here, so a control session that
+/// the switch allowed stops with it.
 #[tauri::command]
 pub async fn devices_set_screen_rule(
     devices: DevicesState<'_>,
@@ -1064,8 +1065,10 @@ pub async fn devices_set_screen_rule(
 ) -> Result<crate::screen::ScreenRules, String> {
     let home = get_config_dir().join("devices");
     crate::screen::set_rule(&home, &id, &capability, allow)?;
-    devices.device.stop().await;
-    devices.start_if_ready().await?;
+    devices.device.reload_policy().await.map_err(|e| e.to_string())?;
+    if !allow {
+        let _ = devices.device.stop_all_sessions().await;
+    }
     crate::screen::rules_for(&home, &id)
 }
 
