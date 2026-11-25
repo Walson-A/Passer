@@ -18,7 +18,7 @@ Read from EAS (`eas build:list`) on 2026-11-25. Every build so far is iOS, inter
 | 2026-11-24 14:07 | preview | 1.1.0 | `ef8af9d` | + the device network (passer-core mobile-v0.1.0) |
 | 2026-11-24 17:45 | preview | 1.1.0 | `68a3cce` | passer-core mobile-v0.2.0, what members are and offer |
 | 2026-11-24 22:24 | preview | 1.1.0 | `c23a124` (dev) | The redesign, the phone's capabilities, streams (mobile-v0.3.0) |
-| 2026-11-25 19:30 | preview | 1.1.0 | `38b0452` (feat/mobile-screen) | + seeing and controlling a PC's screen: Face ID, the H.264 decoder, mobile-v0.4.0. Build `55f1e07a`, running when this was written |
+| 2026-11-25 19:30 | preview | 1.1.0 | `38b0452` (feat/mobile-screen) | + seeing and controlling a PC's screen: Face ID, the H.264 decoder, mobile-v0.4.0. Build `55f1e07a`: compiled; not yet tried on a phone |
 
 Simulator builds on 2026-09-12 checked the Swift of the extensions (three failed before `baebc93`). OTA updates published on the `preview` channel reach these builds while the app version stays 1.1.0; JavaScript that needs native code a build lacks must wait for the next build.
 
