@@ -12,6 +12,7 @@ mod mdns;
 mod commands;
 mod tray;
 mod devices;
+mod screen;
 
 pub use types::*;
 pub use paths::*;
@@ -35,6 +36,7 @@ pub fn run() {
             }
         }))
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec![]))) 
         .invoke_handler(tauri::generate_handler![
             commands::get_ip,
@@ -63,9 +65,21 @@ pub fn run() {
             devices::devices_remove,
             devices::devices_stop_sessions,
             devices::devices_answer_approval,
+            devices::devices_send_clipboard,
+            devices::devices_get_clipboard,
+            devices::devices_pick_and_send,
+            devices::devices_send_paths,
             devices::devices_refresh,
             devices::devices_capabilities,
-            devices::devices_journal
+            devices::devices_journal,
+            devices::devices_fetch_file,
+            devices::devices_list_files,
+            devices::space_files,
+            devices::space_pick_and_add,
+            devices::space_add_paths,
+            devices::space_remove,
+            devices::devices_screen_sessions,
+            devices::devices_screen_status
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
@@ -121,29 +135,12 @@ pub fn run() {
             // Setup System Tray
             tray::setup_tray(app)?;
 
-            // Position Window at Bottom Right (Smart + Margin)
+            // Passer is a full window now, centred by `tauri.conf.json`. It used
+            // to dock in the bottom-right corner of the work area as a 390x520
+            // panel; the device network outgrew that (docs/design_concept.md).
             let window = app.get_webview_window("main").unwrap();
-            let handle = window.clone();
-            
-            tauri::async_runtime::spawn(async move {
-                // Use tokio sleep for better async behavior
-                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-                
-                if let Ok(Some(monitor)) = handle.current_monitor() {
-                     let work_area = monitor.work_area();
-                     if let Ok(window_size) = handle.outer_size() {
-                        let margin = 0; 
-                        
-                        let x = work_area.position.x + work_area.size.width as i32 - window_size.width as i32 - margin;
-                        let y = work_area.position.y + work_area.size.height as i32 - window_size.height as i32 - margin;
-                        
-                        let _ = handle.set_position(tauri::Position::Physical(tauri::PhysicalPosition { x, y }));
-                        // Ensure window is visible and focused after positioning
-                        let _ = handle.show();
-                        let _ = handle.set_focus();
-                     }
-                }
-            });
+            let _ = window.show();
+            let _ = window.set_focus();
 
             Ok(())
         })

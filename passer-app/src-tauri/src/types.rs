@@ -91,7 +91,7 @@ pub struct LogEvent {
 
 /// Structured transfer event consumed by the history feed. Replaces the
 /// previous approach of regex-parsing human-readable log strings.
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, Default)]
 pub struct TransferEvent {
     pub kind: String,        // "text" | "image" | "file"
     pub direction: String,   // "incoming" | "outgoing"
@@ -99,6 +99,11 @@ pub struct TransferEvent {
     pub name: Option<String>,
     pub path: Option<String>,
     pub size: Option<u64>,
+    /// The device it came from or went to, when known: transfers through the
+    /// device network know their peer; the legacy HTTP API (iOS Shortcuts)
+    /// shares one token between every phone, so it cannot say.
+    pub device: Option<String>,
+    pub device_id: Option<String>,
 }
 
 // Server Control State

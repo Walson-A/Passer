@@ -143,6 +143,91 @@
   animation: hud-out 200ms var(--ease-out-expo) both;
 }
 
+/* --- Devices and approvals ----------------------------------------------
+   Sober on purpose: things arrive, they do not perform. A row rises 6px as it
+   appears (staggered by --i, set inline), a card the user must read rises a
+   little further, and the approval sheet comes up from the bottom edge over a
+   fading scrim - it is a question put to the user, so it enters like one.   */
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sheet-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.rise {
+  animation: rise 320ms var(--ease-out-expo) both;
+  animation-delay: calc(var(--i, 0) * 40ms);
+}
+
+.scrim-in {
+  animation: fade-in 180ms ease-out both;
+}
+
+.sheet-in {
+  animation: sheet-up 340ms var(--ease-drawer) both;
+}
+
+/* Skeleton rows while the device list loads. */
+@keyframes breathe {
+
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+.skeleton {
+  background: rgba(255, 255, 255, 0.05);
+  animation: breathe 1.4s ease-in-out infinite;
+}
+
+/* The approval countdown ring empties one second at a time. */
+.countdown-ring {
+  transition: stroke-dashoffset 1s linear, stroke 300ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  /* Appear, don't travel; and nothing pulses. */
+  .rise,
+  .sheet-in {
+    animation-name: fade-in;
+    animation-duration: 150ms;
+    animation-delay: 0ms;
+  }
+
+  .skeleton {
+    animation: none;
+  }
+
+  .countdown-ring {
+    transition: stroke 300ms ease;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
 
   /* Keep the cross-fade (it aids comprehension), drop the movement. */

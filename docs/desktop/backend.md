@@ -8,7 +8,7 @@ The backend powers the desktop application by providing an interface with the OS
   - `tauri-plugin-single-instance`: **Registered first**, as the plugin requires. A second launch no longer starts a rival process that silently fails to bind port 8000 — it shows, unminimises and focuses the window already running.
   - `tauri-plugin-autostart`: Allows the application to launch silently on boot. Enabled on first run only (via a `.initialized` marker), so a user who later turns it off is not overridden at every launch.
   - `tauri-plugin-opener`: Safe handling of external URLs or files.
-- Positions the window dynamically at the bottom right corner of the primary monitor using `monitor.work_area()` and `window.outer_size()`.
+- Shows and focuses the main window at launch; `tauri.conf.json` centres it (1180×760, resizable). It used to be docked at the bottom right of the work area as a 390×520 panel.
 
 ## 🖥️ Commands & IPC (`commands.rs`)
 The IPC (Inter-Process Communication) gateway between the React frontend and Rust system access.
@@ -22,7 +22,7 @@ The IPC (Inter-Process Communication) gateway between the React frontend and Rus
 - **`get_pairing_info`**: Everything a device needs to pair, including the token and the stable device id (see `api.md`).
 - **`get_autostart` / `set_autostart`**: Read and write the launch-on-login preference.
 - **`get_pairing_token` / `regenerate_pairing_token`**: Read the pairing secret, or rotate it and invalidate every paired device.
-- **`handle_file_drop`**: Copies files dragged onto the window into the `Passer Space` folder, renaming to avoid collisions.
+- **`handle_file_drop`**: Copies files into the `Passer Space` folder, renaming to avoid collisions. No longer called: dropped files now go to a device (`devices_send_paths`) while Space is folded away.
 - **`set_window_on_top`**: Toggles the always-on-top ("pin") window flag.
 - **`delete_cache_file`**: Deletes a cached preview image, validated to stay inside the `.cache` directory.
 
@@ -48,12 +48,26 @@ The new way devices talk to this PC, built on [passer-core](https://github.com/W
   | `clipboard.read` | sensitive | **asks** | returns the clipboard text after the user approves |
   | `file.receive` | write | allowed | saves a small file (≤ 700 KB, sent inline) into the Passboard folder, base name only; kept for older apps |
   | `file.drop` | write | allowed | receives a file of any size (up to 4 GB) as a stream; the core keeps it private until it is complete, then it moves into the Passboard folder, base name only |
+  | `file.list` | read | allowed | lists the files directly in the Passer Space folder (name, size, date), newest first, at most 500 |
+  | `file.get` | read | allowed | streams a file from the Passer Space folder, by exact name: no path, no link leading out of the folder |
 
+- **Transfers name their device**: `TransferEvent` carries `device` and `device_id` when it went through the device network (who called, or whom this PC called). The HTTP path leaves them empty: the Shortcuts share one token, so the PC cannot tell which phone.
 - **Approvals**: `WindowPrompter` brings the main window forward and emits `approval-request`; the frontend answers with `devices_answer_approval`. No answer within 55 s means no (the core's own limit is 60 s). `approval-closed` removes the card.
 - **Joins**: when a device joins through an invitation of this PC, `device-joined` carries its name and the 6-digit code to compare. The PC then asks the newcomer what it is and offers, and emits `devices-changed` when it has answered.
 - **What the other members are and offer**: after start, on a join, and on `devices_refresh`, the core asks each member for `bus.capabilities` and, only where it runs without approval, `device.info`. Answers are cached in `devices\members.json` for display only: every call is still decided by the target. A refresh never makes another device ask its user anything.
 - **Network**: n0's development relays for now (`NetworkKind::N0Dev`), shown as a preview in the UI. Production needs Passer's own relay and coordination server.
-- **Commands**: `devices_status` (members with kind, OS, versions and when they last answered), `devices_create_group`, `devices_join`, `devices_invite` (one-time link, 10 min, optionally as approver), `devices_remove`, `devices_stop_sessions` (the stop button), `devices_answer_approval`, `devices_refresh`, `devices_capabilities` (what a member lets this PC call, and what needs approval), `devices_journal` (calls made and received, newest first, never their content; optionally with one member).
+- **Commands**: `devices_status` (members with kind, OS, versions and when they last answered), `devices_create_group`, `devices_join`, `devices_invite` (one-time link, 10 min, optionally as approver), `devices_remove`, `devices_stop_sessions` (the stop button), `devices_answer_approval`, `devices_refresh`, `devices_capabilities` (what a member lets this PC call, and what needs approval), `devices_journal` (calls made and received, newest first, never their content; optionally with one member), `devices_fetch_file` (a file by name from a member's `file.get`, into the Passboard, listed there as coming from it, with `transfer-progress`), `devices_list_files` (a member's `file.list`).
+- **What this PC shares** (the Passer Space folder, offered as `file.list` / `file.get`): `space_files`, `space_pick_and_add` (native picker, copies in), `space_add_paths` (dropped files, *Share from this PC*), `space_remove` (deletes one file from that folder - only directly inside it).
+- **Asking another device** (the Devices stage), each a passer-core call, so the other device's own rules apply: `devices_send_clipboard` (this PC's clipboard text to its `clipboard.write`), `devices_get_clipboard` (its `clipboard.read`, approved by its user, then onto this PC's clipboard; returns the character count), `devices_pick_and_send` (*Send a file*: a native file picker - `tauri-plugin-dialog`, used from Rust only - then the file goes by path), `devices_send_paths` (files dropped on the window, one by one). Both send through `file.drop` when the member offers it - streamed, any size up to the core's 4 GB - and fall back to the older `file.receive` (base64, 700 KB) for members that only have that; progress comes as `transfer-progress` { transfer, name, done, total }, at most every 120 ms - the same event for fetching. Each of these also emits a `transfer` event, so the Passboard lists what this PC sent and fetched. The stage only offers the ones `devices_capabilities` lists for that member.
+
+## 🖥️ Screen (`screen.rs`)
+Other devices of the group can see this PC's screen (`screen.view`) and take control (`screen.control`), when Vasistas is installed (`PASSER_VASISTAS`, or `vasistas.exe` on the PATH; `devices_screen_status` says which).
+
+- **How**: passer-core's `passer-exec` runs `vasistas share --lang fr --viewer <caller> [--control]` and wires its stdio to the stream; Vasistas captures, encodes, applies the viewer's input and shows its own sign on screen.
+- **Who**: the group's own devices, without a confirmation on this PC (a rule added once to `devices\policy.json`), as Walson decided; AI agents get nothing. Effect `sensitive`, so a session lasts at most 15 minutes; the viewer reconnects after.
+- **Stopping**: Escape on this PC (Vasistas), the stop button (`devices_stop_sessions`), or removing the device; the process is killed when its session ends.
+- **Indicator**: passer-core refuses these capabilities without one. `WindowIndicator` records live sessions (`devices_screen_sessions`) and emits `screen-session-started` / `screen-session-ended` for the window.
+- **Not covered**: a locked PC or UAC prompts (Vasistas cannot see the secure desktop).
 
 ## ✂️ Core Utilities
 - **`clipboard.rs`**: Safe reading and writing to the system clipboard (Text, HTML, Image, file lists) for iOS push/pull integrations.

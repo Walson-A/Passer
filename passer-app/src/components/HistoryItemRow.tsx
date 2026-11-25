@@ -12,17 +12,28 @@ import {
     ExternalLink,
     Clipboard,
     Folder,
-    Check
+    Check,
+    Share2,
+    Link2,
 } from "lucide-react";
-import { convertFileSrc } from "@tauri-apps/api/core";
-import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useState } from "react";
 import { PremiumTooltip } from "./PremiumTooltip";
+import { SPACE_CHANGED } from "./DeviceFiles";
 
 interface Props {
     item: HistoryItem;
     isLatest?: boolean;
     onDelete?: (id: string) => void;
+}
+
+/** Where it came from or went: a device of the group, or the iOS Shortcuts (HTTP), which cannot say which phone. */
+function Peer({ item }: { item: HistoryItem }) {
+    const label = item.device
+        ? `${item.direction === "incoming" ? "From" : "To"} ${item.device}`
+        : "Via iOS Shortcuts";
+    return <p className="text-[10.5px] font-semibold text-white/50 mt-0.5 truncate">{label}</p>;
 }
 
 export function HistoryItemRow({ item, isLatest = false, onDelete }: Props) {
@@ -31,6 +42,11 @@ export function HistoryItemRow({ item, isLatest = false, onDelete }: Props) {
     // Determine which actions to show
     const canCopy = item.target === 'clipboard' || item.type === 'text' || item.type === 'image';
     const canRevealFolder = item.target === 'folder' && item.rawPath;
+    // A link someone sent: open it in the browser.
+    const link = item.type === 'text' ? linkOf(item.name) : null;
+    // A file that arrived here can be offered to your other devices too.
+    const canShare = item.direction === 'incoming' && item.target === 'folder' && !!item.rawPath;
+    const [shared, setShared] = useState(false);
 
     // Fixed height (h-[76px]) Ensures uniformity across all types
     const containerClasses = `
@@ -49,9 +65,10 @@ export function HistoryItemRow({ item, isLatest = false, onDelete }: Props) {
                 {item.type === 'text' ? (
                     /* TEXT: Natural flow - line-clamp-3 for max visibility in fixed 76px */
                     <div className="flex-1 min-w-0">
-                        <p className="text-[11.5px] font-normal text-white/85 line-clamp-3 leading-relaxed break-words overflow-hidden">
+                        <p className="text-[12px] font-normal text-white/85 line-clamp-2 leading-relaxed break-words overflow-hidden">
                             {item.name}
                         </p>
+                        <Peer item={item} />
                     </div>
                 ) : (
                     /* IMAGE/FILE: Visual anchor + info */
@@ -68,10 +85,11 @@ export function HistoryItemRow({ item, isLatest = false, onDelete }: Props) {
                                     </h3>
                                 )}
                                 {item.fileSize && (
-                                    <p className="text-[9.5px] font-medium text-white/35 mt-0.5">
+                                    <p className="text-[10px] font-medium text-white/45 mt-0.5">
                                         {item.fileSize}
                                     </p>
                                 )}
+                                <Peer item={item} />
                             </div>
                         )}
                     </div>
@@ -123,6 +141,32 @@ export function HistoryItemRow({ item, isLatest = false, onDelete }: Props) {
                             }
                         }}
                         color="bg-white/10 hover:bg-white/20 text-white border-white/20"
+                    />
+                )}
+
+                {link && (
+                    <ActionButton
+                        icon={<Link2 className="w-4 h-4" strokeWidth={2.5} />}
+                        label="Open link"
+                        onClick={() => { openUrl(link).catch(e => console.error('Failed to open link:', e)); }}
+                        color="bg-blue-500/20 hover:bg-blue-500/30 text-blue-100 border-blue-400/30"
+                    />
+                )}
+
+                {canShare && (
+                    <ActionButton
+                        icon={shared ? <Check className="w-4 h-4" strokeWidth={2.5} /> : <Share2 className="w-4 h-4" strokeWidth={2.5} />}
+                        label={shared ? "Shared" : "Share from this PC"}
+                        onClick={async () => {
+                            try {
+                                await invoke('space_add_paths', { paths: [item.rawPath] });
+                                window.dispatchEvent(new Event(SPACE_CHANGED));
+                                setShared(true);
+                            } catch (e) {
+                                console.error('Failed to share:', e);
+                            }
+                        }}
+                        color={shared ? "bg-emerald-500/20 text-emerald-200 border-emerald-400/30" : "bg-white/10 hover:bg-white/20 text-white border-white/20"}
                     />
                 )}
 
@@ -201,6 +245,7 @@ function ActionButton({ icon, label, onClick, color }: { icon: React.ReactNode, 
         <PremiumTooltip label={isSuccess ? "Copied!" : label} size="sm">
             <button
                 onClick={handleClick}
+                aria-label={label}
                 className={`
                     flex items-center justify-center w-10 h-10 rounded-xl border transition-all duration-300 active:scale-90 group/btn relative shadow-lg
                     ${isSuccess
@@ -229,4 +274,10 @@ function timeAgo(timestamp: number) {
     const hours = Math.floor(minutes / 60);
     if (hours < 24) return `${hours}h ago`;
     return "1d ago";
+}
+
+/** The URL when a text is just a link (what a phone sends when you share a page). */
+function linkOf(text: string): string | null {
+    const t = text.trim();
+    return /^https?:\/\/\S+$/i.test(t) ? t : null;
 }

@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Passer — Banc Devices</title>
+</head>
+
+<!--
+  Development bench for the Devices tab and the approval card:
+  `npm run dev`, then /devices-banc.html. Every state sits next to the others,
+  each in a frame the size of the real window, driven by a fake backend.
+  Deliberately absent from vite.config.ts, so it is dev-only and weighs nothing
+  in the packaged app.
+-->
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/banc/mainDevices.tsx"></script>
+</body>
+
+</html>

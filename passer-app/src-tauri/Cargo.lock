@@ -5226,7 +5226,7 @@ dependencies = [
 
 [[package]]
 name = "passer"
-version = "1.0.0"
+version = "1.1.0-beta.1"
 dependencies = [
  "arboard",
  "async-trait",
@@ -5241,6 +5241,7 @@ dependencies = [
  "local-ip-address",
  "mdns-sd",
  "open",
+ "passer-exec",
  "passer-ffi",
  "rand 0.8.8",
  "serde",
@@ -5248,6 +5249,7 @@ dependencies = [
  "tauri",
  "tauri-build",
  "tauri-plugin-autostart",
+ "tauri-plugin-dialog",
  "tauri-plugin-opener",
  "tauri-plugin-single-instance",
  "tempfile",
@@ -5260,7 +5262,7 @@ dependencies = [
 [[package]]
 name = "passer-bus"
 version = "0.1.0"
-source = "git+https://github.com/Walson-A/passer-core?rev=94e25977401691233ae5538d291df2c5f561003e#94e25977401691233ae5538d291df2c5f561003e"
+source = "git+https://github.com/Walson-A/passer-core?rev=1496f147707a3e39ea6f85de572151d917ba5717#1496f147707a3e39ea6f85de572151d917ba5717"
 dependencies = [
  "async-trait",
  "blake3",
@@ -5277,7 +5279,7 @@ dependencies = [
 [[package]]
 name = "passer-coord"
 version = "0.1.0"
-source = "git+https://github.com/Walson-A/passer-core?rev=94e25977401691233ae5538d291df2c5f561003e#94e25977401691233ae5538d291df2c5f561003e"
+source = "git+https://github.com/Walson-A/passer-core?rev=1496f147707a3e39ea6f85de572151d917ba5717#1496f147707a3e39ea6f85de572151d917ba5717"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5295,7 +5297,7 @@ dependencies = [
 [[package]]
 name = "passer-device-info"
 version = "0.1.0"
-source = "git+https://github.com/Walson-A/passer-core?rev=94e25977401691233ae5538d291df2c5f561003e#94e25977401691233ae5538d291df2c5f561003e"
+source = "git+https://github.com/Walson-A/passer-core?rev=1496f147707a3e39ea6f85de572151d917ba5717#1496f147707a3e39ea6f85de572151d917ba5717"
 dependencies = [
  "async-trait",
  "passer-bus",
@@ -5303,9 +5305,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "passer-exec"
+version = "0.1.0"
+source = "git+https://github.com/Walson-A/passer-core?rev=1496f147707a3e39ea6f85de572151d917ba5717#1496f147707a3e39ea6f85de572151d917ba5717"
+dependencies = [
+ "async-trait",
+ "passer-bus",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "passer-ffi"
 version = "0.1.0"
-source = "git+https://github.com/Walson-A/passer-core?rev=94e25977401691233ae5538d291df2c5f561003e#94e25977401691233ae5538d291df2c5f561003e"
+source = "git+https://github.com/Walson-A/passer-core?rev=1496f147707a3e39ea6f85de572151d917ba5717#1496f147707a3e39ea6f85de572151d917ba5717"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5327,7 +5340,7 @@ dependencies = [
 [[package]]
 name = "passer-identity"
 version = "0.1.0"
-source = "git+https://github.com/Walson-A/passer-core?rev=94e25977401691233ae5538d291df2c5f561003e#94e25977401691233ae5538d291df2c5f561003e"
+source = "git+https://github.com/Walson-A/passer-core?rev=1496f147707a3e39ea6f85de572151d917ba5717#1496f147707a3e39ea6f85de572151d917ba5717"
 dependencies = [
  "hex",
  "iroh-base",
@@ -5341,7 +5354,7 @@ dependencies = [
 [[package]]
 name = "passer-membership"
 version = "0.1.0"
-source = "git+https://github.com/Walson-A/passer-core?rev=94e25977401691233ae5538d291df2c5f561003e#94e25977401691233ae5538d291df2c5f561003e"
+source = "git+https://github.com/Walson-A/passer-core?rev=1496f147707a3e39ea6f85de572151d917ba5717#1496f147707a3e39ea6f85de572151d917ba5717"
 dependencies = [
  "blake3",
  "hex",
@@ -5355,7 +5368,7 @@ dependencies = [
 [[package]]
 name = "passer-node"
 version = "0.1.0"
-source = "git+https://github.com/Walson-A/passer-core?rev=94e25977401691233ae5538d291df2c5f561003e#94e25977401691233ae5538d291df2c5f561003e"
+source = "git+https://github.com/Walson-A/passer-core?rev=1496f147707a3e39ea6f85de572151d917ba5717#1496f147707a3e39ea6f85de572151d917ba5717"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -6175,6 +6188,32 @@ dependencies = [
  "wasm-bindgen-futures",
  "wasm-streams",
  "web-sys",
+]
+
+[[package]]
+name = "rfd"
+version = "0.17.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "20dafead71c16a34e1ff357ddefc8afc11e7d51d6d2b9fbd07eaa48e3e540220"
+dependencies = [
+ "block2",
+ "dispatch2",
+ "glib-sys",
+ "gobject-sys",
+ "gtk-sys",
+ "js-sys",
+ "libc",
+ "log",
+ "objc2",
+ "objc2-app-kit",
+ "objc2-core-foundation",
+ "objc2-foundation",
+ "percent-encoding",
+ "raw-window-handle",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -7410,6 +7449,48 @@ dependencies = [
  "tauri",
  "tauri-plugin",
  "thiserror 2.0.21",
+]
+
+[[package]]
+name = "tauri-plugin-dialog"
+version = "2.8.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ce0fb9c2b6d34a9720627ed930ebc8af26f61e648695aecaeb03d5c33c5896f5"
+dependencies = [
+ "log",
+ "raw-window-handle",
+ "rfd",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+ "tauri-plugin-fs",
+ "thiserror 2.0.21",
+ "url",
+]
+
+[[package]]
+name = "tauri-plugin-fs"
+version = "2.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5d58eb1d4984e535f47a642ffec09a2da6f5c18a12b5902d12126cb7626d628b"
+dependencies = [
+ "anyhow",
+ "dunce",
+ "glob",
+ "log",
+ "objc2-foundation",
+ "percent-encoding",
+ "schemars 0.8.22",
+ "serde",
+ "serde_json",
+ "serde_repr",
+ "tauri",
+ "tauri-plugin",
+ "tauri-utils",
+ "thiserror 2.0.21",
+ "toml 1.2.2+spec-1.1.0",
+ "url",
 ]
 
 [[package]]

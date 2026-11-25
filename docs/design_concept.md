@@ -33,9 +33,10 @@ Passer's visual identity is built on transparency, depth, and high-performance a
 
 ## 4. UI Layout (App)
 
-- The app is a "Docked" utility.
-- It stays pinned to the taskbar area by default.
-- Animations between the compact "Passer Space" and full view must be seamless.
+- The app is a full window (1180×760 by default, resizable), with a sidebar: Devices, Passboard, Settings. It started as a "docked" utility pinned by the taskbar; once Passer became a network of your devices (joining, permissions, approvals) that panel was too small, and Walson chose a real window (November 2026).
+- The Devices space follows the **Showroom** direction: every device in one horizontal strip, the chosen one large on stage with only what it can really do. The mockups that led there are in `passer-app/directions.html`.
+- Files are per device, never one global folder: each device's stage shows what it shares, and *This PC* what this PC shares.
+- The corner HUD still announces transfers while the window is hidden.
 
 ---
 
