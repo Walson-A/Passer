@@ -380,3 +380,43 @@ export function CircleStopIcon(props: IconProps) {
     </Glyph>
   );
 }
+
+/** Lucide `monitor`: seeing another device's screen. */
+export function MonitorIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <Rect x={2} y={3} width={20} height={14} rx={2} />
+      <Path d="M8 21h8M12 17v4" />
+    </Glyph>
+  );
+}
+
+/** Lucide `rotate-cw-square`: turning the picture to fill the phone. */
+export function TurnIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <Path d="M12 5H6a2 2 0 0 0-2 2v3" />
+      <Path d="m9 8 3-3-3-3" />
+      <Path d="M4 14v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
+    </Glyph>
+  );
+}
+
+/** Lucide `mouse-pointer-2`: taking control of it. */
+export function PointerIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <Path d="M4.04 4.95a.5.5 0 0 1 .66-.66l15.5 6.07a.5.5 0 0 1-.06.95l-6.27 1.75a1.75 1.75 0 0 0-1.22 1.22l-1.75 6.27a.5.5 0 0 1-.95.06z" />
+    </Glyph>
+  );
+}
+
+/** Lucide `keyboard`. */
+export function KeyboardIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <Rect x={2} y={4} width={20} height={16} rx={2} />
+      <Path d="M10 8h.01M12 12h.01M14 8h.01M16 12h.01M18 8h.01M6 8h.01M7 16h10M8 12h.01" />
+    </Glyph>
+  );
+}

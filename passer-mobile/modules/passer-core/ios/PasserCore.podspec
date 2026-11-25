@@ -17,7 +17,7 @@ Pod::Spec.new do |s|
   s.source_files = '*.swift', 'vendor/*.swift'
   # The Rust library, with the C header and module map of the generated bindings.
   s.vendored_frameworks = 'vendor/PasserFFI.xcframework'
-  s.frameworks = 'Security', 'SystemConfiguration'
+  s.frameworks = 'Security', 'SystemConfiguration', 'AVFoundation', 'CoreMedia'
   s.libraries = 'resolv'
   s.pod_target_xcconfig = {
     'DEFINES_MODULE' => 'YES',

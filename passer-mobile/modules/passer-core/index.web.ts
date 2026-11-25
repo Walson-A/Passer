@@ -4,7 +4,17 @@
  */
 import { benchHost } from '@/platform/web-bench';
 
-import type { ApprovalRequest, Joined, JournalEntry, OfferedCapability, Received, Status, TransferProgress } from './index';
+import type {
+  ApprovalRequest,
+  Joined,
+  JournalEntry,
+  OfferedCapability,
+  Received,
+  ScreenNativeEvent,
+  Status,
+  TransferProgress,
+} from './index';
+import { BenchScreenView } from './screen-view.web';
 
 export type {
   ApprovalRequest,
@@ -14,6 +24,7 @@ export type {
   Member,
   OfferedCapability,
   Received,
+  ScreenNativeEvent,
   Status,
   TransferProgress,
 } from './index';
@@ -38,6 +49,11 @@ const proxy = {
   refreshMembers: () => benchHost().core.refreshMembers(),
   memberCapabilities: (id: string) => benchHost().core.memberCapabilities(id),
   journal: (limit: number, id: string | null) => benchHost().core.journal(limit, id),
+  screenAvailable: () => true,
+  screenOpen: (device: string, capability: string, inputJson: string, sessionId: string) =>
+    benchHost().core.screenOpen(device, capability, inputJson, sessionId),
+  screenSend: (sessionId: string, json: string) => benchHost().core.screenSend(sessionId, json),
+  screenClose: (sessionId: string) => benchHost().core.screenClose(sessionId),
   answerApproval: (id: number, allow: boolean) => benchHost().core.answerApproval(id, allow),
   addListener: (event: string, listener: Listener) =>
     benchHost().core.addListener(event, listener),
@@ -60,6 +76,11 @@ type Proxy = {
   memberCapabilities(id: string): Promise<OfferedCapability[]>;
   journal(limit: number, id: string | null): Promise<JournalEntry[]>;
   answerApproval(id: number, allow: boolean): boolean;
+  screenAvailable?(): boolean;
+  screenOpen?(device: string, capability: string, inputJson: string, sessionId: string): Promise<void>;
+  screenSend?(sessionId: string, json: string): void;
+  screenClose?(sessionId: string): void;
+  addListener(event: 'onScreenEvent', listener: (event: ScreenNativeEvent) => void): { remove: () => void };
   addListener(event: 'onApprovalRequest', listener: (request: ApprovalRequest) => void): { remove: () => void };
   addListener(event: 'onApprovalClosed', listener: (event: { id: number }) => void): { remove: () => void };
   addListener(event: 'onDeviceJoined', listener: (joined: Joined) => void): { remove: () => void };
@@ -68,6 +89,13 @@ type Proxy = {
 };
 
 export const PasserCore = { available: true, module: proxy as unknown as Proxy };
+
+/** The bench can always show a (drawn) screen. */
+export function screenSupported(): boolean {
+  return true;
+}
+
+export const ScreenView = BenchScreenView;
 
 export function isCoreInvitation(link: string): boolean {
   return link.startsWith('passer-core://join?');

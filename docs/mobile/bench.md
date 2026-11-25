@@ -43,6 +43,8 @@ Only fake what a browser cannot have, never a piece of the app. Each stand-in si
 | Haptics, VoiceOver | `src/platform/haptics.web.ts`, `src/platform/accessibility.web.ts` | They are written to the log, where they can be checked |
 | Safe areas | `src/platform/safe-area-provider.web.tsx` | The web provider measures zero insets, which would hide a title under the Dynamic Island |
 | Appearance and language | `src/theme/system-scheme.web.ts`, `src/i18n/device-language.web.ts` | They are switched from the bench |
+| Face ID | `src/platform/biometrics.web.ts` | No biometrics in a browser: it logs the question and says yes |
+| The PC's screen | `modules/passer-core/screen-view.web.tsx`, `screenOpen` in `bench/core.ts` | A browser can't decode the stream the way the phone does. The fake PC asks its user for 2.8 s (no in *Le PC refuse*), then shows a still desktop at 1920 × 1080; it moves its pointer where the phone sends it, logs every input, and refuses input in view mode as Vasistas does |
 | EAS Update | `src/platform/updates.web.ts` | Only a release build can reach the update server. The bench chooses what the server holds; checks and downloads take a phone's time, and restarting relaunches the phone onto the update |
 
 ### The fake PC answers exactly like the desktop
@@ -75,7 +77,7 @@ A fake that invents a field or a status makes a correct screen look broken, or a
 
 The right rail also sets:
 - the platform the screens follow (iPhone or Android);
-- what another device does: ask for an approval (the iPad, or an AI agent through the PC), send a text or a file, join through this phone;
+- what another device does: ask for an approval (the iPad, or an AI agent through the PC), send a text or a file, join through this phone, and, while its screen is open, lock, come back, be used by someone, or end the share with Escape;
 - the device (iPhone 16, 16 Pro Max, SE);
 - the text size (default, very large, the first accessibility size);
 - which files the document picker hands over (one under 700 KB, or larger ones);

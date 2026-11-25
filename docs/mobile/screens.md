@@ -34,9 +34,29 @@ Every screen of the phone app, with what it shows in each state. Captures come f
 | Screen | What it shows | Captures |
 |---|---|---|
 | List (`(tabs)/devices/index.tsx`) | Every device, managers first, with its drawing, *Reachable* / *Not reachable* and its role; this phone last. *Add a device* for a phone that manages devices, otherwise which device can. *Stop remote activity*, end-to-end encryption and the preview network, explained on demand. | [dark](captures/17-appareils.jpg) · [Android, light, manages](captures/18-appareils-android-gere.jpg) |
-| A device (`(tabs)/devices/[id].tsx`) | The device drawn large (the desktop Showroom's stage, at a phone's scale), whether it answers or when it last did, the commands it offers, its role, system, Passer version and id, *What it shares* (its shared files, each with *Get* and its progress; only for a device offering `file.list` and `file.get`, and a build with streams), and *Recent exchanges* (what was asked, never what was sent). Removal, for a phone that manages devices, with an inline confirmation saying what it does. | [PC](captures/19-fiche-pc.jpg) · [what it shares](captures/38-fiche-pc-partage-clair.jpg) · [exchanges](captures/36-fiche-pc-echanges.jpg) · [iPad](captures/37-fiche-ipad-clair.jpg) · [this phone](captures/20-fiche-ce-telephone.jpg) · [removal](captures/21-fiche-retrait.jpg) |
+| A device (`(tabs)/devices/[id].tsx`) | The device drawn large (the desktop Showroom's stage, at a phone's scale), whether it answers or when it last did, the commands it offers, its role, system, Passer version and id, *What it shares* (its shared files, each with *Get* and its progress; only for a device offering `file.list` and `file.get`, and a build with streams), and *Recent exchanges* (what was asked, never what was sent). Removal, for a phone that manages devices, with an inline confirmation saying what it does. | [PC](captures/19-fiche-pc.jpg) · [what it shares](captures/38-fiche-pc-partage-clair.jpg) · [exchanges](captures/36-fiche-pc-echanges.jpg) · [iPad](captures/37-fiche-ipad-clair.jpg) · [this phone](captures/20-fiche-ce-telephone.jpg) · [removal](captures/21-fiche-retrait.jpg) · [with the screen](captures/39-fiche-pc-ecran.jpg) |
 | Add a device (`invite.tsx`) | First what the new device may do (send and receive, or also manage devices), then the one-time QR, *Expires in m:ss*, *Expired → New code*, the warning that it lets a device in, *Copy link* (*Copied*), *Share the link*. | [role](captures/23-inviter-role.jpg) · [code](captures/24-inviter-code.jpg) |
 | A device joined here | The code to compare with the new device; *Remove it* if it differs. | [sheet](captures/25-appareil-rejoint.jpg) |
+
+## Another device's screen (`screen/[id].tsx`)
+
+From *See its screen* or *Take control* on a device's page, shown only where the device offers
+`screen.view` / `screen.control` and the build can show it. Full screen, always dark whatever the
+appearance (it frames a picture); only the close button leaves it.
+
+| State | What it shows | Captures |
+|---|---|---|
+| It's you | Face ID or the phone's code. Cancelled, not recognised or no code set, each in a sentence; *Try again*. | |
+| Waiting | *Waiting for an answer on DESKTOP-…*, its user must allow it, the 60 s ring, *Cancel*. | [waiting](captures/40-ecran-attente.jpg) |
+| Refused | *DESKTOP-… said no*, no answer, not reachable, each in a sentence; *Try again*. | [refused](captures/45-ecran-refuse.jpg) |
+| Watching | The screen letterboxed, the PC's pointer drawn over it, *You see the screen of DESKTOP-…*, the turn button. | [watching](captures/43-ecran-voir.jpg) |
+| In control | *You control DESKTOP-…* and the keyboard button; open, the phone's keyboard and one scrolling line of keys (Esc, Tab, Ctrl and Alt held for the next key, arrows, Del). | [keyboard, Ctrl held](captures/41-ecran-main-clavier.jpg) |
+| Turned | The picture a quarter clockwise, filling the phone held sideways; touches still land under the finger. | [turned, paused](captures/42-ecran-tourne-pause.jpg) |
+| Told by the PC | *Paused* (lock screen, administrator prompt), *Someone is using DESKTOP-…* (3 s), *You can only watch*. | [paused](captures/42-ecran-tourne-pause.jpg) |
+| Ended | *The share ended* and why: Escape pressed on the PC, stopped there, time limit, connection closed. *Close*. | [ended](captures/44-ecran-termine.jpg) |
+
+The bench draws a still Windows desktop in place of the video (`screen-view.web.tsx`): it judges
+layout and states, not the picture.
 
 ## Activity (tab)
 

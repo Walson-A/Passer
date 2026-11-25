@@ -43,6 +43,9 @@ export type BenchCore = {
   memberCapabilities(id: string): Promise<OfferedCapability[]>;
   journal(limit: number, id: string | null): Promise<JournalEntry[]>;
   answerApproval(id: number, allow: boolean): boolean;
+  screenOpen(device: string, capability: string, inputJson: string, sessionId: string): Promise<void>;
+  screenSend(sessionId: string, json: string): void;
+  screenClose(sessionId: string): void;
   addListener(event: string, listener: (payload: never) => void): { remove: () => void };
 };
 

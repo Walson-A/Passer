@@ -15,6 +15,7 @@ const EAS_PROJECT_ID = '24bd9306-2019-4dbf-808d-bd058478c748';
 const LOCAL_NETWORK_REASON =
   'Passer connects to your PC over Wi-Fi to send and receive your clipboard, photos and files. Nothing leaves your local network.';
 const CAMERA_REASON = 'Passer uses the camera to scan the pairing code shown on your PC.';
+const FACE_ID_REASON = 'Passer checks it is you before showing or controlling the screen of your PC.';
 const SAVE_PHOTOS_REASON = 'Passer saves the images you receive from your PC to your photo library.';
 const PHOTOS_REASON =
   'Passer reads your latest screenshot or photos when you use one of its widgets or Shortcuts actions, to send them to your PC.';
@@ -104,8 +105,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       'expo-media-library',
       { photosPermission: PHOTOS_REASON, savePhotosPermission: SAVE_PHOTOS_REASON, isAccessMediaLocationEnabled: false },
     ],
-    // Tokens are stored without biometrics, so no Face ID permission string.
-    ['expo-secure-store', { faceIDPermission: false }],
+    // Seeing or controlling a PC's screen asks for Face ID or the phone's code first, so a
+    // stolen but unlocked phone isn't enough. Tokens themselves are stored without biometrics;
+    // both plugins write the same string, so neither removes the other's.
+    ['expo-secure-store', { faceIDPermission: FACE_ID_REASON }],
+    ['expo-local-authentication', { faceIDPermission: FACE_ID_REASON }],
     'expo-localization',
     'expo-sharing',
     [

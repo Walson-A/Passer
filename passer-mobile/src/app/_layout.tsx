@@ -67,6 +67,11 @@ function Screens() {
         <Stack.Screen name="destination" options={{ ...sheet, sheetAllowedDetents: 'fitToContents' }} />
         <Stack.Screen name="invite" options={{ ...sheet, sheetAllowedDetents: [1] }} />
         <Stack.Screen name="settings" options={{ ...sheet, sheetAllowedDetents: [1] }} />
+        {/* Another device's screen: always dark, and only the close button leaves it. */}
+        <Stack.Screen
+          name="screen/[id]"
+          options={{ presentation: 'fullScreenModal', animation: 'fade', gestureEnabled: false, contentStyle: { backgroundColor: '#000000' } }}
+        />
         {/* A widget's link: gone as soon as it has handed its action to Send. */}
         <Stack.Screen name="action/[name]" options={{ animation: 'none' }} />
       </Stack>

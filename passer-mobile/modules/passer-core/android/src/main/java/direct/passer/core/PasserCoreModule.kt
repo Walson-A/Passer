@@ -125,6 +125,10 @@ class PasserCoreModule : Module() {
       }
     }
 
+    // Another device's screen: decoding on Android (MediaCodec) isn't written yet, so the
+    // app never offers it here (see ScreenSession.swift for iOS).
+    Function("screenAvailable") { false }
+
     Function("answerApproval") { id: Int, allow: Boolean ->
       waiting.remove(id)?.complete(allow) ?: false
     }

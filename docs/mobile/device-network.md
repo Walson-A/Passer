@@ -47,6 +47,7 @@ and compares the code when a device joins through it.
 | `clipboard.read` | *Its clipboard*, with the lock *It asks first*: the PC's user approves each read | text only |
 | `file.list` | *What DESKTOP-… shares*, on the device's page: the files of its shared folder (Passer Space on the desktop) | none |
 | `file.get` (stream) | *Get* on one of them: the file lands in Documents › Passer and the share sheet opens (`fetchFile`) | none |
+| `screen.view`, `screen.control` (stream) | *See its screen*, *Take control*, on the device's page: the PC's screen, live (Vasistas). Face ID or the phone's code first, then the PC's user accepts, unless its owner switched that off. See below | the core's stream export for mobile, not yet published (below) |
 | `device.info` | Whether a device answers (no live presence in the core), every 30 s for the Send destination while the app is open | none |
 
 There is no shared folder for the whole group: each device shares its own files, reached
@@ -58,6 +59,41 @@ the member decides.
 Refusals arrive as text; `classifyCallError` reads the core's stable codes in it (`denied`,
 `approval_timeout`, `too_large`, `not_member`, `unknown_capability`, network errors) and the
 screens say each in a sentence. How the native bridge words them is not yet checked on a phone.
+
+## Seeing and controlling a screen
+
+The desktop shares its screen through Vasistas (`screen.view`, `screen.control`, both
+sensitive, the indicator on while it lasts). The phone's side:
+
+1. **It's you.** Face ID, or the phone's code (`expo-local-authentication`,
+   `src/platform/biometrics.ts`), so a phone in someone else's hands can't open a screen. A phone
+   without a code is told to set one.
+2. **The PC's user accepts.** *Waiting for an answer on DESKTOP-…*, a ring counting the 60 s the
+   core waits; no answer is no. The PC's owner can switch the question off for this phone.
+3. **The picture.** The stream carries Vasistas's frames (`docs/share.md` in the Vasistas
+   repository): JSON events, H.264 video and the pointer's shape one way, the viewer's JSON the
+   other. `src/core/screen-protocol.ts` reads and writes the framing, the events and the input.
+   On iOS the video never reaches JavaScript: `ScreenSession.swift` reassembles the frames and
+   hands H.264 to an `AVSampleBufferDisplayLayer` (the system's hardware decoder), shown by
+   `PasserScreenView`. A decoding failure asks the PC for a keyframe.
+4. **Control.** A tap clicks where the finger is, holding right-clicks, a drag drags, two fingers
+   scroll; the keyboard types text, and a row adds Esc, Tab, Ctrl and Alt (held for the next key),
+   the arrows and Del. Positions go as fractions of the PC's display; the pointer moves at most
+   30 times a second. Leaving by any way releases every key and button, then closes the stream.
+5. **What the PC says.** *Paused* while it shows its lock screen or an administrator prompt,
+   *Someone is using DESKTOP-…* when its own mouse or keyboard moves (the phone's input waits),
+   *You can only watch* when control wasn't allowed, and why it ended (Escape on the PC, stopped
+   there, time limit).
+
+The picture can be turned a quarter to use the phone's height (the app stays portrait). Touches
+are read in window coordinates and turned back (`windowToStage`), so they land right whatever a
+platform reports for a rotated view.
+
+**Blocked on passer-core.** Raw streams (`open_stream`) exist only for Rust hosts. The phone needs
+them in the UniFFI bindings (requested: `openStream(device, capability, inputJson, sink)` with
+`send`, `close` and the call's result, as mobile-v0.4.0). Until then `ScreenStreams.opener` is
+empty, `screenAvailable()` is false, and the device's page doesn't show the two commands. On
+Android `screenAvailable()` is false too: the MediaCodec decoder isn't written.
 
 ## What the phone offers
 
@@ -110,6 +146,8 @@ long that one call may run, not a window of access.
 - It uses n0's development relays (`N0Dev`), not Passer's own (Devices › *Preview network* says so).
 - A JavaScript update reaching a binary built before this module sees `available: false`, and
   Send asks for an app update instead of crashing.
+- Seeing a screen waits for passer-core's stream export (above), then a build; Android has no
+  decoder yet.
 - Streams to the PC need a desktop offering `file.drop` (on `dev`, not yet released); against
   an older one the app falls back to one call per file, 700 KB at most.
 - The module compiled in the iOS preview builds of 2026-11-24 (`ef8af9d` with mobile-v0.1.0,

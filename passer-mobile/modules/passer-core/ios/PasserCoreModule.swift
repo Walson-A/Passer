@@ -16,7 +16,8 @@ public class PasserCoreModule: Module {
   public func definition() -> ModuleDefinition {
     Name("PasserCore")
 
-    Events("onApprovalRequest", "onApprovalClosed", "onDeviceJoined", "onReceived", "onTransferProgress")
+    Events(
+      "onApprovalRequest", "onApprovalClosed", "onDeviceJoined", "onReceived", "onTransferProgress", "onScreenEvent")
 
     AsyncFunction("open") { () async throws -> [String: Any?] in
       let device = try self.openDevice()
@@ -113,6 +114,49 @@ public class PasserCoreModule: Module {
 
     Function("answerApproval") { (id: Int, allow: Bool) -> Bool in
       self.prompts.answer(id: id, allow: allow)
+    }
+
+    // Another device's screen (ScreenSession.swift). The video stays native; JavaScript
+    // gets the JSON events and sends the viewer's input.
+    Function("screenAvailable") { () -> Bool in
+      ScreenStreams.opener != nil
+    }
+
+    AsyncFunction("screenOpen") { (target: String, capability: String, inputJson: String, sessionId: String) async throws in
+      guard let opener = ScreenStreams.opener else {
+        throw PasserError.Invalid(message: "unsupported: this build cannot open screen streams yet")
+      }
+      let session = ScreenSession(id: sessionId) { [weak self] body in
+        self?.emit("onScreenEvent", body)
+      }
+      ScreenSessions.shared.add(session)
+      do {
+        let transport = try await opener(
+          target, capability, inputJson,
+          { data in session.receive(data) },
+          { error in
+            session.closed(error)
+            ScreenSessions.shared.remove(sessionId)
+          })
+        session.attach(transport)
+      } catch {
+        ScreenSessions.shared.remove(sessionId)
+        throw error
+      }
+    }
+
+    Function("screenSend") { (sessionId: String, json: String) in
+      ScreenSessions.shared.get(sessionId)?.sendJson(json)
+    }
+
+    Function("screenClose") { (sessionId: String) in
+      ScreenSessions.shared.remove(sessionId)
+    }
+
+    View(PasserScreenView.self) {
+      Prop("sessionId") { (view: PasserScreenView, id: String) in
+        view.sessionId = id
+      }
     }
   }
 

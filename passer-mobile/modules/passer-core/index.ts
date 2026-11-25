@@ -1,4 +1,6 @@
-import { requireOptionalNativeModule, type NativeModule } from 'expo';
+import { requireNativeView, requireOptionalNativeModule, type NativeModule } from 'expo';
+import type { ComponentType } from 'react';
+import { Platform, type ViewProps } from 'react-native';
 
 /**
  * The Passer device network (passer-core) on this phone.
@@ -89,12 +91,25 @@ export type Received = { from: string; fromId: string; agent: string | null } & 
 /** How far a `sendFile` or `fetchFile` has gone; `total` is known for uploads. */
 export type TransferProgress = { id: string; done: number; total: number | null };
 
+/**
+ * What a screen session reports (`ScreenSession.swift`): a JSON event of the Vasistas
+ * protocol, the pointer's new look, or the end of the stream. The video itself stays native.
+ */
+export type ScreenNativeEvent = {
+  sessionId: string;
+  json?: string;
+  shape?: { width: number; height: number; hotX: number; hotY: number; rgba: string };
+  closed?: boolean;
+  error?: string | null;
+};
+
 type Events = {
   onApprovalRequest: (request: ApprovalRequest) => void;
   onApprovalClosed: (event: { id: number }) => void;
   onDeviceJoined: (joined: Joined) => void;
   onReceived: (received: Received) => void;
   onTransferProgress: (progress: TransferProgress) => void;
+  onScreenEvent: (event: ScreenNativeEvent) => void;
 };
 
 declare class PasserCoreNative extends NativeModule<Events> {
@@ -121,6 +136,13 @@ declare class PasserCoreNative extends NativeModule<Events> {
   memberCapabilities(id: string): Promise<OfferedCapability[]>;
   journal(limit: number, id: string | null): Promise<JournalEntry[]>;
   answerApproval(id: number, allow: boolean): boolean;
+  /** Missing in builds before the screen; false while passer-core can't open streams for apps. */
+  screenAvailable?(): boolean;
+  /** Opens `screen.view` or `screen.control`; resolves once the other device accepted (up to 60 s). */
+  screenOpen?(device: string, capability: string, inputJson: string, sessionId: string): Promise<void>;
+  /** A viewer message of the Vasistas protocol, as JSON. */
+  screenSend?(sessionId: string, json: string): void;
+  screenClose?(sessionId: string): void;
 }
 
 const native = requireOptionalNativeModule<PasserCoreNative>('PasserCore');
@@ -131,6 +153,25 @@ export const PasserCore = {
 };
 
 /** The links an approver device shows as a QR code. */
+/** Whether this build can show another device's screen. */
+export function screenSupported(): boolean {
+  try {
+    return native?.screenAvailable?.() === true;
+  } catch {
+    return false;
+  }
+}
+
+/** The native view drawing a screen session's video, letterboxed. Null where the build has none. */
+export const ScreenView: ComponentType<ViewProps & { sessionId: string }> | null = (() => {
+  if (Platform.OS !== 'ios' || !native?.screenAvailable) return null;
+  try {
+    return requireNativeView<ViewProps & { sessionId: string }>('PasserCore', 'PasserScreenView');
+  } catch {
+    return null;
+  }
+})();
+
 export function isCoreInvitation(link: string): boolean {
   return link.startsWith('passer-core://join?');
 }

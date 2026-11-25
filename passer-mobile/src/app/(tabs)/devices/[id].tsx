@@ -4,7 +4,7 @@ import { Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DeviceGlyph } from '@/components/device-glyph';
-import { ClipboardDownIcon, FileIcon, SendIcon } from '@/components/icons';
+import { ClipboardDownIcon, FileIcon, MonitorIcon, PointerIcon, SendIcon } from '@/components/icons';
 import { ReachLine } from '@/components/reach-line';
 import { SharedFiles } from '@/components/shared-files';
 import { AppText } from '@/components/ui/app-text';
@@ -24,7 +24,7 @@ import { useTransfers } from '@/state/transfers';
 import { useTheme } from '@/theme/theme';
 import { deviceName, formatRelative } from '@/utils/format';
 
-import type { JournalEntry } from '../../../../modules/passer-core';
+import { screenSupported, type JournalEntry } from '../../../../modules/passer-core';
 
 /**
  * One device: drawn large (the desktop Showroom's stage, kept to a phone's scale), whether
@@ -76,6 +76,10 @@ export default function DeviceScreen() {
   /** Without the member's own list (an older core), every command is shown; the device decides. */
   const offers = (name: string) => !offered || offered.some((offer) => offer.name === name);
   const readOffer = offered?.find((offer) => offer.name === 'clipboard.read');
+  /** The screen only where the member says it shares it, and this build can show it. */
+  const screenOffer = (name: string) => (screenSupported() ? offered?.find((offer) => offer.name === name) : undefined);
+  const viewOffer = screenOffer('screen.view');
+  const controlOffer = screenOffer('screen.control');
 
   const useAsTarget = () => {
     devices.setTarget(member.id);
@@ -169,6 +173,30 @@ export default function DeviceScreen() {
                 />
               ) : null}
             </View>
+            {viewOffer || controlOffer ? (
+              <View style={[styles.discs, styles.pair]}>
+                {viewOffer ? (
+                  <Disc
+                    icon={MonitorIcon}
+                    label={t.screen.see}
+                    locked={viewOffer.needsApproval}
+                    lockedLabel={t.send.asksFirst}
+                    onPress={() => router.push({ pathname: '/screen/[id]', params: { id: member.id, control: '0' } })}
+                    disabled={!reachable}
+                  />
+                ) : null}
+                {controlOffer ? (
+                  <Disc
+                    icon={PointerIcon}
+                    label={t.screen.control}
+                    locked={controlOffer.needsApproval}
+                    lockedLabel={t.send.asksFirst}
+                    onPress={() => router.push({ pathname: '/screen/[id]', params: { id: member.id, control: '1' } })}
+                    disabled={!reachable}
+                  />
+                ) : null}
+              </View>
+            ) : null}
           </>
         ) : null}
 
@@ -256,6 +284,8 @@ const styles = StyleSheet.create({
   center: { textAlign: 'center' },
   centerRow: { flexDirection: 'row', justifyContent: 'center' },
   discs: { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 12, gap: 8 },
+  /** The screen's two commands, under the transfers: centred rather than stretched. */
+  pair: { justifyContent: 'center', gap: 24 },
   mono: { fontFamily: Platform.select({ ios: 'Menlo', default: 'monospace' }), fontSize: 13 },
   confirm: { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
   note: { paddingHorizontal: 32 },

@@ -21,7 +21,18 @@ export function useSecondsLeft(deadline: number): number {
  * How long is left to answer a request: a ring that empties, blue, then amber, then red,
  * like the desktop's. The number is what VoiceOver reads.
  */
-export function CountdownRing({ seconds, total, size = 46 }: { seconds: number; total: number; size?: number }) {
+export function CountdownRing({
+  seconds,
+  total,
+  size = 46,
+  ink,
+}: {
+  seconds: number;
+  total: number;
+  size?: number;
+  /** The number's colour on a ground that ignores the theme (the screen viewer is always dark). */
+  ink?: string;
+}) {
   const { colors } = useTheme();
   const stroke = 3.5;
   const radius = (size - stroke) / 2;
@@ -36,7 +47,7 @@ export function CountdownRing({ seconds, total, size = 46 }: { seconds: number; 
       accessibilityLabel={format(t.approval.secondsLeft, { count: seconds })}
     >
       <Svg width={size} height={size}>
-        <Circle cx={size / 2} cy={size / 2} r={radius} stroke={colors.border.raised} strokeWidth={stroke} fill="none" />
+        <Circle cx={size / 2} cy={size / 2} r={radius} stroke={ink ? 'rgba(255,255,255,0.18)' : colors.border.raised} strokeWidth={stroke} fill="none" />
         <Circle
           cx={size / 2}
           cy={size / 2}
@@ -52,7 +63,7 @@ export function CountdownRing({ seconds, total, size = 46 }: { seconds: number; 
       </Svg>
       <View style={StyleSheet.absoluteFill}>
         <View style={styles.center}>
-          <AppText variant="footnote" maxFontSizeMultiplier={1.2} style={styles.number}>
+          <AppText variant="footnote" maxFontSizeMultiplier={1.2} color={ink} style={styles.number}>
             {seconds}
           </AppText>
         </View>

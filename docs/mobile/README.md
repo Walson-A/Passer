@@ -136,6 +136,7 @@ Every screen and state, with captures: [screens.md](screens.md).
 
 - **A build of the redesign.** The passer-core module has been compiled by the two iOS builds of 2026-11-24; the redesign and the phone's capabilities (`PhoneCapabilities` in Swift and Kotlin, written against the UniFFI bindings without a compiler here) have not. The next build is the check; Kotlin has never been compiled, since there has been no Android build.
 - **Checks on the phone,** not recorded anywhere yet: how native errors read on the JavaScript side (the classification looks for the core's codes in the text), the Local Network prompt with iroh, the native tab bar's look, the paste control at large text sizes, VoiceOver, Android's back gesture.
+- **Seeing and controlling a screen** is written on iOS (Face ID, the H.264 decoder, the viewer) and checked on the bench, but waits for passer-core to export raw streams to mobile, then a build; Android has no decoder yet. See [device-network.md](device-network.md).
 - **Live presence** isn't in passer-core: reachability is probed with `device.info`, and *seen N min ago* comes from the last answer.
 - **Streams to the PC** need the desktop's `file.drop`, on `dev` and not yet released.
 - **Share extension, Shortcuts and widgets** still use the direct connection; moving them to the device network needs the core in the extensions.

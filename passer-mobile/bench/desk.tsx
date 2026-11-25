@@ -43,6 +43,8 @@ const ROUTE_GROUPS: { title: string; routes: Route[] }[] = [
       { label: 'Appareils', path: '/devices', modal: false },
       { label: 'Fiche du PC', path: `/devices/${GROUP.pc.id}`, modal: false },
       { label: 'Fiche de ce téléphone', path: `/devices/${GROUP.phone.id}`, modal: false },
+      { label: 'Voir l’écran du PC', path: `/screen/${GROUP.pc.id}?control=0`, modal: true },
+      { label: 'Prendre la main sur le PC', path: `/screen/${GROUP.pc.id}?control=1`, modal: true },
       { label: 'Ajouter un appareil', path: '/invite', modal: true },
       { label: 'Activité', path: '/activity', modal: false },
       { label: 'Réglages', path: '/settings', modal: true },
@@ -75,6 +77,10 @@ const EVENTS: { label: string; event: string }[] = [
   { label: 'Le PC envoie du texte', event: 'received-text' },
   { label: 'Le PC envoie un fichier', event: 'received-file' },
   { label: 'Un appareil rejoint par ce téléphone', event: 'joined' },
+  { label: 'Écran : le PC se verrouille', event: 'screen-paused' },
+  { label: 'Écran : le PC est de retour', event: 'screen-resumed' },
+  { label: 'Écran : quelqu’un touche le PC', event: 'screen-local' },
+  { label: 'Écran : Échap sur le PC', event: 'screen-escape' },
 ];
 
 const ROUTES = ROUTE_GROUPS.flatMap((group) => group.routes);

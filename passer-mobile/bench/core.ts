@@ -27,7 +27,16 @@ const SHARED = [
 
 type Listener = (payload: never) => void;
 
-export type BenchCoreEvent = 'approval' | 'approval-agent' | 'received-text' | 'received-file' | 'joined';
+export type BenchCoreEvent =
+  | 'approval'
+  | 'approval-agent'
+  | 'received-text'
+  | 'received-file'
+  | 'joined'
+  | 'screen-paused'
+  | 'screen-resumed'
+  | 'screen-local'
+  | 'screen-escape';
 
 export function createFakeCore({
   regime,
@@ -101,6 +110,9 @@ export function createFakeCore({
           { name: 'file.drop', title: 'Send a file to the PC', description: "Saves the file you send into the PC's Passboard folder, under its name.", effect: 'write', needsApproval: false },
           { name: 'file.list', title: "List the PC's shared files", description: "Lists the files in the PC's Passer Space folder, to get one with file.get.", effect: 'read', needsApproval: false },
           { name: 'file.get', title: 'Get a file from the PC', description: "Sends back a file from the PC's Passer Space folder, by name.", effect: 'read', needsApproval: false },
+          // Vasistas over Passer: sensitive, asked on the PC unless its owner switched that off.
+          { name: 'screen.view', title: 'See the screen', description: 'Shows this screen to the caller, live.', effect: 'sensitive', needsApproval: true },
+          { name: 'screen.control', title: 'Control the screen', description: "Lets the caller see this screen and use its mouse and keyboard.", effect: 'sensitive', needsApproval: true },
         );
       }
       return list;
@@ -273,6 +285,51 @@ export function createFakeCore({
       await wait(200);
       log('pc', 'Activité à distance arrêtée');
     },
+    screenOpen: async (device: string, capability: string, _inputJson: string, sessionId: string) => {
+      const member = find(device);
+      if (!answers(member)) {
+        await wait(2_000);
+        throw new Error('network error: connection timed out');
+      }
+      if (!offers(member).some((offer) => offer.name === capability)) {
+        throw new Error('unknown_capability: no such capability on this device');
+      }
+      // The PC's user is asked first (the switch is off by default).
+      log('pc', `Le PC demande d’autoriser « ${capability === 'screen.control' ? 'contrôler' : 'voir'} l’écran »`);
+      await wait(2_800);
+      if (regime === 'refuses') {
+        log('pc', 'Refusé sur le PC');
+        throw new Error('denied: the user refused this request');
+      }
+      log('pc', 'Autorisé une fois sur le PC ; le voyant s’allume');
+      screen = { id: sessionId, control: capability === 'screen.control', moves: 0 };
+      const json = (value: unknown) => emit('onScreenEvent', { sessionId, json: JSON.stringify(value) });
+      setTimeout(() => {
+        json({ event: 'ready', protocol: 1, version: '0.1.0', width: 1920, height: 1080, control: capability === 'screen.control' });
+        json({ event: 'pointer', x: 0.42, y: 0.38 });
+      }, 300);
+    },
+    screenSend: (sessionId: string, message: string) => {
+      if (!screen || screen.id !== sessionId) return;
+      const parsed = JSON.parse(message) as { type: string; x?: number; y?: number; text?: string; code?: string; down?: boolean };
+      if (parsed.type === 'move') {
+        screen.moves += 1;
+        emit('onScreenEvent', { sessionId, json: JSON.stringify({ event: 'pointer', x: parsed.x, y: parsed.y }) });
+        if (screen.moves % 20 === 1) log('pc', `Pointeur déplacé (${(parsed.x ?? 0).toFixed(2)}, ${(parsed.y ?? 0).toFixed(2)})`);
+        return;
+      }
+      if (!screen.control && parsed.type !== 'keyframe') {
+        emit('onScreenEvent', { sessionId, json: JSON.stringify({ event: 'refused', reason: 'view_only' }) });
+        return;
+      }
+      log('pc', `Reçu du téléphone : ${message}`);
+    },
+    screenClose: (sessionId: string) => {
+      if (screen?.id === sessionId) {
+        log('pc', 'Partage terminé ; le voyant s’éteint');
+        screen = null;
+      }
+    },
     answerApproval: (id: number, allow: boolean) => {
       log('pc', `Demande ${id} : ${allow ? 'autorisée une fois' : 'refusée'}`);
       return true;
@@ -286,9 +343,25 @@ export function createFakeCore({
   };
 
   let nextRequest = 1;
+  let screen: { id: string; control: boolean; moves: number } | null = null;
 
   /** What another device does: ask for approval, send something, join through an invitation. */
   const trigger = (event: BenchCoreEvent) => {
+    if (event.startsWith('screen-')) {
+      if (!screen) return;
+      const sessionId = screen.id;
+      const value =
+        event === 'screen-paused'
+          ? { event: 'paused', reason: 'unavailable' }
+          : event === 'screen-resumed'
+            ? { event: 'resumed' }
+            : event === 'screen-local'
+              ? { event: 'local_input' }
+              : { event: 'ended', reason: 'escape' };
+      emit('onScreenEvent', { sessionId, json: JSON.stringify(value) });
+      if (event === 'screen-escape') screen = null;
+      return;
+    }
     if (event === 'approval' || event === 'approval-agent') {
       const request: ApprovalRequest = {
         id: nextRequest++,
