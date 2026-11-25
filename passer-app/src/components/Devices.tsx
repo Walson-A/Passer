@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import {
     ArrowDownLeft, ArrowUpRight, Check, ChevronRight, KeyRound, Laptop, Lock, Monitor, QrCode, RefreshCw, ShieldCheck,
-    Smartphone, Trash2, WifiOff, X, CircleAlert, Link2,
+    Smartphone, Trash2, WifiOff, X, CircleAlert, Link2, Loader2,
 } from "lucide-react";
 import { DeviceInvite, InlineError } from "./DeviceInvite";
 import { DeviceRender } from "./DeviceRender";
@@ -465,6 +465,8 @@ function DetailsPanel({ member: m, canRemove, confirm, busy, onArm, onDisarm, on
                     ))}
                 </dl>
 
+                {!m.this_device && <ScreenSwitches member={m} />}
+
                 <div className="flex-1 min-h-0 flex flex-col mt-5">
                     <h3 className="px-6 text-[11px] font-black uppercase tracking-[0.18em] text-white/50">
                         {m.this_device ? "Calls on this PC" : "Between it and this PC"}
@@ -510,6 +512,89 @@ function DetailsPanel({ member: m, canRemove, confirm, busy, onArm, onDisarm, on
                 </div>
             </aside>
         </div>
+    );
+}
+
+/**
+ * What this device may do with this PC's screen **without anyone accepting here** -
+ * for your own phone when you are away from the PC. Off by default: then viewing and
+ * control ask on this PC each time. Shown only when this PC can share its screen
+ * (Vasistas installed).
+ */
+function ScreenSwitches({ member: m }: { member: Member }) {
+    const [available, setAvailable] = useState<boolean | null>(null);
+    const [rules, setRules] = useState<{ view: boolean; control: boolean } | null>(null);
+    const [saving, setSaving] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        let alive = true;
+        invoke<{ available: boolean }>("devices_screen_status")
+            .then(s => { if (alive) setAvailable(s.available); })
+            .catch(() => { if (alive) setAvailable(false); });
+        invoke<{ view: boolean; control: boolean }>("devices_screen_rules", { id: m.id })
+            .then(r => { if (alive) setRules(r); })
+            .catch(e => { if (alive) setError(String(e)); });
+        return () => { alive = false; };
+    }, [m.id]);
+
+    if (!available) return null;
+
+    const set = async (capability: "screen.view" | "screen.control", allow: boolean) => {
+        setSaving(capability);
+        setError(null);
+        try {
+            setRules(await invoke<{ view: boolean; control: boolean }>("devices_set_screen_rule", { id: m.id, capability, allow }));
+        } catch (e) {
+            setError(String(e));
+        } finally {
+            setSaving(null);
+        }
+    };
+
+    const row = (cap: "screen.view" | "screen.control", title: string, on: boolean) => (
+        <div className="flex items-center gap-4 px-4 py-3">
+            <div className="min-w-0 flex-1">
+                <p className="text-[13px] font-semibold text-white/90 leading-tight">{title}</p>
+                <p className="text-[11.5px] text-white/50 mt-1 leading-snug">{on ? "Without anyone accepting here" : "Asks on this PC each time"}</p>
+            </div>
+            {saving === cap
+                ? <Loader2 className="w-4 h-4 animate-spin text-white/60 shrink-0" aria-label="Applying" />
+                : <Switch checked={on} label={`${title} without asking`} onChange={() => set(cap, !on)} />}
+        </div>
+    );
+
+    return (
+        <section className="mx-6 mt-5" aria-label="This PC's screen">
+            <h3 className="text-[11px] font-black uppercase tracking-[0.18em] text-white/50">This PC's screen</h3>
+            <div className="mt-2.5 rounded-2xl bg-white/[0.03] border border-white/[0.06] divide-y divide-white/[0.05]">
+                {rules ? (
+                    <>
+                        {row("screen.view", "See it without asking", rules.view)}
+                        {row("screen.control", "Control it without asking", rules.control)}
+                    </>
+                ) : <span className="skeleton block h-24 rounded-2xl" />}
+            </div>
+            <p className="mt-2 text-[11.5px] text-white/45 leading-snug">
+                Keep these for your own devices, to reach this PC when you are away. The screen always shows who is there, and Escape on this PC stops it. Changing them restarts the connection for a few seconds.
+            </p>
+            {error && <p className="mt-2 text-[11.5px] text-red-200/80 break-words" role="alert">{error}</p>}
+        </section>
+    );
+}
+
+function Switch({ checked, label, onChange }: { checked: boolean; label: string; onChange: () => void }) {
+    return (
+        <button
+            role="switch"
+            aria-checked={checked}
+            aria-label={label}
+            onClick={onChange}
+            className={`relative shrink-0 w-10 h-[22px] rounded-full transition-all duration-300 cursor-pointer ${FOCUS}
+                ${checked ? "bg-red-500/80 shadow-[0_0_12px_rgba(239,68,68,0.35)]" : "bg-white/10 border border-white/15"}`}
+        >
+            <span className={`absolute top-0.5 w-[18px] h-[18px] rounded-full bg-white shadow-md transition-all duration-300 ${checked ? "left-[20px]" : "left-0.5"}`} />
+        </button>
     );
 }
 

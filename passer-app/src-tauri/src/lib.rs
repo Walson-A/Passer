@@ -79,7 +79,9 @@ pub fn run() {
             devices::space_add_paths,
             devices::space_remove,
             devices::devices_screen_sessions,
-            devices::devices_screen_status
+            devices::devices_screen_status,
+            devices::devices_screen_rules,
+            devices::devices_set_screen_rule
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {

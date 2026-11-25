@@ -6,9 +6,12 @@
 //! checks: member of the group, permission rule, visible indicator, session that the stop
 //! button or Escape on this PC ends (which kills the process).
 //!
-//! Decided with Walson: only his own devices; they may view and take control without a
-//! confirmation on this PC, because Vasistas shows a visible sign and Escape stops it; no
-//! access to a locked PC or to UAC prompts (Vasistas cannot see the secure desktop).
+//! Decided with Walson (25 Nov 2026): viewing and taking control **ask on this PC** by
+//! default (sensitive capabilities, the core's default rule), and each device can be
+//! allowed to do either **without asking** - a per-device rule set from its Details
+//! panel, for his own phone when he is away from the PC. Agents never get it. No access
+//! to a locked PC or to UAC prompts yet (Vasistas cannot see the secure desktop);
+//! unlocking remotely is planned as a separate switch.
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -79,33 +82,72 @@ pub fn commands(program: PathBuf) -> Vec<passer_exec::Command> {
     ]
 }
 
-/// The rule that lets the group's own devices view and control without asking. Agents
-/// are not devices (`Who::AnyDevice` excludes them), so they still get nothing.
-pub fn trusted_devices_rule() -> Rule {
-    Rule {
-        who: Who::AnyDevice,
-        capability: "screen.*".into(),
-        target: None,
-        decision: Decision::Allow,
-        lease_secs: Some(SESSION_SECS),
+/// Earlier builds of this branch let every device of the group view and control
+/// without asking (`Who::AnyDevice`, `screen.*`, allow). Removed at start, so a PC
+/// that ran them is back to asking.
+pub fn remove_group_rule(home: &std::path::Path) -> Result<(), String> {
+    let mut policy = read_policy(home)?;
+    let before = policy.rules.len();
+    policy.rules.retain(|r| !(r.who == Who::AnyDevice && r.capability == "screen.*"));
+    if policy.rules.len() != before {
+        write_policy(home, &policy)?;
+    }
+    Ok(())
+}
+
+/// What one device may do with this PC's screen without asking.
+#[derive(Serialize, Clone, Default)]
+pub struct ScreenRules {
+    pub view: bool,
+    pub control: bool,
+}
+
+fn device_who(id: &str) -> Result<Who, String> {
+    // `Who::Device` holds the core's `DeviceId`, which this crate cannot name: go through
+    // its serde form, which is the one `policy.json` uses anyway.
+    serde_json::from_value(serde_json::json!({ "kind": "device", "id": id })).map_err(|e| e.to_string())
+}
+
+pub fn rules_for(home: &std::path::Path, id: &str) -> Result<ScreenRules, String> {
+    let who = device_who(id)?;
+    let policy = read_policy(home)?;
+    let allowed = |cap: &str| policy.rules.iter().any(|r| r.who == who && r.capability == cap && r.decision == Decision::Allow);
+    Ok(ScreenRules { view: allowed("screen.view"), control: allowed("screen.control") })
+}
+
+/// Lets one device view (`screen.view`) or control (`screen.control`) without asking,
+/// or takes that back. The rule is the device's own: a device added later gets nothing.
+pub fn set_rule(home: &std::path::Path, id: &str, capability: &str, allow: bool) -> Result<(), String> {
+    if capability != "screen.view" && capability != "screen.control" {
+        return Err(format!("not a screen capability: {capability}"));
+    }
+    let who = device_who(id)?;
+    let mut policy = read_policy(home)?;
+    policy.rules.retain(|r| !(r.who == who && r.capability == capability));
+    if allow {
+        // Ahead of the defaults, so it wins over the "sensitive asks" rule.
+        policy.rules.insert(0, Rule {
+            who,
+            capability: capability.into(),
+            target: None,
+            decision: Decision::Allow,
+            lease_secs: Some(SESSION_SECS),
+        });
+    }
+    write_policy(home, &policy)
+}
+
+fn read_policy(home: &std::path::Path) -> Result<Policy, String> {
+    match std::fs::read_to_string(home.join("policy.json")) {
+        Ok(text) => serde_json::from_str(&text).map_err(|e| e.to_string()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Policy::default()),
+        Err(e) => Err(e.to_string()),
     }
 }
 
-/// Adds the rule to the device's `policy.json` once, keeping any other rule.
-pub fn ensure_rule(home: &std::path::Path) -> Result<(), String> {
-    let path = home.join("policy.json");
-    let mut policy: Policy = match std::fs::read_to_string(&path) {
-        Ok(text) => serde_json::from_str(&text).map_err(|e| e.to_string())?,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Policy::default(),
-        Err(e) => return Err(e.to_string()),
-    };
-    let rule = trusted_devices_rule();
-    if policy.rules.iter().any(|r| r.capability == rule.capability && r.who == rule.who) {
-        return Ok(());
-    }
-    policy.rules.push(rule);
+fn write_policy(home: &std::path::Path, policy: &Policy) -> Result<(), String> {
     std::fs::create_dir_all(home).map_err(|e| e.to_string())?;
-    std::fs::write(&path, serde_json::to_string_pretty(&policy).map_err(|e| e.to_string())?)
+    std::fs::write(home.join("policy.json"), serde_json::to_string_pretty(policy).map_err(|e| e.to_string())?)
         .map_err(|e| e.to_string())
 }
 
