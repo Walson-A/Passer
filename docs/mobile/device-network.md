@@ -158,6 +158,6 @@ long that one call may run, not a window of access.
 - Streams to the PC need a desktop offering `file.drop` (on `dev`, not yet released); against
   an older one the app falls back to one call per file, 700 KB at most.
 - The module compiled in the iOS preview builds of 2026-11-24 (`ef8af9d` with mobile-v0.1.0,
-  `68a3cce` with mobile-v0.2.0); see Builds in [README.md](README.md). Streams (mobile-v0.3.0) and
-  the phone's capabilities came after and haven't been compiled yet, and no Android build has
-  ever been made.
+  `68a3cce` with mobile-v0.2.0, `c23a124` with mobile-v0.3.0, streams and the phone's
+  capabilities); see Builds in [README.md](README.md). The screen (mobile-v0.4.0) is in the build
+  of 2026-11-25. No Android build has ever been made.

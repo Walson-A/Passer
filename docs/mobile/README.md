@@ -8,7 +8,7 @@ The app was redesigned on 2026-11-24 (branch `feat/mobile-redesign`): native iOS
 
 ## Builds
 
-Read from EAS (`eas build:list`) on 2026-11-24. Every build so far is iOS, internal distribution (`preview`) or simulator; there has never been an Android build, a TestFlight build or an App Store build.
+Read from EAS (`eas build:list`) on 2026-11-25. Every build so far is iOS, internal distribution (`preview`) or simulator; there has never been an Android build, a TestFlight build or an App Store build.
 
 | Date (UTC) | Profile | App version | Commit | What it carried |
 |---|---|---|---|---|
@@ -17,6 +17,8 @@ Read from EAS (`eas build:list`) on 2026-11-24. Every build so far is iOS, inter
 | 2026-10-02 10:44 | preview | 1.1.0 | `0894ad5` | + widgets and Control Center controls |
 | 2026-11-24 14:07 | preview | 1.1.0 | `ef8af9d` | + the device network (passer-core mobile-v0.1.0) |
 | 2026-11-24 17:45 | preview | 1.1.0 | `68a3cce` | passer-core mobile-v0.2.0, what members are and offer |
+| 2026-11-24 22:24 | preview | 1.1.0 | `c23a124` (dev) | The redesign, the phone's capabilities, streams (mobile-v0.3.0) |
+| 2026-11-25 19:30 | preview | 1.1.0 | `38b0452` (feat/mobile-screen) | + seeing and controlling a PC's screen: Face ID, the H.264 decoder, mobile-v0.4.0. Build `55f1e07a`, running when this was written |
 
 Simulator builds on 2026-09-12 checked the Swift of the extensions (three failed before `baebc93`). OTA updates published on the `preview` channel reach these builds while the app version stays 1.1.0; JavaScript that needs native code a build lacks must wait for the next build.
 
@@ -134,7 +136,7 @@ Every screen and state, with captures: [screens.md](screens.md).
 
 ## Not done yet
 
-- **A build of the redesign.** The passer-core module has been compiled by the two iOS builds of 2026-11-24; the redesign and the phone's capabilities (`PhoneCapabilities` in Swift and Kotlin, written against the UniFFI bindings without a compiler here) have not. The next build is the check; Kotlin has never been compiled, since there has been no Android build.
+- **Android has never been built.** The redesign, streams and the phone's capabilities compiled on iOS (build of 2026-11-24 22:24 from `dev`); their Kotlin, written against the UniFFI bindings without a compiler here, never has.
 - **Checks on the phone,** not recorded anywhere yet: how native errors read on the JavaScript side (the classification looks for the core's codes in the text), the Local Network prompt with iroh, the native tab bar's look, the paste control at large text sizes, VoiceOver, Android's back gesture.
 - **Seeing and controlling a screen** is written on iOS (Face ID, passer-core's `connectStream`, the H.264 decoder, the viewer) and checked on the bench, never compiled: mobile-v0.4.0 is pinned in `passer-core.json`, and the next iOS build is the check. Android has no decoder yet. See [device-network.md](device-network.md).
 - **Live presence** isn't in passer-core: reachability is probed with `device.info`, and *seen N min ago* comes from the last answer.
