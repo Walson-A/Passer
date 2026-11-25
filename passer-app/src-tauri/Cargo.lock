@@ -5226,7 +5226,7 @@ dependencies = [
 
 [[package]]
 name = "passer"
-version = "1.1.0-beta.1"
+version = "1.1.0-beta.2"
 dependencies = [
  "arboard",
  "async-trait",
