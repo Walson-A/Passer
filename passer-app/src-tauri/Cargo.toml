@@ -39,9 +39,8 @@ base64 = "0.21"
 headers = "0.3" 
 open = "5.0" # For auth headers handling if needed
 # The device network: identity, groups, encrypted connections, permissions.
-# TEMPORARY: the local passer-core commit, until it is pushed (same rev on GitHub then).
-passer-ffi = { git = "file:///C:/Users/Walson/Documents/passer-core", rev = "1496f147707a3e39ea6f85de572151d917ba5717" }
-passer-exec = { git = "file:///C:/Users/Walson/Documents/passer-core", rev = "1496f147707a3e39ea6f85de572151d917ba5717" }
+passer-ffi = { git = "https://github.com/Walson-A/passer-core", rev = "1496f147707a3e39ea6f85de572151d917ba5717" }
+passer-exec = { git = "https://github.com/Walson-A/passer-core", rev = "1496f147707a3e39ea6f85de572151d917ba5717" }
 async-trait = "0.1"
 tauri-plugin-autostart = "2.5.1"
 tauri-plugin-single-instance = "2"
