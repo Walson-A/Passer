@@ -36,7 +36,8 @@ export type BenchCoreEvent =
   | 'screen-paused'
   | 'screen-resumed'
   | 'screen-local'
-  | 'screen-escape';
+  | 'screen-escape'
+  | 'screen-limit';
 
 export function createFakeCore({
   regime,
@@ -350,6 +351,13 @@ export function createFakeCore({
     if (event.startsWith('screen-')) {
       if (!screen) return;
       const sessionId = screen.id;
+      if (event === 'screen-limit') {
+        // passer-core ends a sensitive session after 15 minutes: the stream closes, the answer is `interrupted`.
+        emit('onScreenEvent', { sessionId, closed: true, error: 'the session reached its time limit', code: 'interrupted' });
+        log('pc', 'Session de 15 minutes écoulée ; le voyant s’éteint');
+        screen = null;
+        return;
+      }
       const value =
         event === 'screen-paused'
           ? { event: 'paused', reason: 'unavailable' }

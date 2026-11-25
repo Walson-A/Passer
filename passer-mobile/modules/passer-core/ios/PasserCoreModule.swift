@@ -119,26 +119,19 @@ public class PasserCoreModule: Module {
     // Another device's screen (ScreenSession.swift). The video stays native; JavaScript
     // gets the JSON events and sends the viewer's input.
     Function("screenAvailable") { () -> Bool in
-      ScreenStreams.opener != nil
+      true
     }
 
+    // Waits for the other device's approval (up to a minute) before it returns.
     AsyncFunction("screenOpen") { (target: String, capability: String, inputJson: String, sessionId: String) async throws in
-      guard let opener = ScreenStreams.opener else {
-        throw PasserError.Invalid(message: "unsupported: this build cannot open screen streams yet")
-      }
       let session = ScreenSession(id: sessionId) { [weak self] body in
         self?.emit("onScreenEvent", body)
       }
       ScreenSessions.shared.add(session)
       do {
-        let transport = try await opener(
-          target, capability, inputJson,
-          { data in session.receive(data) },
-          { error in
-            session.closed(error)
-            ScreenSessions.shared.remove(sessionId)
-          })
-        session.attach(transport)
+        let handle = try await self.openDevice().connectStream(
+          device: target, capability: capability, inputJson: inputJson, sink: ScreenSink(session))
+        session.attach(handle)
       } catch {
         ScreenSessions.shared.remove(sessionId)
         throw error

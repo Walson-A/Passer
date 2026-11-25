@@ -326,9 +326,11 @@ export const en = {
       stopped: 'It was stopped on {name}.',
       expired: 'It reached its time limit.',
       viewer_left: 'You left.',
+      interrupted: 'It was stopped on {name}, or its 15 minutes ran out. Open it again to go on.',
       other: 'The connection closed.',
     } as Record<string, string>,
     turn: 'Turn the picture to fill the phone',
+    noIndicator: "{name} can't show right now that its screen is shared, so it doesn't share it.",
     keyboard: 'Keyboard',
     hideKeyboard: 'Hide keyboard',
     keys: {
@@ -735,9 +737,11 @@ export const fr: Translation<typeof en> = {
       stopped: 'Il a été arrêté sur {name}.',
       expired: 'Il a atteint sa durée maximale.',
       viewer_left: 'Vous êtes parti.',
+      interrupted: 'Il a été arrêté sur {name}, ou ses 15 minutes sont écoulées. Rouvrez-le pour continuer.',
       other: 'La connexion s’est fermée.',
     },
     turn: "Tourner l'image pour remplir le téléphone",
+    noIndicator: "{name} ne peut pas montrer pour l'instant que son écran est partagé, alors il ne le partage pas.",
     keyboard: 'Clavier',
     hideKeyboard: 'Masquer le clavier',
     keys: {

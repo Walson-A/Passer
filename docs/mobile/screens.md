@@ -48,12 +48,12 @@ appearance (it frames a picture); only the close button leaves it.
 |---|---|---|
 | It's you | Face ID or the phone's code. Cancelled, not recognised or no code set, each in a sentence; *Try again*. | |
 | Waiting | *Waiting for an answer on DESKTOP-…*, its user must allow it, the 60 s ring, *Cancel*. | [waiting](captures/40-ecran-attente.jpg) |
-| Refused | *DESKTOP-… said no*, no answer, not reachable, each in a sentence; *Try again*. | [refused](captures/45-ecran-refuse.jpg) |
+| Refused | *DESKTOP-… said no*, no answer, not reachable, can't show that its screen is shared, each in a sentence; *Try again*. | [refused](captures/45-ecran-refuse.jpg) |
 | Watching | The screen letterboxed, the PC's pointer drawn over it, *You see the screen of DESKTOP-…*, the turn button. | [watching](captures/43-ecran-voir.jpg) |
 | In control | *You control DESKTOP-…* and the keyboard button; open, the phone's keyboard and one scrolling line of keys (Esc, Tab, Ctrl and Alt held for the next key, arrows, Del). | [keyboard, Ctrl held](captures/41-ecran-main-clavier.jpg) |
 | Turned | The picture a quarter clockwise, filling the phone held sideways; touches still land under the finger. | [turned, paused](captures/42-ecran-tourne-pause.jpg) |
 | Told by the PC | *Paused* (lock screen, administrator prompt), *Someone is using DESKTOP-…* (3 s), *You can only watch*. | [paused](captures/42-ecran-tourne-pause.jpg) |
-| Ended | *The share ended* and why: Escape pressed on the PC, stopped there, time limit, connection closed. *Close*. | [ended](captures/44-ecran-termine.jpg) |
+| Ended | *The share ended* and why: Escape pressed on the PC, stopped there, its time limit, the core's 15 minutes (*Open it again to go on*), connection closed. *Close*. | [ended](captures/44-ecran-termine.jpg) |
 
 The bench draws a still Windows desktop in place of the video (`screen-view.web.tsx`): it judges
 layout and states, not the picture.

@@ -89,11 +89,19 @@ The picture can be turned a quarter to use the phone's height (the app stays por
 are read in window coordinates and turned back (`windowToStage`), so they land right whatever a
 platform reports for a rotated view.
 
-**Blocked on passer-core.** Raw streams (`open_stream`) exist only for Rust hosts. The phone needs
-them in the UniFFI bindings (requested: `openStream(device, capability, inputJson, sink)` with
-`send`, `close` and the call's result, as mobile-v0.4.0). Until then `ScreenStreams.opener` is
-empty, `screenAvailable()` is false, and the device's page doesn't show the two commands. On
-Android `screenAvailable()` is false too: the MediaCodec decoder isn't written.
+**The stream** is passer-core's `PasserDevice.connectStream(device, capability, inputJson, sink)`
+(passer-core b8f07ab, to be published as mobile-v0.4.0). It returns once the PC has accepted, or
+throws its refusal (`denied`, `approval_timeout`, `no_indicator`, `not_member`). What arrives goes
+to `ScreenSink` (`onData`, in pieces that don't line up with Vasistas's frames, then
+`onClosed`); the viewer's input goes through `StreamHandle.send`, one message after the other.
+Leaving ends this side (`close`), then everything 3 s later (`cancel`). When the stream closes,
+`result()` says why: `interrupted` when the PC's user stopped it or the session reached the core's
+15-minute limit for sensitive capabilities; the viewer then says to open it again.
+
+**Before a build:** `passer-core.json` still pins mobile-v0.3.0, whose bindings have no
+`connectStream`, so the iOS module doesn't compile against it. Once mobile-v0.4.0 is published,
+set its tag and checksums there and run `npm install` (it fetches the bindings). On Android
+`screenAvailable()` is false: the MediaCodec decoder isn't written, so the commands don't show.
 
 ## What the phone offers
 
@@ -146,8 +154,7 @@ long that one call may run, not a window of access.
 - It uses n0's development relays (`N0Dev`), not Passer's own (Devices › *Preview network* says so).
 - A JavaScript update reaching a binary built before this module sees `available: false`, and
   Send asks for an app update instead of crashing.
-- Seeing a screen waits for passer-core's stream export (above), then a build; Android has no
-  decoder yet.
+- Seeing a screen needs mobile-v0.4.0 pinned (above), then a build; Android has no decoder yet.
 - Streams to the PC need a desktop offering `file.drop` (on `dev`, not yet released); against
   an older one the app falls back to one call per file, 700 KB at most.
 - The module compiled in the iOS preview builds of 2026-11-24 (`ef8af9d` with mobile-v0.1.0,

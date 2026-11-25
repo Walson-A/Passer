@@ -81,6 +81,7 @@ const EVENTS: { label: string; event: string }[] = [
   { label: 'Écran : le PC est de retour', event: 'screen-resumed' },
   { label: 'Écran : quelqu’un touche le PC', event: 'screen-local' },
   { label: 'Écran : Échap sur le PC', event: 'screen-escape' },
+  { label: 'Écran : 15 minutes écoulées', event: 'screen-limit' },
 ];
 
 const ROUTES = ROUTE_GROUPS.flatMap((group) => group.routes);

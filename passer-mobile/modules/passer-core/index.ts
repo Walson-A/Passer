@@ -101,6 +101,8 @@ export type ScreenNativeEvent = {
   shape?: { width: number; height: number; hotX: number; hotY: number; rgba: string };
   closed?: boolean;
   error?: string | null;
+  /** The PC's final answer, when it refused: `interrupted` (stopped there, or the 15-minute limit). */
+  code?: string | null;
 };
 
 type Events = {

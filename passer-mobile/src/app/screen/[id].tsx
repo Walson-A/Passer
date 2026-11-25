@@ -164,11 +164,13 @@ function ScreenViewer() {
       );
     } catch (error) {
       haptic.error();
-      const kind = classifyCallError(error).kind;
+      const failure = classifyCallError(error);
+      const kind = failure.kind;
       setPhase({
         step: 'failed',
-        message:
-          kind === 'denied'
+        message: failure.message.includes('no_indicator')
+          ? format(t.screen.noIndicator, { name: member.name })
+          : kind === 'denied'
             ? format(t.transfer.denied, { name: member.name })
             : kind === 'timeout'
               ? format(t.transfer.timeout, { name: member.name })
@@ -189,7 +191,9 @@ function ScreenViewer() {
       if (event.closed) {
         opened.current = false;
         setPhase((current) =>
-          current.step === 'ended' ? current : { step: 'ended', reason: event.error ? 'other' : 'stopped' },
+          current.step === 'ended'
+            ? current
+            : { step: 'ended', reason: event.code === 'interrupted' ? 'interrupted' : event.error ? 'other' : 'stopped' },
         );
         return;
       }

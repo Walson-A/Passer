@@ -7,20 +7,7 @@ import Foundation
 /// (`docs/share.md` in the Vasistas repository): a stream of framed messages, JSON events
 /// and H.264 video one way, JSON input the other. The video never crosses into JavaScript:
 /// it is decoded here, by the system's hardware decoder, and drawn in `PasserScreenView`.
-
-/// The two directions of an opened `screen.view` / `screen.control` stream.
-protocol ScreenTransport: AnyObject {
-  func send(_ bytes: Data) async throws
-  func close()
-}
-
-/// Opens such a stream on another member. passer-core exposes raw streams to Rust hosts only
-/// for now (`open_stream`); until its mobile bindings carry them, there is no opener and
-/// `screenAvailable` is false, so the app never offers the screen.
-enum ScreenStreams {
-  static var opener: ((_ device: String, _ capability: String, _ inputJson: String, _ onData: @escaping (Data) -> Void,
-    _ onClosed: @escaping (String?) -> Void) async throws -> ScreenTransport)? = nil
-}
+/// The stream itself is passer-core's (`PasserDevice.connectStream`, mobile-v0.4.0).
 
 /// Every open session, by the id JavaScript gave it.
 final class ScreenSessions: @unchecked Sendable {
@@ -48,23 +35,70 @@ final class ScreenSessions: @unchecked Sendable {
   }
 }
 
+/// What passer-core hands over, piece by piece and in order, from one of its own threads.
+/// Pieces don't line up with Vasistas's frames: the session puts those back together.
+final class ScreenSink: StreamSink, @unchecked Sendable {
+  private weak var session: ScreenSession?
+
+  init(_ session: ScreenSession) {
+    self.session = session
+  }
+
+  func onData(bytes: Data) {
+    session?.receive(bytes)
+  }
+
+  func onClosed(error: String?) {
+    session?.streamClosed(error)
+  }
+}
+
 final class ScreenSession: @unchecked Sendable {
   let id: String
   let renderer = H264Renderer()
-  private var transport: ScreenTransport?
+  private let lock = NSLock()
+  private var handle: StreamHandle?
+  /// The viewer left (or never got a stream): a handle arriving late is cancelled at once.
+  private var left = false
+  /// The stream ended before `connectStream` returned its handle.
+  private var endedEarly: String?? = nil
   private var buffer = Data()
   private let emit: (_ body: [String: Any?]) -> Void
+  /// The viewer's input, sent one message after the other: a click's down never overtakes its up.
+  private let outbox: AsyncStream<Data>.Continuation
+  private let outgoing: AsyncStream<Data>
 
   init(id: String, emit: @escaping (_ body: [String: Any?]) -> Void) {
     self.id = id
     self.emit = emit
+    (outgoing, outbox) = AsyncStream<Data>.makeStream()
     renderer.onNeedKeyframe = { [weak self] in
       self?.sendJson(#"{"type":"keyframe"}"#)
     }
   }
 
-  func attach(_ transport: ScreenTransport) {
-    self.transport = transport
+  /// The opened stream. Starts sending what the viewer queued meanwhile.
+  func attach(_ handle: StreamHandle) {
+    lock.lock()
+    let gone = left
+    let early = endedEarly
+    if !gone { self.handle = handle }
+    lock.unlock()
+    if gone {
+      Task { await handle.cancel() }
+      return
+    }
+    let outgoing = self.outgoing
+    Task {
+      for await frame in outgoing {
+        do { try await handle.send(bytes: frame) } catch { break }
+      }
+      // The viewer is done: end this side, so the PC sees it leave, then everything.
+      await handle.close()
+      try? await Task.sleep(nanoseconds: 3_000_000_000)
+      await handle.cancel()
+    }
+    if let early { finish(handle, early) }
   }
 
   /// Bytes as they come off the stream: put frames back together, then route them.
@@ -91,24 +125,51 @@ final class ScreenSession: @unchecked Sendable {
     }
   }
 
-  func closed(_ error: String?) {
-    emit(["sessionId": id, "closed": true, "error": error])
+  /// The PC stopped sending. Its final answer says why: `interrupted` when its user pressed
+  /// stop or Escape, or a sensitive session reached its time limit.
+  func streamClosed(_ error: String?) {
+    lock.lock()
+    let handle = self.handle
+    if handle == nil { endedEarly = .some(error) }
+    lock.unlock()
+    if let handle { finish(handle, error) }
   }
 
-  /// A JSON message from the viewer, framed as kind 1.
+  private func finish(_ handle: StreamHandle, _ error: String?) {
+    let id = self.id
+    let emit = self.emit
+    Task {
+      var code: String? = nil
+      var message = error
+      do {
+        _ = try await handle.result()
+      } catch let PasserError.Refused(refusal, detail) {
+        code = refusal
+        message = detail
+      } catch {
+        if message == nil { message = "\(error)" }
+      }
+      emit(["sessionId": id, "closed": true, "error": message, "code": code])
+      ScreenSessions.shared.remove(id)
+    }
+  }
+
+  /// A JSON message from the viewer, framed as kind 1, queued behind the ones before it.
   func sendJson(_ json: String) {
     let payload = Data(json.utf8)
     var frame = Data([1])
     var length = UInt32(payload.count).littleEndian
     frame.append(Data(bytes: &length, count: 4))
     frame.append(payload)
-    guard let transport else { return }
-    Task { try? await transport.send(frame) }
+    outbox.yield(frame)
   }
 
+  /// The viewer leaves: what it queued still goes (release_all first), then the stream ends.
   func close() {
-    transport?.close()
-    transport = nil
+    lock.lock()
+    left = true
+    lock.unlock()
+    outbox.finish()
   }
 
   /// Width, height, hot spot x and y (four u16 LE), then straight RGBA.

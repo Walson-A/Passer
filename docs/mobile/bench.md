@@ -77,7 +77,7 @@ A fake that invents a field or a status makes a correct screen look broken, or a
 
 The right rail also sets:
 - the platform the screens follow (iPhone or Android);
-- what another device does: ask for an approval (the iPad, or an AI agent through the PC), send a text or a file, join through this phone, and, while its screen is open, lock, come back, be used by someone, or end the share with Escape;
+- what another device does: ask for an approval (the iPad, or an AI agent through the PC), send a text or a file, join through this phone, and, while its screen is open, lock, come back, be used by someone, end the share with Escape, or reach the core's 15 minutes;
 - the device (iPhone 16, 16 Pro Max, SE);
 - the text size (default, very large, the first accessibility size);
 - which files the document picker hands over (one under 700 KB, or larger ones);
