@@ -53,6 +53,10 @@ const APPROVAL_WAIT: Duration = Duration::from_secs(55);
 /// Shared state of the device network.
 pub struct Devices {
     pub device: Arc<PasserDevice>,
+    /// Who is viewing or controlling this PC's screen right now.
+    pub screen_sessions: Arc<Mutex<HashMap<u64, crate::screen::ScreenSession>>>,
+    /// Where Vasistas was found at launch; without it the screen is not offered.
+    pub vasistas: Option<std::path::PathBuf>,
     pending: Mutex<HashMap<u64, oneshot::Sender<bool>>>,
     next: AtomicU64,
     app: AppHandle,
@@ -62,7 +66,7 @@ impl Devices {
     /// Opens this PC's identity and, if it already belongs to a group, starts it.
     pub fn init(app: AppHandle, server: Arc<ServerState>) -> Result<Arc<Self>, String> {
         let home = get_config_dir().join("devices");
-        let device = PasserDevice::open_on_desktop(home).map_err(|e| e.to_string())?;
+        let device = PasserDevice::open_on_desktop(home.clone()).map_err(|e| e.to_string())?;
         device.set_device_details(
             this_pc_kind(),
             windows_version(),
@@ -70,6 +74,8 @@ impl Devices {
         );
         let devices = Arc::new(Self {
             device,
+            screen_sessions: Arc::default(),
+            vasistas: crate::screen::find_vasistas(),
             pending: Mutex::default(),
             next: AtomicU64::new(1),
             app: app.clone(),
@@ -83,6 +89,23 @@ impl Devices {
         devices
             .device
             .set_admission_listener(Arc::new(JoinNotifier(devices.app.clone())));
+
+        // See the screen / take control, when Vasistas is installed.
+        if let Some(vasistas) = devices.vasistas.clone() {
+            if let Err(e) = crate::screen::ensure_rule(&home) {
+                eprintln!(" [devices] cannot write the screen rule: {e}");
+            }
+            let names = Arc::downgrade(&devices.device);
+            devices.device.add_module(Arc::new(passer_exec::Exec::new(
+                crate::screen::commands(vasistas),
+                Arc::new(move |id: &str| names.upgrade().and_then(|d| d.member_name(id))),
+            )));
+        }
+        devices.device.set_indicator(Arc::new(crate::screen::WindowIndicator {
+            app: devices.app.clone(),
+            device: Arc::downgrade(&devices.device),
+            sessions: devices.screen_sessions.clone(),
+        }));
         Ok(devices)
     }
 
@@ -753,6 +776,21 @@ pub async fn devices_fetch_file(
         .await
         .map_err(|e| e.to_string())?;
     Ok(dest.to_string_lossy().into_owned())
+}
+
+/// Whether this PC offers its screen (Vasistas found) and where Vasistas is.
+#[tauri::command]
+pub fn devices_screen_status(devices: DevicesState<'_>) -> crate::screen::ScreenStatus {
+    crate::screen::ScreenStatus {
+        available: devices.vasistas.is_some(),
+        vasistas: devices.vasistas.as_ref().map(|p| p.display().to_string()),
+    }
+}
+
+/// Who is viewing or controlling this PC's screen right now.
+#[tauri::command]
+pub fn devices_screen_sessions(devices: DevicesState<'_>) -> Vec<crate::screen::ScreenSession> {
+    devices.screen_sessions.lock().expect("sessions lock").values().cloned().collect()
 }
 
 /// Asks every other member, now, what it is and offers. Returns how many answered.

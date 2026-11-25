@@ -57,6 +57,15 @@ The new way devices talk to this PC, built on [passer-core](https://github.com/W
 - **Network**: n0's development relays for now (`NetworkKind::N0Dev`), shown as a preview in the UI. Production needs Passer's own relay and coordination server.
 - **Commands**: `devices_status` (members with kind, OS, versions and when they last answered), `devices_create_group`, `devices_join`, `devices_invite` (one-time link, 10 min, optionally as approver), `devices_remove`, `devices_stop_sessions` (the stop button), `devices_answer_approval`, `devices_refresh`, `devices_capabilities` (what a member lets this PC call, and what needs approval), `devices_journal` (calls made and received, newest first, never their content; optionally with one member), `devices_fetch_file` (a file by name from a member's `file.get`, into Passboard, emitting `device-transfer-progress` `{id, done, total}`).
 
+## 🖥️ Screen (`screen.rs`)
+Other devices of the group can see this PC's screen (`screen.view`) and take control (`screen.control`), when Vasistas is installed (`PASSER_VASISTAS`, or `vasistas.exe` on the PATH; `devices_screen_status` says which).
+
+- **How**: passer-core's `passer-exec` runs `vasistas share --lang fr --viewer <caller> [--control]` and wires its stdio to the stream; Vasistas captures, encodes, applies the viewer's input and shows its own sign on screen.
+- **Who**: the group's own devices, without a confirmation on this PC (a rule added once to `devices\policy.json`), as Walson decided; AI agents get nothing. Effect `sensitive`, so a session lasts at most 15 minutes; the viewer reconnects after.
+- **Stopping**: Escape on this PC (Vasistas), the stop button (`devices_stop_sessions`), or removing the device; the process is killed when its session ends.
+- **Indicator**: passer-core refuses these capabilities without one. `WindowIndicator` records live sessions (`devices_screen_sessions`) and emits `screen-session-started` / `screen-session-ended` for the window.
+- **Not covered**: a locked PC or UAC prompts (Vasistas cannot see the secure desktop).
+
 ## ✂️ Core Utilities
 - **`clipboard.rs`**: Safe reading and writing to the system clipboard (Text, HTML, Image, file lists) for iOS push/pull integrations.
 - **`paths.rs`**: Resolves core application directories under `Desktop/Passer/` (`Passboard/` for Push/Pull, `Passer Space/` for the shared folder, `.cache/` for previews) and guarantees collision-free filenames.

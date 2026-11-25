@@ -12,6 +12,7 @@ mod mdns;
 mod commands;
 mod tray;
 mod devices;
+mod screen;
 
 pub use types::*;
 pub use paths::*;
@@ -66,7 +67,9 @@ pub fn run() {
             devices::devices_refresh,
             devices::devices_capabilities,
             devices::devices_journal,
-            devices::devices_fetch_file
+            devices::devices_fetch_file,
+            devices::devices_screen_sessions,
+            devices::devices_screen_status
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
