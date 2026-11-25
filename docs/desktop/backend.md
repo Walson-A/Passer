@@ -64,10 +64,10 @@ The new way devices talk to this PC, built on [passer-core](https://github.com/W
 Other devices of the group can see this PC's screen (`screen.view`) and take control (`screen.control`), when Vasistas is installed (`PASSER_VASISTAS`, or `vasistas.exe` on the PATH; `devices_screen_status` says which).
 
 - **How**: passer-core's `passer-exec` runs `vasistas share --lang fr --viewer <caller> [--control]` and wires its stdio to the stream; Vasistas captures, encodes, applies the viewer's input and shows its own sign on screen.
-- **Who**: the group's own devices, without a confirmation on this PC (a rule added once to `devices\policy.json`), as Walson decided; AI agents get nothing. Effect `sensitive`, so a session lasts at most 15 minutes; the viewer reconnects after.
+- **Who**: by default every request **asks on this PC** (effect `sensitive`, the core's default rule), as Walson decided on 25 Nov 2026. Each device can be allowed to view and/or control **without asking** - its own rule in `devices\policy.json` (`who: { kind: device, id }`), set from its Details panel with `devices_screen_rules` / `devices_set_screen_rule` - for reaching the PC when nobody is in front of it. A device added later gets nothing; AI agents never. A session lasts at most 15 minutes; the viewer reconnects after. The group-wide allow rule of the first version is removed at start (`remove_group_rule`). Changing a rule restarts the device network, because the core reads its rules when it starts.
 - **Stopping**: Escape on this PC (Vasistas), the stop button (`devices_stop_sessions`), or removing the device; the process is killed when its session ends.
 - **Indicator**: passer-core refuses these capabilities without one. `WindowIndicator` records live sessions (`devices_screen_sessions`) and emits `screen-session-started` / `screen-session-ended` for the window.
-- **Not covered**: a locked PC or UAC prompts (Vasistas cannot see the secure desktop).
+- **Not covered**: a locked PC or UAC prompts (Vasistas cannot see the secure desktop). Unlocking remotely, as Chrome Remote Desktop does, is wanted later as an opt-in switch (asked of the Vasistas session).
 
 ## ✂️ Core Utilities
 - **`clipboard.rs`**: Safe reading and writing to the system clipboard (Text, HTML, Image, file lists) for iOS push/pull integrations.

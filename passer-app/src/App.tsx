@@ -9,6 +9,7 @@ import { PairDevice } from "./components/PairDevice";
 import { DropZone } from "./components/DropZone";
 import { Devices } from "./components/Devices";
 import { ApprovalPrompt } from "./components/ApprovalPrompt";
+import { ScreenBanner } from "./components/ScreenBanner";
 import { useHistory } from "./hooks/useHistory";
 import type { Member } from "./components/deviceUi";
 import "./App.css";
@@ -139,6 +140,8 @@ function App() {
 
       {/* Files dropped on the window go to a device you choose. */}
       <DropZone target={view === "devices" ? stage : null} onOpenDevices={() => goTo("devices")} />
+      {/* Someone sees or controls this PC's screen: say who, and the way out. */}
+      <ScreenBanner />
       {/* Above everything: another device asks for something sensitive. */}
       <ApprovalPrompt />
     </Layout>

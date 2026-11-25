@@ -92,8 +92,8 @@ impl Devices {
 
         // See the screen / take control, when Vasistas is installed.
         if let Some(vasistas) = devices.vasistas.clone() {
-            if let Err(e) = crate::screen::ensure_rule(&home) {
-                eprintln!(" [devices] cannot write the screen rule: {e}");
+            if let Err(e) = crate::screen::remove_group_rule(&home) {
+                eprintln!(" [devices] cannot update the screen rules: {e}");
             }
             let names = Arc::downgrade(&devices.device);
             devices.device.add_module(Arc::new(passer_exec::Exec::new(
@@ -1044,6 +1044,29 @@ pub fn devices_screen_status(devices: DevicesState<'_>) -> crate::screen::Screen
         available: devices.vasistas.is_some(),
         vasistas: devices.vasistas.as_ref().map(|p| p.display().to_string()),
     }
+}
+
+/// What one device may do with this PC's screen without asking.
+#[tauri::command]
+pub fn devices_screen_rules(id: String) -> Result<crate::screen::ScreenRules, String> {
+    crate::screen::rules_for(&get_config_dir().join("devices"), &id)
+}
+
+/// Lets one device view or control this PC's screen without asking, or takes it back.
+/// The core reads its rules when the network starts, so the network restarts here (a
+/// few seconds; sessions in progress end).
+#[tauri::command]
+pub async fn devices_set_screen_rule(
+    devices: DevicesState<'_>,
+    id: String,
+    capability: String,
+    allow: bool,
+) -> Result<crate::screen::ScreenRules, String> {
+    let home = get_config_dir().join("devices");
+    crate::screen::set_rule(&home, &id, &capability, allow)?;
+    devices.device.stop().await;
+    devices.start_if_ready().await?;
+    crate::screen::rules_for(&home, &id)
 }
 
 /// Who is viewing or controlling this PC's screen right now.
