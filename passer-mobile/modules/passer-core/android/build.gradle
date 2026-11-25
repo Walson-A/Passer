@@ -1,0 +1,30 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'direct.passer'
+version = '0.1.0'
+
+android {
+  namespace "direct.passer.core"
+  defaultConfig {
+    versionCode 1
+    versionName '0.1.0'
+  }
+  // Fetched by scripts/fetch-passer-core.mjs from the passer-core release:
+  // the Kotlin bindings and the native libraries for each ABI.
+  sourceSets {
+    main {
+      java.srcDirs += 'vendor/kotlin'
+      jniLibs.srcDirs += 'vendor/jniLibs'
+    }
+  }
+}
+
+dependencies {
+  // UniFFI's Kotlin bindings load the Rust library through JNA.
+  implementation "net.java.dev.jna:jna:5.17.0@aar"
+  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+}

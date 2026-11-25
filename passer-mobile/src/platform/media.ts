@@ -1,0 +1,242 @@
+import { getDocumentAsync } from 'expo-document-picker';
+import { Directory, File, Paths } from 'expo-file-system';
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
+import { launchImageLibraryAsync, UIImagePickerPreferredAssetRepresentationMode } from 'expo-image-picker';
+import {
+  deleteAssetsAsync,
+  getAssetInfoAsync,
+  getAssetsAsync,
+  requestPermissionsAsync,
+  saveToLibraryAsync,
+} from 'expo-media-library/legacy';
+import { isAvailableAsync, shareAsync } from 'expo-sharing';
+
+import type { UploadFile } from '@/core/client';
+import { safeName, timestamp, withExtension } from '@/utils/file-names';
+
+import type { PickedPhoto } from './media-types';
+
+export type { PickedPhoto } from './media-types';
+
+/** `File.size` is 0 for a missing file; the UI shows an unknown size instead. */
+function sizeOf(file: File): number | null {
+  return file.exists ? file.size : null;
+}
+
+const OUTGOING = 'outgoing';
+
+/** Each staged file gets its own folder, so two picks with the same name never overwrite each other. */
+function stagingFolder(): Directory {
+  const folder = new Directory(Paths.cache, OUTGOING, `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`);
+  folder.create({ intermediates: true });
+  return folder;
+}
+
+/**
+ * Multipart uploads name the part after the file on disk, so outgoing files are
+ * staged under the exact name the PC should show.
+ */
+async function stage(uri: string, name: string, mimeType: string): Promise<UploadFile> {
+  const source = new File(uri);
+  if (source.name === name) return { uri, name, mimeType, size: sizeOf(source) };
+  const target = new File(stagingFolder(), name);
+  await source.copy(target);
+  return { uri: target.uri, name, mimeType, size: sizeOf(target) };
+}
+
+/** Removes staged copies once a transfer is over. */
+export function clearOutgoing(): void {
+  const folder = new Directory(Paths.cache, OUTGOING);
+  try {
+    if (folder.exists) folder.delete();
+  } catch {
+    // A leftover copy in the cache is harmless; iOS reclaims the cache on its own.
+  }
+}
+
+export async function pickPhotos(): Promise<PickedPhoto[]> {
+  const result = await launchImageLibraryAsync({
+    mediaTypes: ['images'],
+    allowsMultipleSelection: true,
+    selectionLimit: 0,
+    quality: 1,
+    exif: false,
+    // Originals for the Passboard folder; clipboard sends are converted below.
+    preferredAssetRepresentationMode: UIImagePickerPreferredAssetRepresentationMode.Current,
+  });
+  if (result.canceled) return [];
+  return result.assets.map((asset, index) => ({
+    uri: asset.uri,
+    name: safeName(asset.fileName ?? '', `Photo ${index + 1}.jpg`),
+    mimeType: asset.mimeType ?? 'image/jpeg',
+    size: asset.fileSize ?? null,
+    width: asset.width,
+    height: asset.height,
+  }));
+}
+
+export async function pickFiles(): Promise<UploadFile[]> {
+  const result = await getDocumentAsync({ multiple: true, copyToCacheDirectory: true, type: '*/*' });
+  if (result.canceled) return [];
+  return result.assets.map((asset, index) => ({
+    uri: asset.uri,
+    name: safeName(asset.name, `File ${index + 1}`),
+    mimeType: asset.mimeType ?? 'application/octet-stream',
+    size: asset.size ?? null,
+  }));
+}
+
+export type LatestScreenshot = { photo: PickedPhoto; assetId: string };
+
+const IMAGE_TYPES: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', heic: 'image/heic' };
+
+/**
+ * The newest screenshot, for the widgets' screenshot actions. The app is in
+ * front, so iOS can ask for photo access here the first time.
+ */
+export async function latestScreenshot(): Promise<LatestScreenshot | 'denied' | null> {
+  const permission = await requestPermissionsAsync(false);
+  if (!permission.granted) return 'denied';
+  const page = await getAssetsAsync({
+    first: 1,
+    mediaType: 'photo',
+    mediaSubtypes: ['screenshot'],
+    sortBy: [['creationTime', false]],
+  });
+  const asset = page.assets[0];
+  if (!asset) return null;
+  // The library hands out `ph://` references; uploads need the file, downloaded from iCloud if it has to be.
+  const info = await getAssetInfoAsync(asset, { shouldDownloadFromNetwork: true });
+  if (!info.localUri) return null;
+  const name = safeName(asset.filename, `Screenshot ${timestamp()}.png`);
+  const extension = name.split('.').pop()?.toLowerCase() ?? '';
+  return {
+    assetId: asset.id,
+    photo: {
+      uri: info.localUri,
+      name,
+      mimeType: IMAGE_TYPES[extension] ?? 'image/png',
+      size: null,
+      width: asset.width,
+      height: asset.height,
+    },
+  };
+}
+
+/** Deletes a photo from the library. iOS always asks for confirmation; a refusal returns false. */
+export async function deletePhoto(assetId: string): Promise<boolean> {
+  try {
+    return await deleteAssetsAsync([assetId]);
+  } catch {
+    return false;
+  }
+}
+
+/** A photo as it should land in the Passboard folder: the original file, under its own name. */
+export function asPassboardFile(photo: UploadFile): Promise<UploadFile> {
+  return stage(photo.uri, photo.name, photo.mimeType);
+}
+
+/** Any other file, staged under its own name. */
+export function asUploadFile(file: UploadFile): Promise<UploadFile> {
+  return stage(file.uri, file.name, file.mimeType);
+}
+
+/**
+ * A photo as the PC clipboard can take it. The PC decodes JPEG and PNG but not
+ * HEIC, and iOS's own "compatible" conversion is not guaranteed, so anything
+ * else is re-encoded as JPEG here.
+ */
+export async function asClipboardImage(photo: UploadFile): Promise<UploadFile> {
+  if (photo.mimeType === 'image/png' || photo.mimeType === 'image/jpeg') {
+    return stage(photo.uri, withExtension(photo.name, photo.mimeType === 'image/png' ? 'png' : 'jpg'), photo.mimeType);
+  }
+  const image = await ImageManipulator.manipulate(photo.uri).renderAsync();
+  const saved = await image.saveAsync({ format: SaveFormat.JPEG, compress: 0.92 });
+  return stage(saved.uri, withExtension(photo.name, 'jpg'), 'image/jpeg');
+}
+
+/** The image the native paste button handed over, as a file ready to upload. */
+export function stagePastedImage(dataUri: string): UploadFile {
+  const prefix = /^data:(image\/[\w.+-]+);base64,/i.exec(dataUri);
+  const isJpeg = prefix?.[1].toLowerCase() === 'image/jpeg';
+  const name = `Passer ${timestamp()}.${isJpeg ? 'jpg' : 'png'}`;
+  const file = new File(stagingFolder(), name);
+  file.write(prefix ? dataUri.slice(prefix[0].length) : dataUri, { encoding: 'base64' });
+  return { uri: file.uri, name, mimeType: isJpeg ? 'image/jpeg' : 'image/png', size: sizeOf(file) };
+}
+
+/** `/pull` sets no file name, so received content is named after the moment it arrived. */
+export async function finalizePulled(
+  fileUri: string,
+  extension: 'png' | 'zip',
+): Promise<{ uri: string; name: string; size: number | null }> {
+  const name = `Passer ${timestamp()}.${extension}`;
+  const folder = new Directory(Paths.cache, 'received');
+  if (!folder.exists) folder.create({ intermediates: true });
+  const target = new File(folder, name);
+  if (target.exists) target.delete();
+  await new File(fileUri).move(target);
+  return { uri: target.uri, name, size: sizeOf(target) };
+}
+
+/** Saves with add-only access: Passer never asks to read the photo library. */
+export async function saveImageToPhotos(fileUri: string): Promise<boolean> {
+  const permission = await requestPermissionsAsync(true);
+  if (!permission.granted) return false;
+  await saveToLibraryAsync(fileUri);
+  return true;
+}
+
+/**
+ * Where a file fetched from another device lands: Documents › Passer, which the Files app
+ * shows under On My iPhone › Passer, under a free name. Only the base name is kept.
+ */
+export function receivedFileUri(rawName: string): string {
+  const base = rawName.split(/[\\/]/).pop() ?? '';
+  const name = base && base !== '.' && base !== '..' ? base : 'received_file';
+  const folder = new Directory(Paths.document, 'Passer');
+  if (!folder.exists) folder.create({ intermediates: true });
+  const dot = name.lastIndexOf('.');
+  const stem = dot > 0 ? name.slice(0, dot) : name;
+  const extension = dot > 0 ? name.slice(dot) : '';
+  let file = new File(folder, name);
+  for (let copy = 2; file.exists; copy += 1) file = new File(folder, `${stem} ${copy}${extension}`);
+  return file.uri;
+}
+
+/** A file's content, for a call through the device network. */
+export function readBase64(uri: string): Promise<string> {
+  return new File(uri).base64();
+}
+
+/**
+ * A photo small enough for one call through the device network (`maxBytes`), as JPEG.
+ * It is shrunk step by step; `reduced` says whether the sent copy is smaller than the original.
+ */
+export async function fitPhoto(photo: PickedPhoto, maxBytes: number): Promise<{ file: UploadFile; reduced: boolean }> {
+  if (photo.size !== null && photo.size <= maxBytes && (photo.mimeType === 'image/jpeg' || photo.mimeType === 'image/png')) {
+    return { file: photo, reduced: false };
+  }
+  const longest = Math.max(photo.width, photo.height);
+  for (const [edge, compress] of [
+    [Math.min(longest, 2560), 0.82],
+    [1920, 0.75],
+    [1440, 0.7],
+    [1080, 0.65],
+  ] as const) {
+    const context = ImageManipulator.manipulate(photo.uri);
+    if (longest > edge) context.resize(photo.width >= photo.height ? { width: edge } : { height: edge });
+    const image = await context.renderAsync();
+    const saved = await image.saveAsync({ format: SaveFormat.JPEG, compress });
+    const staged = await stage(saved.uri, withExtension(photo.name, 'jpg'), 'image/jpeg');
+    if (staged.size !== null && staged.size <= maxBytes) return { file: staged, reduced: true };
+  }
+  throw new Error('too_large: the photo stays too large once shrunk');
+}
+
+export async function shareFile(fileUri: string, type: { mimeType: string; uti: string }): Promise<void> {
+  if (await isAvailableAsync()) {
+    await shareAsync(fileUri, { mimeType: type.mimeType, UTI: type.uti });
+  }
+}
