@@ -30,86 +30,96 @@ fn strip_html_tags(html: &str) -> String {
 }
 
 
+/// The files copied in the Explorer (Ctrl+C), regular files only. Blocking.
+pub fn copied_files() -> Vec<std::path::PathBuf> {
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(paths) = clipboard_win::get_clipboard::<Vec<String>, _>(clipboard_win::formats::FileList) {
+            return paths
+                .into_iter()
+                .map(std::path::PathBuf::from)
+                .filter(|p| p.is_file())
+                .collect();
+        }
+    }
+    Vec::new()
+}
+
+/// The copied image, encoded as PNG, if there is one. Blocking.
+pub fn clipboard_png() -> Option<Vec<u8>> {
+    let image = arboard::Clipboard::new().ok()?.get_image().ok()?;
+    let mut png = Vec::new();
+    let encoder = image::codecs::png::PngEncoder::new(&mut png);
+    image::ImageEncoder::write_image(
+        encoder,
+        &image.bytes,
+        image.width as u32,
+        image.height as u32,
+        image::ColorType::Rgba8.into(),
+    )
+    .ok()?;
+    Some(png)
+}
+
+/// The copied text; when there is no plain text, the HTML one without its tags
+/// (what ChatGPT's copy button puts there). Blocking.
+pub fn clipboard_text() -> Result<String, String> {
+    let mut clipboard = arboard::Clipboard::new().map_err(|e| e.to_string())?;
+    let mut text = clipboard.get_text().unwrap_or_default();
+    if text.trim().is_empty() {
+        #[cfg(target_os = "windows")]
+        {
+            if let Some(format_id) = clipboard_win::register_format("HTML Format") {
+                use clipboard_win::formats::RawData;
+                if let Ok(html_bytes) = clipboard_win::get_clipboard::<Vec<u8>, _>(RawData(format_id.into())) {
+                    if let Ok(html_text) = String::from_utf8(html_bytes) {
+                        text = strip_html_tags(&html_text);
+                    }
+                }
+            }
+        }
+    }
+    Ok(text)
+}
+
 pub async fn pull_clipboard(State(state): State<Arc<ServerState>>) -> impl IntoResponse {
     let state_clone = state.clone();
     
     // Use proper error handling in spawned task
     let result = tokio::task::spawn_blocking(move || {
-        // 1. Check for Files (via Native Windows API)
-        let file_list_result: Result<Vec<String>, _> = clipboard_win::get_clipboard(clipboard_win::formats::FileList);
-
-        if let Ok(file_paths) = file_list_result {
-            if !file_paths.is_empty() {
-                 let _ = state_clone.app_handle.emit("log", LogEvent {
-                    message: format!("Files detected via Clipboard API: {}", file_paths.len()),
-                    kind: "info".to_string(),
-                });
-
-                // Files detected! Create a ZIP.
-                let mut zip_buffer = Vec::new();
-                let cursor = std::io::Cursor::new(&mut zip_buffer);
-                let mut zip = zip::ZipWriter::new(cursor);
-                
-                let options = zip::write::SimpleFileOptions::default()
-                    .compression_method(zip::CompressionMethod::Stored);
-
-                for path_str in file_paths {
-                    let path = std::path::Path::new(&path_str);
-                    if path.exists() && path.is_file() {
-                        let filename = path.file_name().unwrap_or_default().to_string_lossy();
-                        if let Ok(_) = zip.start_file(filename, options) {
-                            if let Ok(content) = std::fs::read(path) {
-                                use std::io::Write;
-                                let _ = zip.write_all(&content);
-                            }
-                        }
-                    }
-                }
-
-                if let Ok(_) = zip.finish() {
-                    return Ok::<(&str, Vec<u8>), String>(("application/zip", zip_buffer));
-                }
-            }
-        }
-
-        let mut clipboard = arboard::Clipboard::new().map_err(|e| e.to_string())?;
-
-        // 2. Try Image
-        if let Ok(image) = clipboard.get_image() {
-            let mut png_buffer = Vec::new();
-            let encoder = image::codecs::png::PngEncoder::new(&mut png_buffer);
-            
-            if let Ok(_) = image::ImageEncoder::write_image(
-                encoder, 
-                &image.bytes, 
-                image.width as u32, 
-                image.height as u32, 
-                image::ColorType::Rgba8.into()
-            ) {
-               return Ok(("image/png", png_buffer));
-            }
-        }
-
-        // 3. Fallback to Text (with HTML support for ChatGPT)
-        let mut text = clipboard.get_text().unwrap_or_default();
-        
-        // If text/plain is empty, try reading HTML and strip tags
-        if text.trim().is_empty() {
-            #[cfg(target_os = "windows")]
-            {
-                // Try to get HTML from clipboard using registered format
-                // CF_HTML is a standard Windows clipboard format
-                if let Some(format_id) = clipboard_win::register_format("HTML Format") {
-                    use clipboard_win::formats::RawData;
-                    if let Ok(html_bytes) = clipboard_win::get_clipboard::<Vec<u8>, _>(RawData(format_id.into())) {
-                        if let Ok(html_text) = String::from_utf8(html_bytes) {
-                            text = strip_html_tags(&html_text);
-                        }
+        // 1. Files copied in the Explorer, zipped.
+        let file_paths = copied_files();
+        if !file_paths.is_empty() {
+            let _ = state_clone.app_handle.emit("log", LogEvent {
+                message: format!("Files detected via Clipboard API: {}", file_paths.len()),
+                kind: "info".to_string(),
+            });
+            let mut zip_buffer = Vec::new();
+            let cursor = std::io::Cursor::new(&mut zip_buffer);
+            let mut zip = zip::ZipWriter::new(cursor);
+            let options = zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Stored);
+            for path in &file_paths {
+                let filename = path.file_name().unwrap_or_default().to_string_lossy();
+                if zip.start_file(filename, options).is_ok() {
+                    if let Ok(content) = std::fs::read(path) {
+                        use std::io::Write;
+                        let _ = zip.write_all(&content);
                     }
                 }
             }
+            if zip.finish().is_ok() {
+                return Ok::<(&str, Vec<u8>), String>(("application/zip", zip_buffer));
+            }
         }
-        
+
+        // 2. An image, as PNG.
+        if let Some(png) = clipboard_png() {
+            return Ok(("image/png", png));
+        }
+
+        // 3. Text (with HTML support for ChatGPT).
+        let text = clipboard_text()?;
         let json = serde_json::json!({ "text": text });
         Ok(("application/json", serde_json::to_vec(&json).unwrap()))
     })
@@ -195,6 +205,21 @@ pub async fn push_clipboard(
     }
 }
 
+/// Decodes an image (PNG, JPEG, HEIC is not supported) and puts it on this PC's
+/// clipboard. Blocking: call it from `spawn_blocking`.
+pub fn set_clipboard_image(bytes: &[u8]) -> Result<(), String> {
+    let img = image::load_from_memory(bytes).map_err(|e| format!("Decode: {}", e))?;
+    let rgba = img.into_rgba8();
+    let (w, h) = rgba.dimensions();
+    let params = arboard::ImageData {
+        width: w as usize,
+        height: h as usize,
+        bytes: Cow::Owned(rgba.into_vec()),
+    };
+    let mut clipboard = arboard::Clipboard::new().map_err(|e| format!("Clipboard Init: {}", e))?;
+    clipboard.set_image(params).map_err(|e| format!("Clipboard Set: {}", e))
+}
+
 pub async fn push_image(
     State(state): State<Arc<ServerState>>,
     mut multipart: Multipart,
@@ -240,20 +265,7 @@ pub async fn push_image(
         kind: "success".to_string(),
     });
 
-    let processed = tokio::task::spawn_blocking(move || {
-        let img = image::load_from_memory(&image_bytes).map_err(|e| format!("Decode: {}", e))?;
-        let rgba = img.into_rgba8();
-        let (w, h) = rgba.dimensions();
-        let params = arboard::ImageData {
-            width: w as usize,
-            height: h as usize,
-            bytes: Cow::Owned(rgba.into_vec()),
-        };
-
-        let mut clipboard = arboard::Clipboard::new().map_err(|e| format!("Clipboard Init: {}", e))?;
-        clipboard.set_image(params).map_err(|e| format!("Clipboard Set: {}", e))
-    })
-    .await;
+    let processed = tokio::task::spawn_blocking(move || set_clipboard_image(&image_bytes)).await;
 
     match processed {
         Ok(Ok(_)) => {

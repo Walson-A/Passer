@@ -8,6 +8,7 @@ import {
   listFilesOf,
   MAX_FILE_BYTES,
   readClipboardOf,
+  readCopiedOf,
   sendFileTo,
   sendTextTo,
   type CoreCall,
@@ -82,6 +83,22 @@ describe('calls', () => {
   it('rejects an unreadable answer', async () => {
     const { call } = recorder('not json');
     await expect(readClipboardOf(call, 'pc')).rejects.toMatchObject({ kind: 'failed' });
+  });
+
+  it('says when the PC holds an image or files rather than text', async () => {
+    await expect(readCopiedOf(recorder('{"kind":"image","text":""}').call, 'pc')).resolves.toEqual({ kind: 'image' });
+    await expect(
+      readCopiedOf(recorder('{"kind":"files","text":"","files":[{"name":"a.pdf","size":12},{"name":""},{"name":"b"}]}').call, 'pc'),
+    ).resolves.toEqual({
+      kind: 'files',
+      files: [
+        { name: 'a.pdf', size: 12 },
+        { name: 'b', size: null },
+      ],
+    });
+    // An older desktop only says its text; an image or files read as no text there.
+    await expect(readCopiedOf(recorder('{"text":"hi"}').call, 'pc')).resolves.toEqual({ kind: 'text', text: 'hi' });
+    await expect(readClipboardOf(recorder('{"kind":"image","text":""}').call, 'pc')).resolves.toBe('');
   });
 });
 

@@ -68,9 +68,7 @@ passer-mobile/
 
 Since the redesign, everything goes through the **device network** (passer-core, [device-network.md](device-network.md)): one pairing, the other device's rules and approvals, end-to-end encryption. `src/core/device-calls.ts` calls the PC's capabilities and turns the core's refusals into the screens' words (denied, no answer, too large, unreachable).
 
-Photos and files go to the PC as streams (`file.drop`, passer-core mobile-v0.3.0): originals, any size, with progress. Two things still use the **direct connection**, the HTTP pairing below, when the user set one up in Settings › Direct connection:
-- an image for the PC clipboard (the PC's `clipboard.write` takes text);
-- files over 700 KB to a PC whose desktop doesn't offer `file.drop` yet.
+Photos and files go to the PC as streams (`file.drop`, passer-core mobile-v0.3.0): originals, any size, with progress. An image copied on the iPhone (or a screenshot sent to the clipboard) goes onto the PC's clipboard through `clipboard.image`, streamed too, when the PC offers it (desktop 1.1.0-beta.3 and later); against an older PC it lands in its Passer folder instead. The **direct connection**, the HTTP pairing below, when the user set one up in Settings › Direct connection, is still used for files over 700 KB to a PC whose desktop doesn't offer `file.drop` yet.
 
 Without it, against such a PC, photos are shrunk to fit one call and said so; larger files are refused with an explanation ("Too large for now"). The direct pairing's `passer://pair` link carries a permanent token, so it is never handed to other devices of the group (decision with the desktop session, 2026-11-24). Shortcuts, widgets and the share extension keep using it.
 

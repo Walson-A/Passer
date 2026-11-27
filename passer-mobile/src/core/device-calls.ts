@@ -12,6 +12,7 @@ export type CoreCall = (device: string, capability: string, inputJson: string) =
 export const CAPABILITIES = {
   clipboardWrite: 'clipboard.write',
   clipboardRead: 'clipboard.read',
+  clipboardFetch: 'clipboard.fetch',
   fileReceive: 'file.receive',
   deviceInfo: 'device.info',
 } as const;
@@ -93,8 +94,35 @@ export async function sendFileTo(call: CoreCall, device: string, name: string, b
 
 /** Reads the device's clipboard. The device's user approves each read. */
 export async function readClipboardOf(call: CoreCall, device: string): Promise<string> {
-  const output = (await invoke(call, device, CAPABILITIES.clipboardRead, {})) as { text?: unknown };
-  return typeof output?.text === 'string' ? output.text : '';
+  const copied = await readCopiedOf(call, device);
+  return copied.kind === 'text' ? copied.text : '';
+}
+
+/** What is copied on a PC: text, an image, or files copied in its Explorer. */
+export type PcCopied =
+  | { kind: 'text'; text: string }
+  | { kind: 'image' }
+  | { kind: 'files'; files: { name: string; size: number | null }[] };
+
+/**
+ * Reads what is copied on a PC (`clipboard.read`). A desktop before 1.1.0-beta.3 only
+ * says its text; a newer one says when it holds an image or files, which
+ * `clipboard.fetch` then streams.
+ */
+export async function readCopiedOf(call: CoreCall, device: string): Promise<PcCopied> {
+  const output = (await invoke(call, device, CAPABILITIES.clipboardRead, {})) as {
+    kind?: unknown;
+    text?: unknown;
+    files?: unknown;
+  };
+  if (output?.kind === 'image') return { kind: 'image' };
+  if (output?.kind === 'files' && Array.isArray(output.files)) {
+    const files = output.files
+      .filter((file): file is { name: string; size?: unknown } => typeof file?.name === 'string' && file.name.length > 0)
+      .map((file) => ({ name: file.name, size: typeof file.size === 'number' ? file.size : null }));
+    if (files.length > 0) return { kind: 'files', files };
+  }
+  return { kind: 'text', text: typeof output?.text === 'string' ? output.text : '' };
 }
 
 /** Bytes encoded by a base64 string, without decoding it. */

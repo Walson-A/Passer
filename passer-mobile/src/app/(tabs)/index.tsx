@@ -65,13 +65,14 @@ export default function SendScreen() {
   const choosePhotos = async () => {
     const photos = await pickPhotos();
     if (photos.length === 0) return;
-    // Only the direct connection can put a photo on the PC clipboard, so only then is there a choice.
-    if (transfers.direct && !settings.photoDestination) {
+    // A choice only where a photo can go onto the PC clipboard.
+    const toClipboard = transfers.direct || transfers.imagesToClipboard;
+    if (toClipboard && !settings.photoDestination) {
       transfers.setPendingPhotos(photos);
       router.push('/destination');
       return;
     }
-    void transfers.sendPhotos(photos, transfers.direct ? (settings.photoDestination ?? 'passboard') : 'passboard');
+    void transfers.sendPhotos(photos, toClipboard ? (settings.photoDestination ?? 'passboard') : 'passboard');
   };
 
   const chooseFiles = async () => {
@@ -113,7 +114,10 @@ export default function SendScreen() {
           return;
         }
         // A screenshot goes to the PC clipboard when it can, ready to paste, as the Shortcuts action does.
-        const sent = await transfers.sendPhotos([found.photo], transfers.direct ? 'clipboard' : 'passboard');
+        const sent = await transfers.sendPhotos(
+          [found.photo],
+          transfers.direct || transfers.imagesToClipboard ? 'clipboard' : 'passboard',
+        );
         if (sent && action === 'send-and-delete-screenshot' && (await deletePhoto(found.assetId))) {
           transfers.inform(t.transfer.screenshotDeleted);
         }

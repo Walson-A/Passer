@@ -11,7 +11,9 @@
 //! |------------------|-----------|--------------|
 //! | `device.info`    | read      | name, OS, version (built into the core) |
 //! | `clipboard.write`| write     | puts text on this PC's clipboard |
-//! | `clipboard.read` | sensitive | returns the text on this PC's clipboard, after the user approves |
+//! | `clipboard.read` | read      | says what is copied on this PC: its text, or an image, or files copied in the Explorer |
+//! | `clipboard.fetch`| read      | sends back, as a stream, the copied image (PNG) or one of the copied files |
+//! | `clipboard.image`| write     | receives an image of any size as a stream and puts it on this PC's clipboard |
 //! | `file.receive`   | write     | saves a small file (< 700 KB) to the Passboard folder (older apps) |
 //! | `file.drop`      | write     | receives a file of any size (up to 4 GB) as a stream, into the Passboard folder |
 //! | `file.get`       | read      | sends back a file from the Passer Space folder (the one already shared over WebDAV) |
@@ -45,6 +47,8 @@ use crate::types::{ServerState, TransferEvent};
 const NETWORK: NetworkKind = NetworkKind::N0Dev;
 /// Longest text accepted on the clipboard from another device.
 const MAX_TEXT: usize = 200_000;
+/// The largest image `clipboard.image` decodes: a phone screenshot is 1 to 5 MB.
+const MAX_CLIPBOARD_IMAGE: u64 = 50 * 1024 * 1024;
 /// Largest file accepted before streams exist in the core (base64 in a 1 MiB frame).
 const MAX_FILE_BYTES: usize = 700 * 1024;
 /// A prompt nobody answers is refused just before the core's own 60 s limit.
@@ -167,13 +171,43 @@ fn pc_capabilities() -> Vec<CapabilitySpec> {
                 "additionalProperties": false
             }),
         ),
+        CapabilitySpec {
+            stream: Some(StreamKind::Upload),
+            ..spec(
+                "clipboard.image",
+                "Put an image on the PC clipboard",
+                "Puts the image you send (PNG or JPEG, any size) on this PC's clipboard, ready to paste.",
+                EffectKind::Write,
+                json!({
+                    "type": "object",
+                    "properties": { "name": { "type": "string", "maxLength": 255 } },
+                    "additionalProperties": false
+                }),
+            )
+        },
+        // The user's own devices read it without asking, as the direct connection always
+        // did (decision with Walson, 2026-11-27); agents get nothing unless granted.
         spec(
             "clipboard.read",
             "Read the PC clipboard",
-            "Returns the text currently copied on this PC. Its user approves each read.",
-            EffectKind::Sensitive,
+            "Says what is copied on this PC: { kind: text, text } or { kind: image } or { kind: files, files: [{ name, size }] }. Get the image or a file with clipboard.fetch.",
+            EffectKind::Read,
             json!({ "type": "object", "additionalProperties": false }),
         ),
+        CapabilitySpec {
+            stream: Some(StreamKind::Download),
+            ..spec(
+                "clipboard.fetch",
+                "Get what is copied on the PC",
+                "Sends back the copied image as PNG, or the copied file at `index` (0 first), any size.",
+                EffectKind::Read,
+                json!({
+                    "type": "object",
+                    "properties": { "index": { "type": "integer", "minimum": 0, "maximum": 10000 } },
+                    "additionalProperties": false
+                }),
+            )
+        },
         spec(
             "file.receive",
             "Send a file to the PC",
@@ -294,8 +328,114 @@ impl PcCapabilities {
     }
 }
 
+/// What is copied on this PC, in the order the pull has always looked.
+enum Copied {
+    /// Files copied in the Explorer: name and size.
+    Files(Vec<(String, u64)>),
+    Image,
+    Text(String),
+}
+
+/// Blocking: the files copied in the Explorer, else an image, else the text.
+fn clipboard_content() -> Result<Copied, PasserError> {
+    let files = crate::clipboard::copied_files();
+    if !files.is_empty() {
+        return Ok(Copied::Files(
+            files
+                .iter()
+                .map(|p| {
+                    let name = p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+                    (name, std::fs::metadata(p).map(|m| m.len()).unwrap_or(0))
+                })
+                .collect(),
+        ));
+    }
+    if arboard::Clipboard::new().and_then(|mut c| c.get_image()).is_ok() {
+        return Ok(Copied::Image);
+    }
+    let text = crate::clipboard::clipboard_text().map_err(failed)?;
+    if text.chars().count() > MAX_TEXT {
+        return Err(failed("the copied text is too long (200,000 characters at most)"));
+    }
+    Ok(Copied::Text(text))
+}
+
 fn failed(message: impl std::fmt::Display) -> PasserError {
     PasserError::Invalid { message: message.to_string() }
+}
+
+impl PcCapabilities {
+    /// `clipboard.fetch`: the copied file at `index`, or the copied image written to a
+    /// PNG in the cache (the core streams that path).
+    async fn provide_clipboard(&self, index: usize, caller: CallerInfo) -> Result<String, PasserError> {
+        let (path, kind, name) = tokio::task::spawn_blocking(move || -> Result<_, String> {
+            let files = crate::clipboard::copied_files();
+            if !files.is_empty() {
+                let path = files.get(index).cloned().ok_or("that file is no longer copied")?;
+                let name = path.file_name().map(|n| n.to_string_lossy().into_owned());
+                return Ok((path, "file", name));
+            }
+            let png = crate::clipboard::clipboard_png().ok_or("no image or file is copied on this PC")?;
+            let path = crate::paths::get_cache_dir().join("clipboard_fetch.png");
+            std::fs::write(&path, png).map_err(|e| e.to_string())?;
+            Ok((path, "image", None))
+        })
+        .await
+        .map_err(failed)?
+        .map_err(failed)?;
+        let size = std::fs::metadata(&path).map(|m| m.len()).ok();
+        self.record(TransferEvent {
+            kind: kind.into(),
+            direction: "outgoing".into(),
+            target: "clipboard".into(),
+            name,
+            path: Some(path.to_string_lossy().into_owned()),
+            size,
+            device: Some(caller.device_name.clone()),
+            device_id: Some(caller.device_id.clone()),
+        });
+        Ok(path.to_string_lossy().into_owned())
+    }
+
+    /// `clipboard.image`: the whole image arrived in the core's private folder; put it
+    /// on the clipboard, keep a copy for the history's preview, and drop the original.
+    async fn receive_clipboard_image(&self, caller: CallerInfo, path: String) -> Result<String, PasserError> {
+        let from = std::path::PathBuf::from(&path);
+        let size = tokio::fs::metadata(&from).await.map_err(failed)?.len();
+        if size > MAX_CLIPBOARD_IMAGE {
+            let _ = tokio::fs::remove_file(&from).await;
+            return Err(failed(format!("image over {} MB", MAX_CLIPBOARD_IMAGE / 1024 / 1024)));
+        }
+        let cache = crate::paths::get_cache_dir().join(format!(
+            "pushed_{}.png",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis())
+                .unwrap_or(0)
+        ));
+        let preview = cache.clone();
+        tokio::task::spawn_blocking(move || -> Result<(), String> {
+            let bytes = std::fs::read(&from).map_err(|e| e.to_string())?;
+            let set = crate::clipboard::set_clipboard_image(&bytes);
+            let _ = std::fs::write(&preview, &bytes);
+            let _ = std::fs::remove_file(&from);
+            set
+        })
+        .await
+        .map_err(failed)?
+        .map_err(failed)?;
+        self.record(TransferEvent {
+            kind: "image".into(),
+            direction: "incoming".into(),
+            target: "clipboard".into(),
+            name: None,
+            path: Some(cache.to_string_lossy().into_owned()),
+            size: Some(size),
+            device: Some(caller.device_name.clone()),
+            device_id: Some(caller.device_id.clone()),
+        });
+        Ok(json!({ "copied": true, "size": size }).to_string())
+    }
 }
 
 #[async_trait]
@@ -333,23 +473,37 @@ impl CapabilityHandler for PcCapabilities {
                 Ok(json!({ "ok": true }).to_string())
             }
             "clipboard.read" => {
-                let text = tokio::task::spawn_blocking(|| {
-                    arboard::Clipboard::new().and_then(|mut c| c.get_text())
-                })
-                .await
-                .map_err(failed)?
-                .unwrap_or_default();
+                let content = tokio::task::spawn_blocking(clipboard_content).await.map_err(failed)??;
+                let (kind, name, size) = match &content {
+                    Copied::Text(text) => ("text", format!("Read by {}", caller.device_name), text.len() as u64),
+                    Copied::Image => ("image", format!("Image read by {}", caller.device_name), 0),
+                    Copied::Files(files) => (
+                        "file",
+                        format!("{} file(s) read by {}", files.len(), caller.device_name),
+                        files.iter().map(|f| f.1).sum(),
+                    ),
+                };
                 self.record(TransferEvent {
-                    kind: "text".into(),
+                    kind: kind.into(),
                     direction: "outgoing".into(),
                     target: "clipboard".into(),
-                    name: Some(format!("Read by {}", caller.device_name)),
+                    name: Some(name),
                     path: None,
-                    size: Some(text.len() as u64),
+                    size: Some(size),
                     device: Some(caller.device_name.clone()),
                     device_id: Some(caller.device_id.clone()),
                 });
-                Ok(json!({ "text": text }).to_string())
+                Ok(match content {
+                    // `text` stays, empty for an image or files: older apps read only it.
+                    Copied::Text(text) => json!({ "kind": "text", "text": text }),
+                    Copied::Image => json!({ "kind": "image", "text": "" }),
+                    Copied::Files(files) => json!({
+                        "kind": "files",
+                        "text": "",
+                        "files": files.iter().map(|(name, size)| json!({ "name": name, "size": size })).collect::<Vec<_>>(),
+                    }),
+                }
+                .to_string())
             }
             "file.list" => {
                 let dir = get_webdav_dir();
@@ -400,6 +554,9 @@ impl CapabilityHandler for PcCapabilities {
         caller: CallerInfo,
         path: String,
     ) -> Result<String, PasserError> {
+        if capability == "clipboard.image" {
+            return self.receive_clipboard_image(caller, path).await;
+        }
         if capability != "file.drop" {
             return Err(failed(format!("unknown capability {capability}")));
         }
@@ -440,6 +597,11 @@ impl CapabilityHandler for PcCapabilities {
         input_json: String,
         caller: CallerInfo,
     ) -> Result<String, PasserError> {
+        if capability == "clipboard.fetch" {
+            let input: serde_json::Value = serde_json::from_str(&input_json).map_err(failed)?;
+            let index = input["index"].as_u64().unwrap_or(0) as usize;
+            return self.provide_clipboard(index, caller).await;
+        }
         if capability != "file.get" {
             return Err(failed(format!("unknown capability {capability}")));
         }

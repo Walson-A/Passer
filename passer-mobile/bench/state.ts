@@ -56,7 +56,7 @@ export const REGIMES: Choice<RegimeName>[] = [
   { value: 'first-launch', label: 'Premier lancement', help: 'aucun groupe, aucun historique' },
   { value: 'alone', label: 'Seul', help: 'un groupe sans autre appareil' },
   { value: 'asleep', label: 'PC endormi', help: 'le PC ne répond plus' },
-  { value: 'refuses', label: 'Le PC refuse', help: 'son utilisateur dit non aux lectures' },
+  { value: 'refuses', label: 'Le PC refuse', help: 'une règle du PC refuse la lecture de son presse-papiers' },
   { value: 'old-pc', label: 'Ancien bureau', help: 'le PC n’offre pas file.drop : un appel par fichier, 700 Ko au plus' },
   { value: 'broken', label: 'Erreur au chargement', help: 'le noyau ne s’ouvre pas' },
   { value: 'slow', label: 'Lent', help: 'connexion directe lente, progression visible' },

@@ -7,7 +7,7 @@ import {
   classifyCallError,
   fitsOneCall,
   MAX_FILE_BYTES,
-  readClipboardOf,
+  readCopiedOf,
   sendFileTo,
   sendTextTo,
 } from '@/core/device-calls';
@@ -15,7 +15,7 @@ import { ping } from '@/core/endpoint';
 import { PasserError } from '@/core/errors';
 import { format, t } from '@/i18n';
 import { announce } from '@/platform/accessibility';
-import { copyText } from '@/platform/clipboard';
+import { copyImageFile, copyText } from '@/platform/clipboard';
 import { fileTransport } from '@/platform/file-transport';
 import { haptic } from '@/platform/haptics';
 import {
@@ -25,6 +25,8 @@ import {
   clearOutgoing,
   fitPhoto,
   readBase64,
+  receivedFileUri,
+  shareFile,
   stagePastedImage,
   type PickedPhoto,
 } from '@/platform/media';
@@ -40,10 +42,11 @@ import { usePairings } from './pairings';
  * Sending to the device chosen on Send, and fetching its clipboard.
  *
  * Everything goes through the device network (passer-core), so the other device's own
- * rules and approvals apply. Two things a single call can't carry yet use the direct
- * connection to the PC, when the user set one up for Shortcuts (Settings): files over
- * 700 KB, and images for the PC clipboard. Without it, photos are shrunk to fit and
- * larger files are refused with an explanation.
+ * rules and approvals apply: files and images as streams, any size; images for the PC
+ * clipboard through `clipboard.image`. Only against a PC with an older desktop (no
+ * `file.drop`) does a file go in one call, 700 KB at most: photos are shrunk to fit and
+ * larger files go through the direct connection when there is one, else are refused
+ * with an explanation.
  */
 
 export type ActiveTransfer = {
@@ -73,6 +76,8 @@ type TransfersValue = {
   outcome: Outcome | null;
   /** A direct connection to the Send destination is up (Settings › Direct connection). */
   direct: boolean;
+  /** The PC takes an image onto its clipboard over the device network (`clipboard.image`). */
+  imagesToClipboard: boolean;
   /** Photos picked on Send, waiting for the destination sheet (direct connection only). */
   pendingPhotos: PickedPhoto[];
   setPendingPhotos: (photos: PickedPhoto[]) => void;
@@ -134,12 +139,15 @@ function describe(error: unknown, name: string): string {
 }
 
 export function TransfersProvider({ children }: { children: ReactNode }) {
-  const { target, call, reach, report, offers, sendFile, canStream } = useDevices();
+  const { target, call, reach, report, offers, sendFile, fetchFile, canStream } = useDevices();
   /** The destination takes files of any size as a stream (`file.drop`, desktop with passer-core streams). */
   // Streams need the PC to offer file.drop and this build to carry them: a build from before
   // mobile-v0.3.0, reached by an over-the-air update, sends one call per file instead.
   const streams =
     canStream && target ? (offers[target.id]?.some((offer) => offer.name === 'file.drop') ?? false) : false;
+  /** The PC puts a streamed image on its clipboard (`clipboard.image`, desktop 1.1.0-beta.3 and later). */
+  const imagesToClipboard =
+    canStream && target ? (offers[target.id]?.some((offer) => offer.name === 'clipboard.image') ?? false) : false;
   const { pc } = usePairings();
   const { connection, reportUnauthorized, retry } = useConnection();
   const { record } = useHistory();
@@ -280,6 +288,14 @@ export function TransfersProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  /** One image onto the PC clipboard, streamed: any size, with progress. */
+  const streamToClipboard = async (to: Member, file: UploadFile, title: string) => {
+    begin(to, { kind: 'image', title, total: file.size ?? 0 });
+    await sendFile(to.id, 'clipboard.image', { name: file.name }, file.uri, (sent, fileTotal) => {
+      setActive((current) => (current ? { ...current, sent, total: file.size ?? fileTotal ?? 0 } : current));
+    });
+  };
+
   /** Through the device network, one call per file; a batch stops between files when cancelled. */
   const sendThroughGroup = async (signal: AbortSignal, to: Member, files: UploadFile[], kind: HistoryKind) => {
     for (const [index, file] of files.entries()) {
@@ -305,13 +321,27 @@ export function TransfersProvider({ children }: { children: ReactNode }) {
     run(async (to, signal) => {
       const file = stagePastedImage(dataUri);
       if (direct) {
-        // Only the direct connection can put an image on the PC clipboard today.
         await uploadDirect(signal, to, [file], 'pc-clipboard', 'image');
         land(
           to,
           sentItem(to, 'image', 'pc-clipboard', t.transfer.pastedImage, file.size),
           format(t.transfer.onClipboardOf, { name: to.name }),
         );
+        return;
+      }
+      if (imagesToClipboard) {
+        await streamToClipboard(to, file, t.transfer.pastedImage);
+        land(
+          to,
+          sentItem(to, 'image', 'pc-clipboard', t.transfer.pastedImage, file.size),
+          format(t.transfer.onClipboardOf, { name: to.name }),
+        );
+        return;
+      }
+      if (streams) {
+        // A PC without clipboard.image keeps it in its Passer folder, whatever its size.
+        await streamToGroup(signal, to, [file], 'image');
+        land(to, sentItem(to, 'image', 'passboard', file.name, file.size), format(t.transfer.inPasserFolderOf, { name: to.name }));
         return;
       }
       const base64 = dataUri.replace(/^data:[^;]+;base64,/, '');
@@ -339,6 +369,16 @@ export function TransfersProvider({ children }: { children: ReactNode }) {
         for (const photo of photos) files.push(await asPassboardFile(photo));
         await uploadDirect(signal, to, files, 'passboard', 'image');
         land(to, photosItem(to, files), format(t.transfer.inPasserFolderOf, { name: to.name }));
+        return;
+      }
+      if (destination === 'clipboard' && imagesToClipboard && photos.length === 1) {
+        const file = await asClipboardImage(photos[0]);
+        await streamToClipboard(to, file, photos[0].name);
+        land(
+          to,
+          sentItem(to, 'image', 'pc-clipboard', photos[0].name, file.size),
+          format(t.transfer.onClipboardOf, { name: to.name }),
+        );
         return;
       }
       if (streams) {
@@ -405,13 +445,32 @@ export function TransfersProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  /** Streams what is copied on the PC (`clipboard.fetch`) into `uri`, with progress. */
+  const fetchCopied = async (to: Member, index: number, uri: string, kind: HistoryKind, title: string, size: number | null, of: { index: number; count: number }) => {
+    setActive({
+      direction: 'down',
+      kind,
+      title,
+      peer: to.name,
+      index: of.index,
+      count: of.count,
+      sent: 0,
+      total: size ?? 0,
+      waiting: false,
+      cancellable: false,
+    });
+    await fetchFile(to.id, 'clipboard.fetch', { index }, uri, (done, total) => {
+      setActive((current) => (current ? { ...current, sent: done, total: size ?? total ?? 0 } : current));
+    });
+  };
+
   const pull = () =>
     run(async (to) => {
-      // The other device's user approves each read: the wait is shown as such.
+      // A desktop before 1.1.0-beta.3 still asks its user: the wait is shown as such.
       setActive({
         direction: 'down',
         kind: 'text',
-        title: format(t.transfer.waitingApproval, { name: to.name }),
+        title: t.transfer.receiving,
         peer: to.name,
         index: 0,
         count: 1,
@@ -420,7 +479,51 @@ export function TransfersProvider({ children }: { children: ReactNode }) {
         waiting: true,
         cancellable: false,
       });
-      const text = await readClipboardOf(call, to.id);
+      const copied = await readCopiedOf(call, to.id);
+      if (copied.kind === 'image' || copied.kind === 'files') {
+        if (!canStream) throw new CallFailure('not-offered', 'this build has no streams');
+      }
+      if (copied.kind === 'image') {
+        const uri = receivedFileUri(`Passer ${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.png`);
+        await fetchCopied(to, 0, uri, 'image', format(t.transfer.imageFromPc, { name: to.name }), null, { index: 0, count: 1 });
+        await copyImageFile(uri);
+        const item = record({
+          pcKey: to.id,
+          peer: to.name,
+          direction: 'received',
+          kind: 'image',
+          destination: 'iphone-clipboard',
+          title: format(t.transfer.imageFromPc, { name: to.name }),
+          size: null,
+          fileUri: uri,
+        });
+        land(to, item, t.transfer.copiedHere);
+        return;
+      }
+      if (copied.kind === 'files') {
+        const received: { uri: string; name: string; size: number | null }[] = [];
+        for (const [index, file] of copied.files.entries()) {
+          const uri = receivedFileUri(file.name);
+          await fetchCopied(to, index, uri, 'file', file.name, file.size, { index, count: copied.files.length });
+          received.push({ uri, name: file.name, size: file.size });
+        }
+        const one = received.length === 1 ? received[0] : null;
+        const item = record({
+          pcKey: to.id,
+          peer: to.name,
+          direction: 'received',
+          kind: one ? 'file' : 'files',
+          destination: 'files',
+          title: one ? one.name : format(t.transfer.filesFromPc, { name: to.name }),
+          size: received.every((file) => file.size !== null) ? received.reduce((sum, file) => sum + (file.size ?? 0), 0) : null,
+          fileUri: one?.uri,
+        });
+        land(to, item, format(t.transfer.receivedFrom, { name: to.name }));
+        // One file opens the share sheet, as the direct pull always did with what it got.
+        if (one) await shareFile(one.uri, { mimeType: 'application/octet-stream', uti: 'public.data' }).catch(() => {});
+        return;
+      }
+      const text = copied.text;
       if (text.length === 0) {
         haptic.warning();
         notify(format(t.transfer.pcClipboardEmpty, { name: to.name }));
@@ -453,6 +556,7 @@ export function TransfersProvider({ children }: { children: ReactNode }) {
         active,
         outcome,
         direct: direct !== null,
+        imagesToClipboard,
         pendingPhotos,
         setPendingPhotos,
         sendText,

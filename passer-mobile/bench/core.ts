@@ -89,8 +89,12 @@ export function createFakeCore({
   /** What each member lets this phone ask for, as `memberCapabilities` reports it (the desktop's `devices.rs` on `dev`). */
   const offers = (member: Member): OfferedCapability[] => {
     if (member.id === pc.id) {
+      const old = regime === 'old-pc';
       const list: OfferedCapability[] = [
-        { name: 'clipboard.read', title: 'Read the PC clipboard', description: 'Returns the text copied on this PC.', effect: 'sensitive', needsApproval: true },
+        // Before 1.1.0-beta.3 the PC asked its user for each read; since, the user's own devices read it freely.
+        old
+          ? { name: 'clipboard.read', title: 'Read the PC clipboard', description: 'Returns the text copied on this PC.', effect: 'sensitive', needsApproval: true }
+          : { name: 'clipboard.read', title: 'Read the PC clipboard', description: 'Says what is copied on this PC.', effect: 'read', needsApproval: false },
         { name: 'clipboard.write', title: 'Put text on the PC clipboard', description: "Replaces the text on this PC's clipboard.", effect: 'write', needsApproval: false },
         { name: 'device.info', title: 'Device info', description: 'Name, kind, system and versions.', effect: 'read', needsApproval: false },
         { name: 'file.receive', title: 'Send a file to the PC', description: 'Saves a small file (under 700 KB) into the Passboard folder.', effect: 'write', needsApproval: false },
@@ -101,6 +105,8 @@ export function createFakeCore({
           { name: 'file.drop', title: 'Send a file to the PC', description: "Saves the file you send into the PC's Passboard folder, under its name.", effect: 'write', needsApproval: false },
           { name: 'file.list', title: "List the PC's shared files", description: "Lists the files in the PC's Passer Space folder, to get one with file.get.", effect: 'read', needsApproval: false },
           { name: 'file.get', title: 'Get a file from the PC', description: "Sends back a file from the PC's Passer Space folder, by name.", effect: 'read', needsApproval: false },
+          { name: 'clipboard.fetch', title: 'Get what is copied on the PC', description: 'Sends back the copied image as PNG, or a copied file.', effect: 'read', needsApproval: false },
+          { name: 'clipboard.image', title: 'Put an image on the PC clipboard', description: "Puts the image you send on this PC's clipboard.", effect: 'write', needsApproval: false },
         );
       }
       return list;
@@ -201,13 +207,24 @@ export function createFakeCore({
           return JSON.stringify({ saved: true, size });
         }
         case 'clipboard.read': {
+          if (regime !== 'old-pc') {
+            // devices.rs since 1.1.0-beta.3: no question; files copied in the Explorer, else an image, else text.
+            if (regime === 'refuses') {
+              // A rule on the PC that says no answers at once.
+              log('pc', 'Refusé par une règle du PC');
+              throw new Error('denied: a rule refuses this request');
+            }
+            const content = await pcClipboard();
+            log('pc', 'Presse-papiers du PC lu');
+            if (content.kind === 'image') return JSON.stringify({ kind: 'image', text: '' });
+            if (content.kind === 'files') {
+              return JSON.stringify({ kind: 'files', text: '', files: [{ name: 'Copie du PC.zip', size: content.zip.size }] });
+            }
+            return JSON.stringify({ kind: 'text', text: content.text });
+          }
           // Sensitive: the PC's user is asked first, and answers after a few seconds.
           log('pc', 'Le PC demande à son utilisateur d’autoriser la lecture');
           await wait(2_600);
-          if (regime === 'refuses') {
-            log('pc', 'Refusé sur le PC');
-            throw new Error('denied: the user refused this request');
-          }
           const content = await pcClipboard();
           log('pc', 'Autorisé une fois sur le PC');
           // devices.rs reads text only; anything else reads as empty.
@@ -225,6 +242,7 @@ export function createFakeCore({
       }
       if (!offers(member).some((offer) => offer.name === capability)) throw new Error('unknown_capability: no such capability on this device');
       const name = String((JSON.parse(inputJson) as { name?: string }).name ?? 'file');
+      const toClipboard = capability === 'clipboard.image';
       // The bench's picks carry their size in the fixtures or the URI (`media.web.ts`).
       const marked = /#bench-size=(\d+)$/.exec(uri);
       const total = marked ? Number(marked[1]) : (sizes.get(uri) ?? 1_000_000);
@@ -232,6 +250,10 @@ export function createFakeCore({
       for (let step = 1; step <= steps; step += 1) {
         await wait(220);
         emit('onTransferProgress', { id: transferId, done: Math.round((total * step) / steps), total });
+      }
+      if (toClipboard) {
+        log('pc', `Presse-papiers du PC (image, flux) : ${name} (${Math.round(total / 1024)} Ko)`);
+        return JSON.stringify({ copied: true, size: total });
       }
       log('pc', `Passboard du PC (flux) : ${name} (${Math.round(total / 1024)} Ko)`);
       return JSON.stringify({ saved: true, size: total, name });
@@ -242,8 +264,20 @@ export function createFakeCore({
         await wait(2_000);
         throw new Error('network error: connection timed out');
       }
-      if (capability !== 'file.get' || !offers(member).some((offer) => offer.name === capability)) {
+      const known = capability === 'file.get' || capability === 'clipboard.fetch';
+      if (!known || !offers(member).some((offer) => offer.name === capability)) {
         throw new Error('unknown_capability: no such capability on this device');
+      }
+      if (capability === 'clipboard.fetch') {
+        const content = await pcClipboard();
+        if (content.kind === 'text') throw new Error('module_error: no image or file is copied on this PC');
+        const total = content.kind === 'image' ? content.png.size : content.zip.size;
+        for (let step = 1; step <= 4; step += 1) {
+          await wait(240);
+          emit('onTransferProgress', { id: transferId, done: Math.round((total * step) / 4), total });
+        }
+        log('pc', content.kind === 'image' ? 'Image copiée envoyée depuis le PC' : 'Fichier copié envoyé depuis le PC');
+        return JSON.stringify({ bytes: total });
       }
       const name = String((JSON.parse(inputJson) as { name?: string }).name ?? '');
       const file = SHARED.find((one) => one.name === name);

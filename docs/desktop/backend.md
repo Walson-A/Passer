@@ -46,6 +46,7 @@ The new way devices talk to this PC, built on [passer-core](https://github.com/W
   | `device.info` | read | allowed | name, kind (laptop or desktop: a PC with a battery is a laptop), Windows version (`RtlGetVersion`), Passer and passer-core versions |
   | `clipboard.write` | write | allowed | puts text (≤ 200 000 characters) on the clipboard; history + HUD |
   | `clipboard.read` | sensitive | **asks** | returns the clipboard text after the user approves |
+  | `clipboard.image` | write | allowed | receives an image (PNG or JPEG, up to 50 MB) as a stream and puts it on the clipboard, ready to paste; a copy stays for the history's preview; history + HUD |
   | `file.receive` | write | allowed | saves a small file (≤ 700 KB, sent inline) into the Passboard folder, base name only; kept for older apps |
   | `file.drop` | write | allowed | receives a file of any size (up to 4 GB) as a stream; the core keeps it private until it is complete, then it moves into the Passboard folder, base name only |
   | `file.list` | read | allowed | lists the files directly in the Passer Space folder (name, size, date), newest first, at most 500 |
