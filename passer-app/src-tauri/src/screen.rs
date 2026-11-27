@@ -211,7 +211,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_rule_is_added_once_and_keeps_the_others() {
+    fn the_old_group_rule_goes_and_the_others_stay() {
         let dir = tempfile::tempdir().unwrap();
         let other = Rule {
             who: Who::AnyAgent,
@@ -220,17 +220,32 @@ mod tests {
             decision: Decision::Allow,
             lease_secs: None,
         };
-        std::fs::write(
-            dir.path().join("policy.json"),
-            serde_json::to_string(&Policy { rules: vec![other.clone()] }).unwrap(),
-        )
-        .unwrap();
-        ensure_rule(dir.path()).unwrap();
-        ensure_rule(dir.path()).unwrap();
-        let policy: Policy =
-            serde_json::from_str(&std::fs::read_to_string(dir.path().join("policy.json")).unwrap())
-                .unwrap();
-        assert_eq!(policy.rules, vec![other, trusted_devices_rule()]);
+        let group = Rule {
+            who: Who::AnyDevice,
+            capability: "screen.*".into(),
+            target: None,
+            decision: Decision::Allow,
+            lease_secs: Some(SESSION_SECS),
+        };
+        write_policy(dir.path(), &Policy { rules: vec![other.clone(), group] }).unwrap();
+        remove_group_rule(dir.path()).unwrap();
+        assert_eq!(read_policy(dir.path()).unwrap().rules, vec![other]);
+    }
+
+    #[test]
+    fn a_device_switch_turns_on_and_off() {
+        let dir = tempfile::tempdir().unwrap();
+        // RFC 8032, test 1: a valid Ed25519 public key.
+        let id = "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a";
+        assert!(!rules_for(dir.path(), id).unwrap().control);
+        set_rule(dir.path(), id, "screen.control", true).unwrap();
+        set_rule(dir.path(), id, "screen.control", true).unwrap();
+        let rules = rules_for(dir.path(), id).unwrap();
+        assert!(rules.control && !rules.view);
+        assert_eq!(read_policy(dir.path()).unwrap().rules.len(), 1, "set twice, kept once");
+        set_rule(dir.path(), id, "screen.control", false).unwrap();
+        assert!(!rules_for(dir.path(), id).unwrap().control);
+        assert!(set_rule(dir.path(), id, "file.drop", true).is_err());
     }
 
     #[test]

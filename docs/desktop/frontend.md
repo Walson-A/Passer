@@ -70,8 +70,8 @@ The **Devices** space, in the direction Walson chose after the mockups (*A3*, se
 
 The footnote is one line, *End-to-end encrypted*; while `development_network` is true it carries a **Preview** toggle that unfolds what the preview network means for the user. It does not name n0 — that is in `backend.md`, for developers.
 
-### The screen: `ScreenBanner.tsx` and the Details switches
-When another device sees or controls this PC's screen (through Vasistas), a banner floats at the top of the window, over every view: who, *sees this PC's screen* or *is controlling this PC* (red), for how long, and **Stop**, which ends every session other devices have open here. It follows `screen-session-started` / `-ended` and is seeded from `devices_screen_sessions`. Vasistas also shows its own sign on the screen and stops on Escape.
+### The screen: the Details switches
+When another device sees or controls this PC's screen, Vasistas itself shows it on the screen (who, *sees* or *controls*, the time left, framed corners) and stops on Escape. Passer adds no banner of its own: two bars saying the same thing were one too many. *Stop remote activity* in the sidebar still ends every session other devices have open here.
 
 In a device's Details, *This PC's screen* has two switches, **See it without asking** and **Control it without asking**, off by default: then each request asks on this PC with the approval card. They are for your own devices, to reach the PC when nobody is in front of it. A change applies at once; switching one off also ends any session in progress. Shown only when Vasistas is installed.
 
