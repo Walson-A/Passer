@@ -466,7 +466,10 @@ export function TransfersProvider({ children }: { children: ReactNode }) {
 
   const pull = () =>
     run(async (to) => {
-      // A desktop before 1.1.0-beta.3 still asks its user: the wait is shown as such.
+      // A desktop before 1.1.0-beta.3 still asks its user: the wait is shown as such, and only
+      // then (a member on an older core lists nothing, so it may ask).
+      const readOffer = offers[to.id]?.find((offer) => offer.name === 'clipboard.read');
+      const asks = readOffer ? readOffer.needsApproval : !offers[to.id];
       setActive({
         direction: 'down',
         kind: 'text',
@@ -476,7 +479,7 @@ export function TransfersProvider({ children }: { children: ReactNode }) {
         count: 1,
         sent: 0,
         total: 0,
-        waiting: true,
+        waiting: asks,
         cancellable: false,
       });
       const copied = await readCopiedOf(call, to.id);
