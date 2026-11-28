@@ -75,17 +75,18 @@ export function DeviceStage({ member: m, running, onRefresh, refreshing, last, o
     const sendFile = () => run("file", async () => {
         setProgress(null);
         try {
-            const name = await invoke<string | null>("devices_pick_and_send", { id: m.id, transfer });
-            if (name === null) throw new Error("cancelled");
-            return `${name} sent`;
+            const sent = await invoke<{ name: string; queued: boolean } | null>("devices_pick_and_send", { id: m.id, transfer });
+            if (sent === null) throw new Error("cancelled");
+            // Asleep: the PC keeps it, and the phone gets it from the notification.
+            return sent.queued ? `${m.name} is asleep: it gets ${sent.name} from the notification` : `${sent.name} sent`;
         } finally {
             setProgress(null);
         }
     }, "The file didn't go through.");
 
     const sendClipboard = () => run("send-clipboard", async () => {
-        await invoke("devices_send_clipboard", { id: m.id });
-        return "Your clipboard is on it";
+        const now = await invoke<boolean>("devices_send_clipboard", { id: m.id });
+        return now ? "Your clipboard is on it" : `${m.name} is asleep: it gets it from the notification`;
     }, "Your clipboard didn't go through.");
 
     const getClipboard = () => run("get-clipboard", async () => {

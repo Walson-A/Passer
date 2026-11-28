@@ -62,8 +62,8 @@ export function DropZone({ target, onOpenDevices }: Props) {
         setProgress(null);
         setQuick({ phase: "busy", text: `Sending to ${m.name}…` });
         try {
-            const n = await invoke<number>("devices_send_paths", { id: m.id, paths: list });
-            setQuick({ phase: "done", text: `${n === 1 ? "Sent" : `${n} files sent`} to ${m.name}` });
+            const r = await invoke<{ sent: number; queued: number }>("devices_send_paths", { id: m.id, paths: list });
+            setQuick({ phase: "done", text: sentText(r, m.name) });
             setTimeout(() => setQuick(q => (q?.phase === "done" ? null : q)), 2600);
         } catch (e) {
             setQuick({ phase: "error", text: `It didn't reach ${m.name}.`, detail: String(e) });
@@ -156,8 +156,8 @@ export function DropZone({ target, onOpenDevices }: Props) {
         setError(null);
         setProgress(null);
         try {
-            const n = await invoke<number>("devices_send_paths", { id: m.id, paths });
-            setDone(`${n === 1 ? "Sent" : `${n} files sent`} to ${m.name}`);
+            const r = await invoke<{ sent: number; queued: number }>("devices_send_paths", { id: m.id, paths });
+            setDone(sentText(r, m.name));
             setTimeout(() => setPaths(null), 1600);
         } catch (e) {
             setError({ text: `It didn't reach ${m.name}.`, detail: String(e) });
@@ -308,4 +308,11 @@ export function DropZone({ target, onOpenDevices }: Props) {
             )}
         </>
     );
+}
+
+/** What a drop did: sent now, or kept for a device that sleeps until its notification is opened. */
+function sentText(r: { sent: number; queued: number }, name: string): string {
+    if (r.queued > 0 && r.sent === 0) return `${name} is asleep: it gets ${r.queued === 1 ? "it" : "them"} from the notification`;
+    if (r.queued > 0) return `${r.sent} sent to ${name}; ${r.queued} more when it opens the notification`;
+    return `${r.sent === 1 ? "Sent" : `${r.sent} files sent`} to ${name}`;
 }

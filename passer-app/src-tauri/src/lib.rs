@@ -13,6 +13,7 @@ mod commands;
 mod tray;
 mod devices;
 mod screen;
+mod outbox;
 
 pub use types::*;
 pub use paths::*;

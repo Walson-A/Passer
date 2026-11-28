@@ -45,8 +45,11 @@ The new way devices talk to this PC, built on [passer-core](https://github.com/W
   |---|---|---|---|
   | `device.info` | read | allowed | name, kind (laptop or desktop: a PC with a battery is a laptop), Windows version (`RtlGetVersion`), Passer and passer-core versions |
   | `clipboard.write` | write | allowed | puts text (≤ 200 000 characters) on the clipboard; history + HUD |
-  | `clipboard.read` | sensitive | **asks** | returns the clipboard text after the user approves |
+  | `clipboard.read` | read | allowed | says what is copied: text, an image, or files copied in the Explorer; the user's own devices no longer ask (decision with Walson, 2026-11-27), agents still get nothing |
   | `clipboard.image` | write | allowed | receives an image (PNG or JPEG, up to 50 MB) as a stream and puts it on the clipboard, ready to paste; a copy stays for the history's preview; history + HUD |
+  | `clipboard.fetch` | read | allowed | streams what is copied: the image (PNG) or each file copied in the Explorer (`index`) |
+  | `push.register` | write | allowed | the caller gives its Expo push token and language, to be notified when it sleeps |
+  | `outbox.list` / `outbox.get` / `outbox.done` | read / read (stream) / write | allowed | what waits for the caller, only its own; see *A phone that sleeps* below |
   | `file.receive` | write | allowed | saves a small file (≤ 700 KB, sent inline) into the Passboard folder, base name only; kept for older apps |
   | `file.drop` | write | allowed | receives a file of any size (up to 4 GB) as a stream; the core keeps it private until it is complete, then it moves into the Passboard folder, base name only |
   | `file.list` | read | allowed | lists the files directly in the Passer Space folder (name, size, date), newest first, at most 500 |
@@ -69,6 +72,9 @@ Other devices of the group can see this PC's screen (`screen.view`) and take con
 - **Stopping**: Escape on this PC (Vasistas), the stop button (`devices_stop_sessions`), or removing the device; the process is killed when its session ends.
 - **Indicator**: passer-core refuses these capabilities without one. `WindowIndicator` records live sessions (`devices_screen_sessions`) and emits `screen-session-started` / `screen-session-ended` for the window.
 - **Not covered**: a locked PC or UAC prompts (Vasistas cannot see the secure desktop). Unlocking remotely, as Chrome Remote Desktop does, is wanted later as an opt-in switch (asked of the Vasistas session).
+
+## 💤 A phone that sleeps (`outbox.rs`)
+An iPhone's app is suspended when it is not in front, so the PC cannot reach it. When sending to a member fails because it is unreachable (`PasserError::Network`), the text or the files wait in `devices\outbox.json` (files by path, not copied; a week and 50 items per device at most), and the PC asks **Expo's push service** (`exp.host/--/api/v2/push/send`) for a visible notification on that phone, plus a background wake when iOS allows it. No server of ours: the phone gave its Expo push token through `push.register`, and Expo holds the Apple key EAS set up for the app. Opening the notification (or the app), the phone reads `outbox.list`, gets files through `outbox.get`, and says `outbox.done`; the Passboard shows the item as sent then. A member that never registered a token gets the old error, which tells the user to open Passer once with notifications allowed. The window says *asleep: it gets it from the notification* (`devices_send_clipboard` returns `false`, `devices_pick_and_send` `{ name, queued }`, `devices_send_paths` `{ sent, queued }`).
 
 ## ✂️ Core Utilities
 - **`clipboard.rs`**: Safe reading and writing to the system clipboard (Text, HTML, Image, file lists) for iOS push/pull integrations.

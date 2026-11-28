@@ -286,6 +286,11 @@ function installBackend(scenario: Scenario) {
                 ];
             }
             case "devices_send_clipboard":
+                return true;
+            case "devices_send_paths":
+                return { sent: (a.paths as string[] | undefined)?.length ?? 1, queued: 0 };
+            case "devices_pick_and_send":
+                return { name: "rapport.pdf", queued: false };
             case "devices_send_file":
                 return null;
             case "devices_list_files":

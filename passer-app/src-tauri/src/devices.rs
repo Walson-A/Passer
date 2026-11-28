@@ -18,6 +18,7 @@
 //! | `file.drop`      | write     | receives a file of any size (up to 4 GB) as a stream, into the Passboard folder |
 //! | `file.get`       | read      | sends back a file from the Passer Space folder (the one already shared over WebDAV) |
 //! | `file.list`      | read      | lists the files in the Passer Space folder (names, sizes, dates) |
+//! | `push.register`, `outbox.*` | | what waits for a sleeping phone, and its notification (`outbox.rs`) |
 //!
 //! Approvals are shown in the main window; a request nobody answers is refused.
 
@@ -61,6 +62,8 @@ pub struct Devices {
     pub screen_sessions: Arc<Mutex<HashMap<u64, crate::screen::ScreenSession>>>,
     /// Where Vasistas was found at launch; without it the screen is not offered.
     pub vasistas: Option<std::path::PathBuf>,
+    /// What waits for a phone that could not be reached, and how to notify it.
+    pub outbox: Arc<crate::outbox::Outbox>,
     pending: Mutex<HashMap<u64, oneshot::Sender<bool>>>,
     next: AtomicU64,
     app: AppHandle,
@@ -80,13 +83,17 @@ impl Devices {
             device,
             screen_sessions: Arc::default(),
             vasistas: crate::screen::find_vasistas(),
+            outbox: Arc::new(crate::outbox::Outbox::open(&home)),
             pending: Mutex::default(),
             next: AtomicU64::new(1),
             app: app.clone(),
         });
         devices
             .device
-            .add_capabilities(pc_capabilities(), Arc::new(PcCapabilities { app, server }));
+            .add_capabilities(
+                pc_capabilities(),
+                Arc::new(PcCapabilities { app, server, outbox: devices.outbox.clone() }),
+            );
         devices
             .device
             .set_approval_prompter(Arc::new(WindowPrompter(Arc::downgrade(&devices))));
@@ -245,6 +252,55 @@ fn pc_capabilities() -> Vec<CapabilitySpec> {
                 }),
             )
         },
+        spec(
+            "push.register",
+            "Get notified by the PC",
+            "Gives this PC your Expo push token (null to stop), and the language of your notifications, so it can tell you when it has something for you while your app sleeps.",
+            EffectKind::Write,
+            json!({
+                "type": "object",
+                "properties": {
+                    "token": { "type": ["string", "null"], "maxLength": 200 },
+                    "lang": { "type": "string", "maxLength": 8 }
+                },
+                "required": ["token"],
+                "additionalProperties": false
+            }),
+        ),
+        spec(
+            "outbox.list",
+            "What the PC kept for you",
+            "Lists what this PC could not hand you while you were asleep: { items: [{ id, kind: text|file, name, size, text, at }] }. Texts come inline; get a file with outbox.get, then say outbox.done.",
+            EffectKind::Read,
+            json!({ "type": "object", "additionalProperties": false }),
+        ),
+        CapabilitySpec {
+            stream: Some(StreamKind::Download),
+            ..spec(
+                "outbox.get",
+                "Get a file the PC kept for you",
+                "Sends back a file from outbox.list, by id.",
+                EffectKind::Read,
+                json!({
+                    "type": "object",
+                    "properties": { "id": { "type": "string", "maxLength": 64 } },
+                    "required": ["id"],
+                    "additionalProperties": false
+                }),
+            )
+        },
+        spec(
+            "outbox.done",
+            "Say you got it",
+            "Tells this PC you have an item from outbox.list, so it forgets it.",
+            EffectKind::Write,
+            json!({
+                "type": "object",
+                "properties": { "id": { "type": "string", "maxLength": 64 } },
+                "required": ["id"],
+                "additionalProperties": false
+            }),
+        ),
         CapabilitySpec {
             stream: Some(StreamKind::Upload),
             ..spec(
@@ -319,6 +375,7 @@ fn base_name(raw: &str) -> String {
 struct PcCapabilities {
     app: AppHandle,
     server: Arc<ServerState>,
+    outbox: Arc<crate::outbox::Outbox>,
 }
 
 impl PcCapabilities {
@@ -449,6 +506,34 @@ impl CapabilityHandler for PcCapabilities {
     ) -> Result<String, PasserError> {
         let input: serde_json::Value = serde_json::from_str(&input_json).map_err(failed)?;
         match capability.as_str() {
+            "push.register" => {
+                let token = input["token"].as_str().filter(|t| !t.is_empty()).map(str::to_owned);
+                let lang = input["lang"].as_str().unwrap_or("en");
+                self.outbox.set_token(&caller.device_id, token.map(|t| format!("{lang}|{t}")));
+                Ok(json!({ "registered": true }).to_string())
+            }
+            "outbox.list" => {
+                let items: Vec<_> = self.outbox.list(&caller.device_id).iter().map(|i| i.public()).collect();
+                Ok(json!({ "items": items }).to_string())
+            }
+            "outbox.done" => {
+                let id = input["id"].as_str().unwrap_or_default();
+                let item = self.outbox.get(&caller.device_id, id);
+                let removed = self.outbox.done(&caller.device_id, id);
+                if let Some(item) = item.filter(|_| removed) {
+                    self.record(TransferEvent {
+                        kind: item.kind.clone(),
+                        direction: "outgoing".into(),
+                        target: if item.kind == "text" { "clipboard".into() } else { "folder".into() },
+                        name: item.name.clone().or(item.text.clone()),
+                        path: item.path.clone(),
+                        size: item.size,
+                        device: Some(caller.device_name.clone()),
+                        device_id: Some(caller.device_id.clone()),
+                    });
+                }
+                Ok(json!({ "done": removed }).to_string())
+            }
             "clipboard.write" => {
                 let text = input["text"].as_str().unwrap_or_default().to_owned();
                 let shown = text.clone();
@@ -597,6 +682,18 @@ impl CapabilityHandler for PcCapabilities {
         input_json: String,
         caller: CallerInfo,
     ) -> Result<String, PasserError> {
+        if capability == "outbox.get" {
+            let input: serde_json::Value = serde_json::from_str(&input_json).map_err(failed)?;
+            let item = self
+                .outbox
+                .get(&caller.device_id, input["id"].as_str().unwrap_or_default())
+                .ok_or_else(|| failed("nothing waits for you under that id"))?;
+            let path = item.path.ok_or_else(|| failed("that item is not a file"))?;
+            if !std::path::Path::new(&path).is_file() {
+                return Err(failed("that file is no longer on the PC"));
+            }
+            return Ok(path);
+        }
         if capability == "clipboard.fetch" {
             let input: serde_json::Value = serde_json::from_str(&input_json).map_err(failed)?;
             let index = input["index"].as_u64().unwrap_or(0) as usize;
@@ -922,7 +1019,9 @@ fn record_with(devices: &Devices, id: &str, ev: TransferEvent) {
 
 /// Sends the text currently copied on this PC to a member's clipboard.
 #[tauri::command]
-pub async fn devices_send_clipboard(devices: DevicesState<'_>, id: String) -> Result<(), String> {
+/// `true`: it is on the member's clipboard; `false`: the member sleeps, and gets it when
+/// it opens the notification.
+pub async fn devices_send_clipboard(devices: DevicesState<'_>, id: String) -> Result<bool, String> {
     let text = tokio::task::spawn_blocking(|| arboard::Clipboard::new().and_then(|mut c| c.get_text()))
         .await
         .map_err(|e| e.to_string())?
@@ -933,7 +1032,24 @@ pub async fn devices_send_clipboard(devices: DevicesState<'_>, id: String) -> Re
     if text.chars().count() > MAX_TEXT {
         return Err("The copied text is too long to send (200,000 characters at most).".into());
     }
-    call_member(&devices, id.clone(), "clipboard.write", json!({ "text": text.clone() })).await?;
+    match devices.device.call(id.clone(), "clipboard.write".into(), json!({ "text": text.clone() }).to_string()).await {
+        Ok(_) => {}
+        Err(e) if unreachable(&e) => {
+            let item = crate::outbox::Item {
+                id: String::new(),
+                device_id: id.clone(),
+                kind: "text".into(),
+                name: None,
+                size: Some(text.len() as u64),
+                text: Some(text),
+                path: None,
+                at: 0,
+            };
+            queue(&devices, &id, vec![item]).await?;
+            return Ok(false);
+        }
+        Err(e) => return Err(e.to_string()),
+    }
     record_with(&devices, &id, TransferEvent {
         kind: "text".into(),
         direction: "outgoing".into(),
@@ -941,7 +1057,80 @@ pub async fn devices_send_clipboard(devices: DevicesState<'_>, id: String) -> Re
         name: Some(text),
         ..Default::default()
     });
-    Ok(())
+    Ok(true)
+}
+
+/// The member could not be reached (asleep, away, offline): worth keeping for later.
+fn unreachable(e: &PasserError) -> bool {
+    matches!(e, PasserError::Network { .. })
+}
+
+/// Keeps items for a member that sleeps, and asks Expo to notify it. Fails, keeping
+/// nothing, when the member never gave this PC a push token.
+async fn queue(devices: &Devices, id: &str, items: Vec<crate::outbox::Item>) -> Result<(), String> {
+    let name = devices
+        .device
+        .members()
+        .ok()
+        .and_then(|list| list.into_iter().find(|m| m.id == id).map(|m| m.name))
+        .unwrap_or_else(|| "This device".into());
+    let Some(registered) = devices.outbox.token(id) else {
+        return Err(format!(
+            "{name} can't be reached right now. Open Passer on it once with notifications allowed, and next time it gets a notification instead."
+        ));
+    };
+    let (lang, token) = registered.split_once('|').unwrap_or(("en", registered.as_str()));
+    let french = lang.starts_with("fr");
+    let pc = crate::device::display_name();
+    let body = match (items.as_slice(), french) {
+        ([one], true) if one.kind == "text" => "Veut vous envoyer du texte. Touchez pour le recevoir.".to_owned(),
+        ([one], false) if one.kind == "text" => "Wants to send you some text. Tap to get it.".to_owned(),
+        ([one], true) => format!("Veut vous envoyer « {} ». Touchez pour le recevoir.", one.name.clone().unwrap_or_default()),
+        ([one], false) => format!("Wants to send you {}. Tap to get it.", one.name.clone().unwrap_or_default()),
+        (many, true) => format!("Veut vous envoyer {} fichiers. Touchez pour les recevoir.", many.len()),
+        (many, false) => format!("Wants to send you {} files. Tap to get them.", many.len()),
+    };
+    for item in items {
+        let item = devices.outbox.add(item);
+        record_with(devices, id, TransferEvent {
+            kind: item.kind.clone(),
+            direction: "outgoing".into(),
+            target: "outbox".into(),
+            name: item.name.clone().or(item.text.clone()),
+            path: item.path.clone(),
+            size: item.size,
+            ..Default::default()
+        });
+    }
+    crate::outbox::notify(token, &pc, &body).await
+}
+
+/// A file kept for a member that sleeps.
+fn file_item(id: &str, path: &std::path::Path) -> crate::outbox::Item {
+    crate::outbox::Item {
+        id: String::new(),
+        device_id: id.to_owned(),
+        kind: "file".into(),
+        name: path.file_name().map(|n| n.to_string_lossy().into_owned()),
+        size: std::fs::metadata(path).map(|m| m.len()).ok(),
+        text: None,
+        path: Some(path.to_string_lossy().into_owned()),
+        at: 0,
+    }
+}
+
+/// How a send ended: delivered now, or kept for a member that sleeps.
+#[derive(Serialize)]
+pub struct Sent {
+    pub name: String,
+    pub queued: bool,
+}
+
+/// How many dropped files went now, and how many wait for the member to wake.
+#[derive(Serialize)]
+pub struct SentCount {
+    pub sent: u32,
+    pub queued: u32,
 }
 
 /// Copies a member's clipboard text onto this PC. Returns how many characters came.
@@ -996,7 +1185,19 @@ impl passer_ffi::TransferProgress for EmitProgress {
 /// Sends one file to a member: streamed through `file.drop` when the member offers it
 /// (any size, up to the core's 4 GB), else the older `file.receive` (700 KB at most).
 /// Records it in the Passboard as sent. Returns the file's name.
-async fn send_one(devices: &Devices, id: &str, path: std::path::PathBuf, transfer: &str) -> Result<String, String> {
+/// Why a file did not go: the member sleeps (keep it), or something else.
+enum SendError {
+    Unreachable,
+    Failed(String),
+}
+
+impl From<String> for SendError {
+    fn from(message: String) -> Self {
+        SendError::Failed(message)
+    }
+}
+
+async fn send_one(devices: &Devices, id: &str, path: std::path::PathBuf, transfer: &str) -> Result<String, SendError> {
     let name = path
         .file_name()
         .and_then(|n| n.to_str())
@@ -1022,10 +1223,10 @@ async fn send_one(devices: &Devices, id: &str, path: std::path::PathBuf, transfe
                 Some(progress),
             )
             .await
-            .map_err(|e| format!("{name}: {e}"))?;
+            .map_err(|e| if unreachable(&e) { SendError::Unreachable } else { SendError::Failed(format!("{name}: {e}")) })?;
     } else if offers.iter().any(|c| c.name == "file.receive") {
         if size as usize > MAX_FILE_BYTES {
-            return Err(format!("{name} is too large for this device (700 KB at most): it needs a newer Passer."));
+            return Err(SendError::Failed(format!("{name} is too large for this device (700 KB at most): it needs a newer Passer.")));
         }
         let read_path = path.clone();
         let bytes = tokio::task::spawn_blocking(move || std::fs::read(read_path))
@@ -1033,11 +1234,13 @@ async fn send_one(devices: &Devices, id: &str, path: std::path::PathBuf, transfe
             .map_err(|e| e.to_string())?
             .map_err(|e| format!("{name}: {e}"))?;
         let data = base64::engine::general_purpose::STANDARD.encode(&bytes);
-        call_member(devices, id.to_owned(), "file.receive", json!({ "name": name.clone(), "data_base64": data }))
+        devices
+            .device
+            .call(id.to_owned(), "file.receive".into(), json!({ "name": name.clone(), "data_base64": data }).to_string())
             .await
-            .map_err(|e| format!("{name}: {e}"))?;
+            .map_err(|e| if unreachable(&e) { SendError::Unreachable } else { SendError::Failed(format!("{name}: {e}")) })?;
     } else {
-        return Err("This device doesn't accept files from here.".into());
+        return Err(SendError::Failed("This device doesn't accept files from here.".into()));
     }
 
     record_with(devices, id, TransferEvent {
@@ -1061,7 +1264,7 @@ pub async fn devices_pick_and_send(
     devices: DevicesState<'_>,
     id: String,
     transfer: String,
-) -> Result<Option<String>, String> {
+) -> Result<Option<Sent>, String> {
     use tauri_plugin_dialog::DialogExt;
     let picker = app.clone();
     let picked = tokio::task::spawn_blocking(move || picker.dialog().file().set_title("Send a file").blocking_pick_file())
@@ -1069,20 +1272,39 @@ pub async fn devices_pick_and_send(
         .map_err(|e| e.to_string())?;
     let Some(file) = picked else { return Ok(None) };
     let path = file.into_path().map_err(|e| e.to_string())?;
-    send_one(&devices, &id, path, &transfer).await.map(Some)
+    match send_one(&devices, &id, path.clone(), &transfer).await {
+        Ok(name) => Ok(Some(Sent { name, queued: false })),
+        Err(SendError::Unreachable) => {
+            let item = file_item(&id, &path);
+            let name = item.name.clone().unwrap_or_default();
+            queue(&devices, &id, vec![item]).await?;
+            Ok(Some(Sent { name, queued: true }))
+        }
+        Err(SendError::Failed(e)) => Err(e),
+    }
 }
 
 /// Sends files dropped on the window to a member, one by one (`transfer` is
 /// `drop-<index>` in the progress events). Stops at the first that fails and says
 /// which; the ones before it went through.
 #[tauri::command]
-pub async fn devices_send_paths(devices: DevicesState<'_>, id: String, paths: Vec<String>) -> Result<u32, String> {
+pub async fn devices_send_paths(devices: DevicesState<'_>, id: String, paths: Vec<String>) -> Result<SentCount, String> {
+    let paths: Vec<std::path::PathBuf> = paths.into_iter().map(std::path::PathBuf::from).collect();
     let mut sent = 0;
-    for (i, p) in paths.into_iter().enumerate() {
-        send_one(&devices, &id, std::path::PathBuf::from(p), &format!("drop-{i}")).await?;
-        sent += 1;
+    for (i, path) in paths.iter().enumerate() {
+        match send_one(&devices, &id, path.clone(), &format!("drop-{i}")).await {
+            Ok(_) => sent += 1,
+            // Asleep: this file and the rest wait for it, under one notification.
+            Err(SendError::Unreachable) => {
+                let items: Vec<_> = paths[i..].iter().map(|p| file_item(&id, p)).collect();
+                let queued = items.len() as u32;
+                queue(&devices, &id, items).await?;
+                return Ok(SentCount { sent, queued });
+            }
+            Err(SendError::Failed(e)) => return Err(e),
+        }
     }
-    Ok(sent)
+    Ok(SentCount { sent, queued: 0 })
 }
 
 #[tauri::command]
