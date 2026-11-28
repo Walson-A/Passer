@@ -1,6 +1,6 @@
 [package]
 name = "passer"
-version = "1.1.0-beta.2"
+version = "1.1.0-beta.4"
 description = "Passer - Cross-device clipboard"
 authors = ["Walson Argan René"]
 edition = "2021"
@@ -41,9 +41,11 @@ base64 = "0.21"
 headers = "0.3" 
 open = "5.0" # For auth headers handling if needed
 # The device network: identity, groups, encrypted connections, permissions.
-passer-ffi = { git = "https://github.com/Walson-A/passer-core", rev = "788889a2c4697ffc540f684110391d7df1986aca" }
-passer-exec = { git = "https://github.com/Walson-A/passer-core", rev = "788889a2c4697ffc540f684110391d7df1986aca" }
+passer-ffi = { git = "https://github.com/Walson-A/passer-core", rev = "59889693c0131b5ef3cf80110ecca39cc0dfcf10" }
+passer-exec = { git = "https://github.com/Walson-A/passer-core", rev = "59889693c0131b5ef3cf80110ecca39cc0dfcf10" }
 async-trait = "0.1"
+# Expo's push service, to notify a sleeping phone (outbox.rs).
+reqwest = { version = "0.13.5", default-features = false, features = ["json", "rustls"] }
 tauri-plugin-autostart = "2.5.1"
 tauri-plugin-single-instance = "2"
 html-escape = "0.2.13"

@@ -535,6 +535,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "aws-lc-rs"
+version = "1.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "048006790404103c488e6c5616b3e7e702a71292aadda08e8f7698a9e0d2eb53"
+dependencies = [
+ "aws-lc-sys",
+ "zeroize",
+]
+
+[[package]]
+name = "aws-lc-sys"
+version = "0.47.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8bfbe32ac36b3c428696ce315464181bc4029d689fd58e3f2a4e58c252242f52"
+dependencies = [
+ "cc",
+ "cmake",
+ "dunce",
+ "fs_extra",
+ "pkg-config",
+]
+
+[[package]]
 name = "axum"
 version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1106,6 +1129,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "052af7878466feccda12ba7a6a67d019d712f296809559b47c12c8cc196d3a9a"
 dependencies = [
  "error-code",
+]
+
+[[package]]
+name = "cmake"
+version = "0.1.58"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c0f78a02292a74a88ac736019ab962ece0bc380e3f977bf72e376c5d78ff0678"
+dependencies = [
+ "cc",
 ]
 
 [[package]]
@@ -2265,6 +2297,12 @@ checksum = "b5c95b673b8f6f7235229ae11c5642d81b04c2e64c1e2fb417bc0cf73ca45f29"
 dependencies = [
  "autocfg",
 ]
+
+[[package]]
+name = "fs_extra"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "42703706b716c37f96a77aea830392ad231f44c9e9a67872fa5548707e11b11c"
 
 [[package]]
 name = "futures"
@@ -5226,7 +5264,7 @@ dependencies = [
 
 [[package]]
 name = "passer"
-version = "1.1.0-beta.2"
+version = "1.1.0-beta.4"
 dependencies = [
  "arboard",
  "async-trait",
@@ -5244,6 +5282,7 @@ dependencies = [
  "passer-exec",
  "passer-ffi",
  "rand 0.8.8",
+ "reqwest",
  "serde",
  "serde_json",
  "tauri",
@@ -5262,7 +5301,7 @@ dependencies = [
 [[package]]
 name = "passer-bus"
 version = "0.1.0"
-source = "git+https://github.com/Walson-A/passer-core?rev=788889a2c4697ffc540f684110391d7df1986aca#788889a2c4697ffc540f684110391d7df1986aca"
+source = "git+https://github.com/Walson-A/passer-core?rev=59889693c0131b5ef3cf80110ecca39cc0dfcf10#59889693c0131b5ef3cf80110ecca39cc0dfcf10"
 dependencies = [
  "async-trait",
  "blake3",
@@ -5279,7 +5318,7 @@ dependencies = [
 [[package]]
 name = "passer-coord"
 version = "0.1.0"
-source = "git+https://github.com/Walson-A/passer-core?rev=788889a2c4697ffc540f684110391d7df1986aca#788889a2c4697ffc540f684110391d7df1986aca"
+source = "git+https://github.com/Walson-A/passer-core?rev=59889693c0131b5ef3cf80110ecca39cc0dfcf10#59889693c0131b5ef3cf80110ecca39cc0dfcf10"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5297,7 +5336,7 @@ dependencies = [
 [[package]]
 name = "passer-device-info"
 version = "0.1.0"
-source = "git+https://github.com/Walson-A/passer-core?rev=788889a2c4697ffc540f684110391d7df1986aca#788889a2c4697ffc540f684110391d7df1986aca"
+source = "git+https://github.com/Walson-A/passer-core?rev=59889693c0131b5ef3cf80110ecca39cc0dfcf10#59889693c0131b5ef3cf80110ecca39cc0dfcf10"
 dependencies = [
  "async-trait",
  "passer-bus",
@@ -5307,7 +5346,7 @@ dependencies = [
 [[package]]
 name = "passer-exec"
 version = "0.1.0"
-source = "git+https://github.com/Walson-A/passer-core?rev=788889a2c4697ffc540f684110391d7df1986aca#788889a2c4697ffc540f684110391d7df1986aca"
+source = "git+https://github.com/Walson-A/passer-core?rev=59889693c0131b5ef3cf80110ecca39cc0dfcf10#59889693c0131b5ef3cf80110ecca39cc0dfcf10"
 dependencies = [
  "async-trait",
  "passer-bus",
@@ -5318,7 +5357,7 @@ dependencies = [
 [[package]]
 name = "passer-ffi"
 version = "0.1.0"
-source = "git+https://github.com/Walson-A/passer-core?rev=788889a2c4697ffc540f684110391d7df1986aca#788889a2c4697ffc540f684110391d7df1986aca"
+source = "git+https://github.com/Walson-A/passer-core?rev=59889693c0131b5ef3cf80110ecca39cc0dfcf10#59889693c0131b5ef3cf80110ecca39cc0dfcf10"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5340,7 +5379,7 @@ dependencies = [
 [[package]]
 name = "passer-identity"
 version = "0.1.0"
-source = "git+https://github.com/Walson-A/passer-core?rev=788889a2c4697ffc540f684110391d7df1986aca#788889a2c4697ffc540f684110391d7df1986aca"
+source = "git+https://github.com/Walson-A/passer-core?rev=59889693c0131b5ef3cf80110ecca39cc0dfcf10#59889693c0131b5ef3cf80110ecca39cc0dfcf10"
 dependencies = [
  "hex",
  "iroh-base",
@@ -5354,7 +5393,7 @@ dependencies = [
 [[package]]
 name = "passer-membership"
 version = "0.1.0"
-source = "git+https://github.com/Walson-A/passer-core?rev=788889a2c4697ffc540f684110391d7df1986aca#788889a2c4697ffc540f684110391d7df1986aca"
+source = "git+https://github.com/Walson-A/passer-core?rev=59889693c0131b5ef3cf80110ecca39cc0dfcf10#59889693c0131b5ef3cf80110ecca39cc0dfcf10"
 dependencies = [
  "blake3",
  "hex",
@@ -5368,7 +5407,7 @@ dependencies = [
 [[package]]
 name = "passer-node"
 version = "0.1.0"
-source = "git+https://github.com/Walson-A/passer-core?rev=788889a2c4697ffc540f684110391d7df1986aca#788889a2c4697ffc540f684110391d7df1986aca"
+source = "git+https://github.com/Walson-A/passer-core?rev=59889693c0131b5ef3cf80110ecca39cc0dfcf10#59889693c0131b5ef3cf80110ecca39cc0dfcf10"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5885,6 +5924,63 @@ dependencies = [
 ]
 
 [[package]]
+name = "quinn"
+version = "0.11.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4051e23e9185c255a7e33ef59cdbca87a22d359052eecd22fc6b901fb37d9d11"
+dependencies = [
+ "bytes",
+ "cfg_aliases",
+ "pin-project-lite",
+ "quinn-proto",
+ "quinn-udp",
+ "rustc-hash",
+ "rustls",
+ "socket2 0.5.10",
+ "thiserror 2.0.21",
+ "tokio",
+ "tracing",
+ "web-time",
+]
+
+[[package]]
+name = "quinn-proto"
+version = "0.11.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0e750cca55fe4f0439a15d0bb529da9651e79993e8e72c61a899a36d462befbe"
+dependencies = [
+ "aws-lc-rs",
+ "bytes",
+ "getrandom 0.4.3",
+ "lru-slab",
+ "rand 0.10.4",
+ "rand_pcg",
+ "ring",
+ "rustc-hash",
+ "rustls",
+ "rustls-pki-types",
+ "slab",
+ "thiserror 2.0.21",
+ "tinyvec",
+ "tracing",
+ "web-time",
+]
+
+[[package]]
+name = "quinn-udp"
+version = "0.5.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "af66907df18639dcf4db56ca65490cabc4b27a97dbadd96f2926cca73298f016"
+dependencies = [
+ "cfg_aliases",
+ "libc",
+ "once_cell",
+ "socket2 0.5.10",
+ "tracing",
+ "windows-sys 0.52.0",
+]
+
+[[package]]
 name = "quote"
 version = "1.0.47"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6171,6 +6267,7 @@ dependencies = [
  "log",
  "percent-encoding",
  "pin-project-lite",
+ "quinn",
  "rustls",
  "rustls-pki-types",
  "rustls-platform-verifier",
@@ -6270,6 +6367,7 @@ version = "0.23.46"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "48e13bd8c0e9365c43cfa5c9e8f9ad49d3c8444926c9aac819e0e4dc503c8fdf"
 dependencies = [
+ "aws-lc-rs",
  "log",
  "once_cell",
  "ring",
@@ -6334,6 +6432,7 @@ version = "0.103.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3a0760a887c14823fca5a1c970b01d47c328c696c0c64829d1df50e8f853fd5"
 dependencies = [
+ "aws-lc-rs",
  "ring",
  "rustls-pki-types",
  "untrusted",
